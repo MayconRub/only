@@ -1,0 +1,20 @@
+{
+  "name": "Premium Social",
+  "short_name": "Premium",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#E11D48",
+  "icons": [
+    {
+      "src": "https://api.dicebear.com/7.x/avataaars/svg?seed=app",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://api.dicebear.com/7.x/avataaars/svg?seed=app",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -204,99 +204,157 @@ const BottomNav = ({ active, onChange }: { active: Screen, onChange: (s: Screen)
 
 // --- Screens ---
 
-const ScreenFeed = ({ profile }: { profile: any }) => (
-  <div className="pt-20 pb-24 max-w-2xl mx-auto">
-    {/* Stories */}
-    <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 py-6 bg-white border-b border-primary/5">
-      <div className="flex flex-col items-center gap-2 flex-shrink-0">
-        <div className="relative p-[3px] rounded-full story-ring">
-          <div className="p-0.5 bg-white rounded-full">
-            <img src={profile?.avatar_url || ELENA.avatar} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
-          </div>
-          <div className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 border-2 border-white">
-            <PlusCircle size={14} />
-          </div>
-        </div>
-        <span className="text-[10px] font-bold text-on-surface">Você</span>
+const ScreenFeed = ({ profile }: { profile: any }) => {
+  const [posts, setPosts] = useState<any[]>([]);
+  const [stories, setStories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [feedData, storiesData] = await Promise.all([
+          supabaseService.getFeed(),
+          supabaseService.getStories()
+        ]);
+        setPosts(feedData || []);
+        setStories(storiesData || []);
+      } catch (err) {
+        console.error('Erro ao carregar feed:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="pt-20 pb-24 flex items-center justify-center min-h-[50vh]">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
       </div>
-      {['Valentina', 'Kael', 'Mariana', 'Thiago', 'Lucas', 'Bia'].map((name) => (
-        <div key={name} className="flex flex-col items-center gap-2 flex-shrink-0">
-          <div className="p-[3px] rounded-full story-ring">
+    );
+  }
+
+  return (
+    <div className="pt-20 pb-24 max-w-2xl mx-auto">
+      {/* Stories */}
+      <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 py-6 bg-white border-b border-primary/5">
+        <div className="flex flex-col items-center gap-2 flex-shrink-0">
+          <div className="relative p-[3px] rounded-full story-ring">
             <div className="p-0.5 bg-white rounded-full">
-              <img src={`https://picsum.photos/seed/${name}/200`} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
+              <img src={profile?.avatar_url || ELENA.avatar} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
+            </div>
+            <div className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 border-2 border-white">
+              <PlusCircle size={14} />
             </div>
           </div>
-          <span className="text-[10px] font-bold text-on-surface/60">{name}</span>
+          <span className="text-[10px] font-bold text-on-surface">Você</span>
         </div>
-      ))}
-    </div>
-
-    {/* Posts */}
-    <div className="space-y-4 py-4">
-      {POSTS.map(post => (
-        <article key={post.id} className="bg-white shadow-sm">
-          <div className="flex items-center justify-between p-4">
-            <div className="flex items-center gap-3">
-              <img src={post.creator.avatar} className="w-10 h-10 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
-              <div>
-                <div className="flex items-center gap-1">
-                  <p className="font-bold text-sm">{post.creator.name}</p>
-                  <CheckCircle2 size={12} className="text-primary fill-primary/10" />
-                </div>
-                <p className="text-[10px] text-on-surface/40 font-bold uppercase tracking-wider">{post.time}</p>
+        {stories.map((story) => (
+          <div key={story.id} className="flex flex-col items-center gap-2 flex-shrink-0">
+            <div className="p-[3px] rounded-full story-ring">
+              <div className="p-0.5 bg-white rounded-full">
+                <img src={story.profiles?.avatar_url || ELENA.avatar} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
               </div>
             </div>
-            <MoreHorizontal className="text-on-surface/40 cursor-pointer" />
+            <span className="text-[10px] font-bold text-on-surface/60">{story.profiles?.username || 'user'}</span>
           </div>
-          
-          <div className="aspect-square relative overflow-hidden">
-            <img src={post.image} className={`w-full h-full object-cover ${post.isLocked ? 'blur-3xl opacity-60' : ''}`} referrerPolicy="no-referrer" />
-            {post.isLocked && (
-              <div className="absolute inset-0 flex items-center justify-center p-8">
-                <div className="bg-white/40 backdrop-blur-xl p-8 rounded-[2.5rem] flex flex-col items-center text-center shadow-2xl border border-white/40">
-                  <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-6">
-                    <Lock className="text-primary" size={32} />
+        ))}
+        {stories.length === 0 && ['Valentina', 'Kael', 'Mariana'].map((name) => (
+          <div key={name} className="flex flex-col items-center gap-2 flex-shrink-0">
+            <div className="p-[3px] rounded-full story-ring">
+              <div className="p-0.5 bg-white rounded-full">
+                <img src={`https://picsum.photos/seed/${name}/200`} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
+              </div>
+            </div>
+            <span className="text-[10px] font-bold text-on-surface/60">{name}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Posts */}
+      <div className="space-y-4 py-4">
+        {posts.length > 0 ? posts.map(post => (
+          <article key={post.id} className="bg-white shadow-sm">
+            <div className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-3">
+                <img src={post.profiles?.avatar_url || ELENA.avatar} className="w-10 h-10 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
+                <div>
+                  <div className="flex items-center gap-1">
+                    <p className="font-bold text-sm">{post.profiles?.full_name || 'Criador'}</p>
+                    {post.profiles?.is_verified && <CheckCircle2 size={12} className="text-primary fill-primary/10" />}
                   </div>
-                  <h3 className="text-xl font-bold mb-2">Conteúdo Exclusivo</h3>
-                  <p className="text-sm text-on-surface/60 mb-8">Assine o nível premium para ter acesso total.</p>
-                  <button className="w-full py-4 px-8 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all text-sm uppercase tracking-widest">
-                    DESBLOQUEAR POR {post.price}
-                  </button>
+                  <p className="text-[10px] text-on-surface/40 font-bold uppercase tracking-wider">
+                    {new Date(post.created_at).toLocaleDateString()}
+                  </p>
                 </div>
               </div>
-            )}
-            {post.isVideo && !post.isLocked && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
-                  <Play className="text-white fill-white" size={40} />
+              <MoreHorizontal className="text-on-surface/40 cursor-pointer" />
+            </div>
+            
+            <div className="aspect-square relative overflow-hidden">
+              <img src={post.image_url} className={`w-full h-full object-cover ${post.is_locked ? 'blur-3xl opacity-60' : ''}`} referrerPolicy="no-referrer" />
+              {post.is_locked && (
+                <div className="absolute inset-0 flex items-center justify-center p-8">
+                  <div className="bg-white/40 backdrop-blur-xl p-8 rounded-[2.5rem] flex flex-col items-center text-center shadow-2xl border border-white/40">
+                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+                      <Lock className="text-primary" size={32} />
+                    </div>
+                    <h3 className="text-xl font-bold mb-2">Conteúdo Exclusivo</h3>
+                    <p className="text-sm text-on-surface/60 mb-8">Assine o nível premium para ter acesso total.</p>
+                    <button className="w-full py-4 px-8 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all text-sm uppercase tracking-widest">
+                      DESBLOQUEAR POR {post.price || 'R$ 15,00'}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-6">
-                <Heart className="text-on-surface cursor-pointer" fill={post.id === '1' ? '#E11D48' : 'none'} stroke={post.id === '1' ? '#E11D48' : 'currentColor'} />
-                <MessageCircle className="text-on-surface cursor-pointer" />
-                <Send className="text-on-surface cursor-pointer" />
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-6">
+                  <Heart className="text-on-surface cursor-pointer" />
+                  <MessageCircle className="text-on-surface cursor-pointer" />
+                  <Send className="text-on-surface cursor-pointer" />
+                </div>
+                <Bookmark className="text-on-surface cursor-pointer" />
               </div>
-              <Bookmark className="text-on-surface cursor-pointer" />
+              <div className="space-y-1">
+                <p className="text-sm text-on-surface/80 leading-relaxed">
+                  <span className="font-bold">{post.profiles?.full_name}</span> {post.caption}
+                </p>
+              </div>
             </div>
-            <div className="space-y-1">
-              <p className="text-sm font-bold">{post.likes} curtidas</p>
-              <p className="text-sm text-on-surface/80 leading-relaxed">
-                <span className="font-bold">{post.creator.name}</span> {post.caption}
-              </p>
-            </div>
+          </article>
+        )) : (
+          <div className="text-center py-20 px-6">
+            <p className="text-on-surface/40 font-bold">Nenhum post encontrado no momento.</p>
           </div>
-        </article>
-      ))}
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const ScreenProfile = ({ onEdit, profile }: { onEdit: () => void, profile: any }) => {
+  const [posts, setPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUserPosts = async () => {
+      if (!profile?.id) return;
+      try {
+        const data = await supabaseService.getPostsByUserId(profile.id);
+        setPosts(data || []);
+      } catch (err) {
+        console.error('Erro ao carregar posts do usuário:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUserPosts();
+  }, [profile?.id]);
+
   if (!profile) {
     return (
       <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto flex flex-col items-center justify-center min-h-[50vh]">
@@ -319,7 +377,7 @@ const ScreenProfile = ({ onEdit, profile }: { onEdit: () => void, profile: any }
 
         <div className="flex justify-center items-center gap-10 mb-10 py-6 px-8 bg-white rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5">
           <div className="text-center">
-            <span className="block text-xl font-bold">{ELENA.stats?.posts}</span>
+            <span className="block text-xl font-bold">{posts.length}</span>
             <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
           </div>
           <div className="w-px h-8 bg-primary/10"></div>
@@ -356,187 +414,176 @@ const ScreenProfile = ({ onEdit, profile }: { onEdit: () => void, profile: any }
       </div>
 
       <section className="max-w-5xl mx-auto px-4">
-        <div className="grid grid-cols-3 gap-2">
-          <div className="col-span-2 row-span-2 relative overflow-hidden rounded-2xl bg-white aspect-square">
-            <img src="https://images.unsplash.com/photo-1539109132314-34a9c615b2b1?auto=format&fit=crop&q=80&w=800" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-            <div className="absolute top-4 right-4">
-              <div className="bg-black/20 backdrop-blur-md p-2 rounded-full text-white">
-                <Heart size={18} fill="white" />
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        ) : posts.length > 0 ? (
+          <div className="grid grid-cols-3 gap-2">
+            {posts.map(post => (
+              <div key={post.id} className="aspect-square overflow-hidden rounded-2xl bg-white shadow-sm relative">
+                <img src={post.image_url} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                {post.is_locked && (
+                  <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center text-white">
+                    <Lock size={18} fill="white" />
+                  </div>
+                )}
               </div>
-            </div>
+            ))}
           </div>
-          <div className="relative aspect-square overflow-hidden rounded-2xl bg-white">
-            <div className="absolute inset-0 bg-primary/40 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center text-white">
-              <Lock size={24} fill="white" />
-              <span className="text-[8px] font-bold uppercase tracking-widest mt-1">Exclusivo</span>
-            </div>
-            <img src="https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=400" className="w-full h-full object-cover blur-md" referrerPolicy="no-referrer" />
+        ) : (
+          <div className="text-center py-20">
+            <p className="text-on-surface/40 font-bold">Nenhuma criação ainda.</p>
           </div>
-          <div className="aspect-square overflow-hidden rounded-2xl bg-white shadow-sm">
-            <img src="https://images.unsplash.com/photo-1529139513477-323c66b8d5b5?auto=format&fit=crop&q=80&w=400" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-          </div>
-          <div className="aspect-square overflow-hidden rounded-2xl bg-white shadow-sm relative">
-            <div className="absolute top-3 left-3 z-10 text-white">
-              <Play size={18} fill="white" />
-            </div>
-            <img src="https://images.unsplash.com/photo-1492707892479-7bc8d5a4ee93?auto=format&fit=crop&q=80&w=400" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-          </div>
-          <div className="aspect-square overflow-hidden rounded-2xl bg-white shadow-sm">
-            <img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=400" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-          </div>
-          <div className="aspect-square overflow-hidden rounded-2xl bg-white shadow-sm">
-            <img src="https://images.unsplash.com/photo-1554048612-b6a482bc67e5?auto=format&fit=crop&q=80&w=400" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-          </div>
-          <div className="aspect-square overflow-hidden rounded-2xl bg-white shadow-sm">
-            <img src="https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&q=80&w=400" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-          </div>
-        </div>
+        )}
       </section>
     </div>
   );
 };
 
-const ScreenActivity = () => (
-  <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
-    <section className="mb-8 pt-8">
-      <h2 className="text-4xl font-extrabold tracking-tight mb-1">Atividade</h2>
-      <p className="text-on-surface/60 text-sm font-medium">Sua jornada criativa em tempo real.</p>
-    </section>
+const ScreenActivity = ({ user }: { user: any }) => {
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-    <div className="space-y-10">
-      <div>
-        <h3 className="text-[10px] font-bold uppercase tracking-widest text-on-surface/30 mb-4">Hoje</h3>
-        <div className="space-y-3">
-          {NOTIFICATIONS.map(notif => (
-            <div key={notif.id} className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-primary/5">
-              <div className="relative">
-                <img src={notif.user.avatar} className="w-12 h-12 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
-                {notif.user.isVerified && (
-                  <span className="absolute -bottom-1 -right-1 bg-primary text-white rounded-full p-0.5 border-2 border-white">
-                    <CheckCircle2 size={10} fill="white" />
-                  </span>
-                )}
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      if (!user?.id) return;
+      try {
+        const data = await supabaseService.getNotifications(user.id);
+        setNotifications(data || []);
+      } catch (err) {
+        console.error('Erro ao carregar notificações:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchNotifications();
+  }, [user?.id]);
+
+  if (loading) {
+    return (
+      <div className="pt-20 pb-24 flex items-center justify-center min-h-[50vh]">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
+      <section className="mb-8 pt-8">
+        <h2 className="text-4xl font-extrabold tracking-tight mb-1">Atividade</h2>
+        <p className="text-on-surface/60 text-sm font-medium">Sua jornada criativa em tempo real.</p>
+      </section>
+
+      <div className="space-y-10">
+        {notifications.length > 0 ? (
+          <div>
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-on-surface/30 mb-4">Recentes</h3>
+            <div className="space-y-3">
+              {notifications.map(notif => (
+                <div key={notif.id} className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-primary/5">
+                  <div className="relative">
+                    <img src={notif.actor?.avatar_url || ELENA.avatar} className="w-12 h-12 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
+                    {notif.actor?.is_verified && (
+                      <span className="absolute -bottom-1 -right-1 bg-primary text-white rounded-full p-0.5 border-2 border-white">
+                        <CheckCircle2 size={10} fill="white" />
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium leading-relaxed text-on-surface">
+                      <span className="font-bold">{notif.actor?.username || 'Alguém'}</span> {notif.content}
+                    </p>
+                    <span className="text-[10px] text-on-surface/40 mt-0.5 block font-bold uppercase tracking-tighter">
+                      {new Date(notif.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-20">
+            <p className="text-on-surface/40 font-bold">Nenhuma atividade recente.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const ScreenMessages = ({ user }: { user: any }) => {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchMessages = async () => {
+      if (!user?.id) return;
+      try {
+        const data = await supabaseService.getMessages(user.id);
+        setMessages(data || []);
+      } catch (err) {
+        console.error('Erro ao carregar mensagens:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMessages();
+  }, [user?.id]);
+
+  if (loading) {
+    return (
+      <div className="pt-20 pb-24 flex items-center justify-center min-h-[50vh]">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pt-20 pb-24 max-w-2xl mx-auto px-6">
+      <section className="mb-8 pt-8">
+        <h1 className="text-4xl font-extrabold tracking-tight mb-1">Mensagens</h1>
+        <p className="text-on-surface/60 text-sm font-medium">Gerencie suas conexões e conversas exclusivas.</p>
+      </section>
+
+      <div className="flex gap-2 overflow-x-auto no-scrollbar mb-6">
+        <button className="px-5 py-2 rounded-full premium-gradient text-white font-bold text-xs shadow-sm">Todas</button>
+        <button className="px-5 py-2 rounded-full bg-white text-on-surface/60 font-bold text-xs border border-primary/5">Não Lidas</button>
+      </div>
+
+      <div className="space-y-3">
+        {messages.length > 0 ? messages.map(msg => (
+          <div key={msg.id} className="group relative flex items-center gap-4 p-4 rounded-2xl bg-white transition-all hover:shadow-md cursor-pointer border border-primary/5">
+            <div className="relative flex-shrink-0">
+              <img 
+                src={msg.sender_id === user.id ? msg.receiver?.avatar_url : msg.sender?.avatar_url || ELENA.avatar} 
+                className="w-14 h-14 rounded-full object-cover border border-primary/10 p-0.5" 
+                referrerPolicy="no-referrer" 
+              />
+            </div>
+            <div className="flex-grow min-w-0">
+              <div className="flex justify-between items-baseline mb-0.5">
+                <h3 className="font-bold text-base truncate text-on-surface">
+                  {msg.sender_id === user.id ? msg.receiver?.username : msg.sender?.username}
+                </h3>
+                <span className="text-[10px] font-bold text-on-surface/40 uppercase tracking-tighter">
+                  {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
               </div>
-              <div className="flex-1">
-                {notif.badge && (
-                  <span className="bg-primary/10 text-primary text-[8px] font-black px-2 py-0.5 rounded-full tracking-wider mb-1 inline-block uppercase">
-                    {notif.badge}
-                  </span>
-                )}
-                <p className="text-xs font-medium leading-relaxed text-on-surface">
-                  <span className="font-bold">{notif.user.name}</span> {notif.content}
-                </p>
-                <span className="text-[10px] text-on-surface/40 mt-0.5 block font-bold uppercase tracking-tighter">{notif.time}</span>
-              </div>
-              {notif.thumbnail && (
-                <img src={notif.thumbnail} className="w-12 h-12 rounded-lg object-cover" referrerPolicy="no-referrer" />
-              )}
+              <p className="text-xs truncate text-on-surface/60 font-medium">
+                {msg.content}
+              </p>
             </div>
-          ))}
-        </div>
-      </div>
-      
-      <div>
-        <h3 className="text-[10px] font-bold uppercase tracking-widest text-on-surface/30 mb-4">Ontem</h3>
-        <div className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-primary/5 opacity-60">
-          <img src="https://picsum.photos/seed/user/100" className="w-12 h-12 rounded-full object-cover" referrerPolicy="no-referrer" />
-          <div className="flex-1">
-            <p className="text-xs font-medium text-on-surface">
-              <span className="font-bold">Marco Aurélio</span> comentou no seu post: "Incrível!"
-            </p>
-            <span className="text-[10px] text-on-surface/40 mt-0.5 block font-bold uppercase tracking-tighter">Há 24 horas</span>
           </div>
-        </div>
+        )) : (
+          <div className="text-center py-20">
+            <p className="text-on-surface/40 font-bold">Nenhuma mensagem ainda.</p>
+          </div>
+        )}
       </div>
     </div>
-  </div>
-);
-
-const ScreenMessages = () => (
-  <div className="pt-20 pb-24 max-w-2xl mx-auto px-6">
-    <section className="mb-8 pt-8">
-      <h1 className="text-4xl font-extrabold tracking-tight mb-1">Mensagens</h1>
-      <p className="text-on-surface/60 text-sm font-medium">Gerencie suas conexões e conversas exclusivas.</p>
-    </section>
-
-    <div className="flex gap-2 overflow-x-auto no-scrollbar mb-6">
-      <button className="px-5 py-2 rounded-full premium-gradient text-white font-bold text-xs shadow-sm">Todas</button>
-      <button className="px-5 py-2 rounded-full bg-white text-on-surface/60 font-bold text-xs border border-primary/5">Não Lidas</button>
-      <button className="px-5 py-2 rounded-full bg-white text-on-surface/60 font-bold text-xs border border-primary/5 flex items-center gap-1.5">
-        <Star size={14} className="text-primary" fill="currentColor" />
-        Premium
-      </button>
-    </div>
-
-    <div className="space-y-3">
-      {MESSAGES.map(msg => (
-        <div key={msg.id} className="group relative flex items-center gap-4 p-4 rounded-2xl bg-white transition-all hover:shadow-md cursor-pointer border border-primary/5">
-          <div className="relative flex-shrink-0">
-            <img src={msg.user.avatar} className={`w-14 h-14 rounded-full object-cover border border-primary/10 p-0.5 ${msg.isLocked ? 'grayscale opacity-50' : ''}`} referrerPolicy="no-referrer" />
-            {msg.isOnline && <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></div>}
-          </div>
-          <div className="flex-grow min-w-0">
-            <div className="flex justify-between items-baseline mb-0.5">
-              <h3 className={`font-bold text-base truncate ${msg.isLocked ? 'text-on-surface/60' : 'text-on-surface'}`}>{msg.user.name}</h3>
-              <span className="text-[10px] font-bold text-on-surface/40 uppercase tracking-tighter">{msg.time}</span>
-            </div>
-            <p className={`text-xs truncate ${msg.isLocked ? 'text-primary font-bold' : 'text-on-surface/60 font-medium'}`}>
-              {msg.isLocked ? (
-                <span className="flex items-center gap-1"><Lock size={12} /> {msg.lastMessage}</span>
-              ) : msg.lastMessage}
-            </p>
-          </div>
-          {msg.unreadCount && (
-            <div className="bg-primary text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">
-              {msg.unreadCount}
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-
-    <section className="mt-12">
-      <div className="flex justify-between items-end mb-6">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight">Descobrir Novos</h2>
-          <p className="text-xs text-on-surface/60 font-medium">Recomendações baseadas no seu perfil</p>
-        </div>
-        <button className="text-primary font-bold text-xs flex items-center gap-0.5">Ver todos <ChevronRight size={14} /></button>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="relative h-48 rounded-2xl overflow-hidden group">
-          <img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=400" className="absolute inset-0 w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
-          <div className="absolute bottom-0 left-0 p-4 w-full">
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <span className="w-1.5 h-1.5 bg-primary rounded-full"></span>
-              <span className="text-[8px] font-black text-white uppercase tracking-widest">Fashion</span>
-            </div>
-            <p className="text-white font-bold text-sm">Alana Costa</p>
-          </div>
-        </div>
-        <div className="grid grid-rows-2 gap-3">
-          <div className="relative rounded-2xl overflow-hidden bg-white flex items-center p-3 gap-3 border border-primary/5">
-            <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200" className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
-            <div>
-              <p className="font-bold text-xs">Lucas M.</p>
-              <p className="text-[8px] font-black text-primary uppercase tracking-widest">Música</p>
-            </div>
-          </div>
-          <div className="relative rounded-2xl overflow-hidden bg-primary/5 flex items-center p-3 gap-3 border border-primary/10">
-            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm">
-              <PlusCircle size={18} className="text-primary" />
-            </div>
-            <div>
-              <p className="font-bold text-xs text-primary">Explorar</p>
-              <p className="text-[8px] font-black text-primary/70 uppercase tracking-widest">Tendências</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  </div>
-);
+  );
+};
 
 const ScreenEditProfile = ({ onBack, profile, onUpdate }: { onBack: () => void, profile: any, onUpdate: (updates: any) => void }) => {
   const [fullName, setFullName] = useState(profile?.full_name || '');
@@ -919,8 +966,8 @@ export default function App() {
     switch (screen) {
       case 'feed': return <ScreenFeed profile={profile} />;
       case 'profile': return <ScreenProfile onEdit={() => setScreen('edit-profile')} profile={profile} />;
-      case 'activity': return <ScreenActivity />;
-      case 'messages': return <ScreenMessages />;
+      case 'activity': return <ScreenActivity user={user} />;
+      case 'messages': return <ScreenMessages user={user} />;
       case 'edit-profile': return (
         <ScreenEditProfile 
           onBack={() => setScreen('profile')} 

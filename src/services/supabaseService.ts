@@ -130,6 +130,17 @@ export const supabaseService = {
     return data;
   },
 
+  async getPostsByUserId(userId: string) {
+    const { data, error } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('author_id', userId)
+      .eq('type', 'post')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
   // --- Messages ---
   async getMessages(userId: string) {
     const { data, error } = await supabase
