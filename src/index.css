@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Noto Serif", ui-serif, Georgia, serif;
+
+  --color-primary: #E11D48;
+  --color-primary-dim: #BE123C;
+  --color-primary-container: #FFE4E6;
+  --color-on-primary-container: #9F1239;
+  
+  --color-secondary: #9D174D;
+  --color-secondary-container: #FCE7F3;
+  
+  --color-background: #FFF1F2;
+  --color-surface: #FFFFFF;
+  --color-surface-variant: #FFE4E6;
+  --color-on-surface: #4C0519;
+  --color-on-surface-variant: #881337;
+  
+  --color-outline: #FB7185;
+  --color-outline-variant: #FDA4AF;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-on-surface font-sans antialiased;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.glass-header {
+  @apply bg-white/80 backdrop-blur-xl border-b border-primary/5;
+}
+
+.premium-gradient {
+  background: linear-gradient(135deg, #E11D48 0%, #F43F5E 100%);
+}
+
+.story-ring {
+  background: linear-gradient(45deg, #FDA4AF, #E11D48, #9D174D);
+}
+
+.locked-blur {
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+}
+

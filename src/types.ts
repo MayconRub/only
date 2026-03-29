@@ -1,0 +1,50 @@
+export type Screen = 'feed' | 'profile' | 'activity' | 'messages' | 'login' | 'register' | 'edit-profile';
+
+export interface Creator {
+  id: string;
+  name: string;
+  username: string;
+  avatar: string;
+  bio?: string;
+  stats?: {
+    posts: string;
+    followers: string;
+    likes: string;
+  };
+}
+
+export interface Post {
+  id: string;
+  creator: Creator;
+  image: string;
+  likes: string;
+  caption: string;
+  time: string;
+  isLocked?: boolean;
+  isVideo?: boolean;
+  price?: string;
+}
+
+export interface Notification {
+  id: string;
+  type: 'sale' | 'subscription' | 'like' | 'comment';
+  user: {
+    name: string;
+    avatar: string;
+    isVerified?: boolean;
+  };
+  content: string;
+  time: string;
+  thumbnail?: string;
+  badge?: string;
+}
+
+export interface Message {
+  id: string;
+  user: Creator;
+  lastMessage: string;
+  time: string;
+  unreadCount?: number;
+  isLocked?: boolean;
+  isOnline?: boolean;
+}
