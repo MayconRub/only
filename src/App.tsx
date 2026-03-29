@@ -142,7 +142,7 @@ const MESSAGES: Message[] = [
 
 // --- Components ---
 
-const TopNav = ({ title = "CRIADOR", showBack = false, onBack = () => {}, supabaseStatus, profile }: { title?: string, showBack?: boolean, onBack?: () => void, supabaseStatus: 'checking' | 'connected' | 'error', profile: any }) => (
+const TopNav = ({ title = "ONLY MOC", showBack = false, onBack = () => {}, supabaseStatus, profile, onRetry }: { title?: string, showBack?: boolean, onBack?: () => void, supabaseStatus: 'checking' | 'connected' | 'error', profile: any, onRetry?: () => void }) => (
   <header className="fixed top-0 w-full flex justify-between items-center px-6 py-4 glass-header z-50">
     <div className="flex items-center gap-4">
       {showBack ? (
@@ -159,9 +159,12 @@ const TopNav = ({ title = "CRIADOR", showBack = false, onBack = () => {}, supaba
       </div>
     </div>
     <div className="flex items-center gap-4">
-      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${
+      <button 
+        onClick={onRetry}
+        disabled={supabaseStatus === 'checking'}
+        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border transition-all active:scale-95 ${
         supabaseStatus === 'connected' ? 'bg-green-50 text-green-600 border-green-200' : 
-        supabaseStatus === 'error' ? 'bg-red-50 text-red-600 border-red-200' : 
+        supabaseStatus === 'error' ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100' : 
         'bg-gray-50 text-gray-400 border-gray-200'
       }`}>
         <div className={`w-1.5 h-1.5 rounded-full ${
@@ -169,8 +172,8 @@ const TopNav = ({ title = "CRIADOR", showBack = false, onBack = () => {}, supaba
           supabaseStatus === 'error' ? 'bg-red-500' : 
           'bg-gray-400 animate-pulse'
         }`}></div>
-        {supabaseStatus === 'connected' ? 'DB Online' : supabaseStatus === 'error' ? 'DB Offline' : 'Checking DB'}
-      </div>
+        {supabaseStatus === 'connected' ? 'DB Online' : supabaseStatus === 'error' ? 'DB Offline (Retry)' : 'Checking DB'}
+      </button>
       <button className="text-on-surface hover:opacity-80 transition-opacity">
         <Search size={24} />
       </button>
@@ -894,7 +897,7 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: (user: any) =
     <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12 bg-background">
       <div className="w-full max-w-md space-y-12">
         <div className="flex flex-col items-center space-y-6">
-          <div className="text-4xl font-black premium-gradient bg-clip-text text-transparent tracking-tighter">CRIADOR</div>
+          <div className="text-4xl font-black premium-gradient bg-clip-text text-transparent tracking-tighter">ONLY MOC</div>
           <div className="text-center space-y-2">
             <h1 className="text-5xl font-black tracking-tight leading-none text-on-surface">Bem-vindo de volta.</h1>
             <p className="text-on-surface/60 text-base font-bold max-w-[280px] mx-auto">Acesse sua galeria digital e gerencie seu legado.</p>
@@ -989,7 +992,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: (user: 
     <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12 bg-background">
       <div className="w-full max-w-md space-y-10">
         <div className="flex flex-col items-center space-y-6">
-          <div className="text-4xl font-black premium-gradient bg-clip-text text-transparent tracking-tighter">CRIADOR</div>
+          <div className="text-4xl font-black premium-gradient bg-clip-text text-transparent tracking-tighter">ONLY MOC</div>
           <div className="text-center space-y-2">
             <h1 className="text-5xl font-black tracking-tight leading-none text-on-surface">Criar Conta.</h1>
             <p className="text-on-surface/60 text-base font-bold max-w-[280px] mx-auto">Junte-se à elite dos criadores digitais.</p>
@@ -1073,16 +1076,32 @@ export default function App() {
   const [profile, setProfile] = useState<any>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [supabaseStatus, setSupabaseStatus] = useState<'checking' | 'connected' | 'error'>('checking');
+  const [connectionDetails, setConnectionDetails] = useState<string | null>(null);
+
+  const checkConnection = async () => {
+    setSupabaseStatus('checking');
+    setConnectionDetails(null);
+    const result = await testSupabaseConnection();
+    setSupabaseStatus(result.success ? 'connected' : 'error');
+    if (result.details) setConnectionDetails(result.details);
+    
+    // Se falhar, libera o loading inicial para mostrar a tela de login
+    if (!result.success) {
+      setProfileLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const checkConnection = async () => {
-      const result = await testSupabaseConnection();
-      setSupabaseStatus(result.success ? 'connected' : 'error');
-    };
     checkConnection();
+
+    // Timeout de segurança para o loading inicial
+    const loadingTimeout = setTimeout(() => {
+      setProfileLoading(false);
+    }, 8000);
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      clearTimeout(loadingTimeout);
       if (session?.user) {
         setUser(session.user);
         setProfileLoading(true);
@@ -1144,7 +1163,7 @@ export default function App() {
     if (screen === 'activity') return 'ATIVIDADE';
     if (screen === 'messages') return 'MENSAGENS';
     if (screen === 'edit-profile') return 'EDITAR';
-    return 'CRIADOR';
+    return 'ONLY MOC';
   };
 
   const isLoggedIn = !!user;
@@ -1159,7 +1178,45 @@ export default function App() {
           onBack={() => setScreen('profile')} 
           supabaseStatus={supabaseStatus}
           profile={profile}
+          onRetry={checkConnection}
         />
+      )}
+
+      {supabaseStatus === 'error' && (
+        <div className="fixed top-20 left-6 right-6 z-[60] bg-red-50 border border-red-100 p-4 rounded-2xl shadow-lg flex items-start gap-3 animate-in fade-in slide-in-from-top-4">
+          <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center text-red-600 flex-shrink-0">
+            <X size={16} />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs font-black text-red-600 uppercase tracking-widest">Erro de Conexão</p>
+            <p className="text-[10px] font-bold text-red-500 leading-relaxed">
+              Não foi possível conectar ao Supabase. Isso geralmente acontece se o projeto estiver <strong>Pausado</strong> ou se as chaves estiverem incorretas.
+              {connectionDetails && <span className="block mt-1 opacity-60">Diagnóstico: {connectionDetails}</span>}
+            </p>
+            <div className="flex flex-wrap gap-3 mt-2">
+              <button 
+                onClick={checkConnection}
+                className="text-[10px] font-black text-red-600 uppercase tracking-widest underline"
+              >
+                Tentar novamente
+              </button>
+              <button 
+                onClick={() => window.location.reload()}
+                className="text-[10px] font-black text-red-600 uppercase tracking-widest underline"
+              >
+                Reiniciar App
+              </button>
+              <a 
+                href="https://supabase.com/dashboard" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[10px] font-black text-red-600 uppercase tracking-widest underline"
+              >
+                Dashboard Supabase
+              </a>
+            </div>
+          </div>
+        </div>
       )}
       
       <AnimatePresence mode="wait">

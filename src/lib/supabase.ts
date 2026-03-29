@@ -18,19 +18,47 @@ const finalKey = supabaseAnonKey || 'placeholder-key';
 export const supabase = createClient(finalUrl, finalKey);
 
 export const testSupabaseConnection = async () => {
+  const maskedUrl = supabaseUrl ? `${supabaseUrl.substring(0, 12)}...${supabaseUrl.substring(supabaseUrl.length - 12)}` : 'N/A';
+  
   if (!supabaseUrl || !supabaseAnonKey || !isValidUrl(supabaseUrl)) {
-    return { success: false, message: 'Missing or invalid Supabase credentials' };
+    return { 
+      success: false, 
+      message: 'Configurações ausentes ou inválidas.',
+      details: `URL: ${maskedUrl}`
+    };
   }
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 25000);
+
   try {
-    const { error } = await supabase.from('profiles').select('count', { count: 'exact', head: true });
-    if (error) {
-      console.error('Supabase connection error:', error.message);
-      return { success: false, message: error.message };
+    // Try a simple fetch to the REST endpoint first - more reliable for connectivity check
+    const response = await fetch(`${supabaseUrl}/rest/v1/?apikey=${supabaseAnonKey}`, {
+      method: 'GET',
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+
+    if (response.ok || response.status === 404 || response.status === 401) {
+      // If we get any response from Supabase (even 401/404), the connection is alive
+      console.log('Supabase API is reachable!');
+      return { success: true, message: 'Connected' };
     }
-    console.log('Successfully connected to Supabase!');
-    return { success: true, message: 'Connected' };
-  } catch (err) {
-    console.error('Unexpected error connecting to Supabase:', err);
-    return { success: false, message: 'Unexpected error' };
+
+    return { 
+      success: false, 
+      message: `Erro de resposta: ${response.status}`,
+      details: `URL: ${maskedUrl}`
+    };
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    const isTimeout = err.name === 'AbortError' || err.message?.includes('timeout');
+    
+    return { 
+      success: false, 
+      message: isTimeout ? 'O servidor do Supabase não respondeu (Timeout). Tente novamente em 1 minuto.' : 'Erro de rede ou DNS.',
+      details: `Erro: ${err.message} | URL: ${maskedUrl}`
+    };
   }
 };
