@@ -27,7 +27,10 @@ import {
   Star,
   ChevronRight,
   Camera,
-  Link as LinkIcon
+  Link as LinkIcon,
+  X,
+  Image as ImageIcon,
+  Video
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Screen, Post, Notification, Message, Creator } from './types';
@@ -188,7 +191,7 @@ const BottomNav = ({ active, onChange }: { active: Screen, onChange: (s: Screen)
       <Compass size={24} />
       <span className="text-[10px] font-bold">Explorar</span>
     </button>
-    <button className="p-2 bg-primary text-white rounded-full shadow-lg shadow-primary/20 transition-transform active:scale-90">
+    <button onClick={() => onChange('create-post')} className="p-2 bg-primary text-white rounded-full shadow-lg shadow-primary/20 transition-transform active:scale-90">
       <PlusCircle size={28} />
     </button>
     <button onClick={() => onChange('activity')} className={`flex flex-col items-center gap-1 transition-all ${active === 'activity' ? 'text-primary' : 'text-on-surface/40'}`}>
@@ -711,6 +714,162 @@ const ScreenEditProfile = ({ onBack, profile, onUpdate }: { onBack: () => void, 
   );
 };
 
+const ScreenCreatePost = ({ onBack, user }: { onBack: () => void, user: any }) => {
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [caption, setCaption] = useState('');
+  const [isLocked, setIsLocked] = useState(false);
+  const [price, setPrice] = useState('R$ 15,00');
+  const [loading, setLoading] = useState(false);
+  const [type, setType] = useState<'post' | 'story'>('post');
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result as string);
+      };
+      reader.readAsDataURL(selectedFile);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!file || !user) return;
+    setLoading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      // Upload to 'posts' bucket
+      const imageUrl = await supabaseService.uploadFile('posts', filePath, file);
+
+      // Create post record
+      await supabaseService.createPost({
+        author_id: user.id,
+        image_url: imageUrl,
+        caption,
+        type,
+        is_locked: isLocked,
+        price: isLocked ? price : undefined
+      });
+
+      onBack();
+    } catch (err) {
+      console.error('Erro ao criar post:', err);
+      alert('Erro ao criar post. Verifique se o bucket "posts" existe no Supabase e tem permissões públicas.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
+      <div className="flex items-center justify-between mb-8 pt-8">
+        <h1 className="text-4xl font-extrabold tracking-tight">Novo Post</h1>
+        <button onClick={onBack} className="p-2 bg-primary/5 rounded-full text-primary"><X size={24} /></button>
+      </div>
+
+      <div className="space-y-8">
+        <div className="flex gap-4 mb-4">
+          <button 
+            onClick={() => setType('post')}
+            className={`flex-1 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${type === 'post' ? 'premium-gradient text-white shadow-lg' : 'bg-white text-on-surface/40 border border-primary/5'}`}
+          >
+            Feed
+          </button>
+          <button 
+            onClick={() => setType('story')}
+            className={`flex-1 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${type === 'story' ? 'premium-gradient text-white shadow-lg' : 'bg-white text-on-surface/40 border border-primary/5'}`}
+          >
+            Story
+          </button>
+        </div>
+
+        {!preview ? (
+          <label className="aspect-square w-full border-2 border-dashed border-primary/20 rounded-3xl flex flex-col items-center justify-center gap-4 bg-white cursor-pointer hover:bg-primary/5 transition-colors">
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+              <PlusCircle size={32} />
+            </div>
+            <div className="text-center">
+              <p className="font-bold text-on-surface">Selecionar Foto ou Vídeo</p>
+              <p className="text-[10px] text-on-surface/40 uppercase tracking-widest font-black mt-1">Máximo 50MB</p>
+            </div>
+            <input type="file" accept="image/*,video/*" className="hidden" onChange={handleFileChange} />
+          </label>
+        ) : (
+          <div className="relative aspect-square w-full rounded-3xl overflow-hidden bg-black shadow-xl">
+            {file?.type.startsWith('video') ? (
+              <video src={preview} className="w-full h-full object-cover" controls />
+            ) : (
+              <img src={preview} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            )}
+            <button 
+              onClick={() => { setFile(null); setPreview(null); }}
+              className="absolute top-4 right-4 p-2 bg-black/40 backdrop-blur-md rounded-full text-white"
+            >
+              <X size={20} />
+            </button>
+          </div>
+        )}
+
+        <div className="space-y-6">
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Legenda</label>
+            <textarea 
+              className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm text-sm leading-relaxed min-h-[100px] resize-none font-medium text-on-surface/80" 
+              placeholder="Escreva algo sobre este conteúdo..."
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+            />
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl border border-primary/5 shadow-sm space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                  <Lock size={20} />
+                </div>
+                <div>
+                  <p className="font-bold text-sm">Conteúdo Exclusivo</p>
+                  <p className="text-[10px] text-on-surface/40 font-bold uppercase tracking-widest">Apenas para assinantes</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsLocked(!isLocked)}
+                className={`w-12 h-6 rounded-full transition-colors relative ${isLocked ? 'bg-primary' : 'bg-on-surface/10'}`}
+              >
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isLocked ? 'right-1' : 'left-1'}`}></div>
+              </button>
+            </div>
+
+            {isLocked && (
+              <div className="pt-4 border-t border-primary/5 space-y-1.5">
+                <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Preço Sugerido</label>
+                <input 
+                  className="w-full bg-background border border-primary/5 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/10 font-bold" 
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        <button 
+          onClick={handleUpload}
+          disabled={loading || !file}
+          className="w-full premium-gradient text-white font-black py-5 rounded-2xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all uppercase tracking-widest text-sm disabled:opacity-50"
+        >
+          {loading ? 'Publicando...' : 'Publicar Conteúdo'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: (user: any) => void, onNavigateToRegister: () => void }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -968,6 +1127,7 @@ export default function App() {
       case 'profile': return <ScreenProfile onEdit={() => setScreen('edit-profile')} profile={profile} />;
       case 'activity': return <ScreenActivity user={user} />;
       case 'messages': return <ScreenMessages user={user} />;
+      case 'create-post': return <ScreenCreatePost onBack={() => setScreen('feed')} user={user} />;
       case 'edit-profile': return (
         <ScreenEditProfile 
           onBack={() => setScreen('profile')} 

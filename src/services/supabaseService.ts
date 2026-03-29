@@ -141,6 +141,32 @@ export const supabaseService = {
     return data;
   },
 
+  async uploadFile(bucket: string, path: string, file: File) {
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(path, file, {
+        cacheControl: '3600',
+        upsert: true
+      });
+    if (error) throw error;
+    
+    const { data: { publicUrl } } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(path);
+      
+    return publicUrl;
+  },
+
+  async createPost(postData: { author_id: string, image_url: string, caption: string, type: string, is_locked: boolean, price?: string }) {
+    const { data, error } = await supabase
+      .from('posts')
+      .insert([postData])
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
   // --- Messages ---
   async getMessages(userId: string) {
     const { data, error } = await supabase
