@@ -7,6 +7,7 @@ export interface Creator {
   avatar: string;
   cover_image?: string;
   bio?: string;
+  welcome_audio?: string;
   stats?: {
     posts: string;
     followers: string;

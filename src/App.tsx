@@ -13,6 +13,8 @@ import {
   Bookmark, 
   Lock, 
   Play, 
+  Pause,
+  Volume2,
   Home, 
   Compass, 
   PlusCircle, 
@@ -732,6 +734,67 @@ const ScreenFeed = ({
 );
 };
 
+const WelcomeAudioPlayer = ({ audioUrl }: { audioUrl: string }) => {
+  const [isPlaying, setIsPlaying] = React.useState(false);
+  const [progress, setProgress] = React.useState(0);
+  const audioRef = React.useRef<HTMLAudioElement>(null);
+
+  const togglePlay = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      const current = audioRef.current.currentTime;
+      const duration = audioRef.current.duration;
+      if (duration > 0) {
+        setProgress((current / duration) * 100);
+      }
+    }
+  };
+
+  const handleEnded = () => {
+    setIsPlaying(false);
+    setProgress(0);
+  };
+
+  return (
+    <div className="w-full max-w-md mx-auto mb-8 bg-primary/5 border border-primary/10 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
+      <audio 
+        ref={audioRef} 
+        src={audioUrl} 
+        onTimeUpdate={handleTimeUpdate}
+        onEnded={handleEnded}
+      />
+      <button 
+        onClick={togglePlay}
+        className="w-12 h-12 flex-shrink-0 bg-primary text-white rounded-full flex items-center justify-center shadow-md shadow-primary/20 active:scale-95 transition-all"
+      >
+        {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
+      </button>
+      <div className="flex-1">
+        <div className="flex justify-between items-center mb-1">
+          <span className="text-xs font-black uppercase tracking-widest text-primary">Boas-vindas</span>
+          <Volume2 size={14} className="text-primary/60" />
+        </div>
+        <div className="h-2 bg-primary/10 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-primary transition-all duration-100 ease-linear"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ScreenProfile = ({ 
   onEdit, 
   creator, 
@@ -807,6 +870,10 @@ const ScreenProfile = ({
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator.name}</h1>
         <p className="text-base text-primary font-bold mb-8">{creator.bio}</p>
+
+        {creator.welcome_audio && (
+          <WelcomeAudioPlayer audioUrl={creator.welcome_audio} />
+        )}
 
         <div className="flex justify-center items-center gap-4 sm:gap-10 mb-10 py-6 px-4 sm:px-8 bg-white rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5 overflow-hidden">
           <div className="text-center min-w-[60px]">
@@ -991,6 +1058,10 @@ const ScreenPublicProfile = ({ creator, posts, onSubscribe, stories }: { creator
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator.name}</h1>
         <p className="text-base text-primary font-bold mb-8">{creator.bio}</p>
+
+        {creator.welcome_audio && (
+          <WelcomeAudioPlayer audioUrl={creator.welcome_audio} />
+        )}
 
         <div className="flex justify-center items-center gap-4 sm:gap-10 mb-10 py-6 px-4 sm:px-8 bg-white rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5 overflow-hidden">
           <div className="text-center min-w-[60px]">
@@ -1216,6 +1287,7 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
   const [name, setName] = useState(creator.name);
   const [username, setUsername] = useState(creator.username);
   const [bio, setBio] = useState(creator.bio);
+  const [welcomeAudio, setWelcomeAudio] = useState(creator.welcome_audio || '');
   const [avatar, setAvatar] = useState(creator.avatar);
   const [coverImage, setCoverImage] = useState(creator.cover_image || '');
   const [loading, setLoading] = useState(false);
@@ -1287,6 +1359,7 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
         name,
         username,
         bio,
+        welcome_audio: welcomeAudio,
         avatar,
         cover_image: coverImage
       }).eq('id', user.id);
@@ -1372,6 +1445,39 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
               value={bio}
               onChange={(e) => setBio(e.target.value)}
             />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Áudio de Boas-vindas</label>
+            <div className="flex items-center gap-3">
+              <label className="flex-1 cursor-pointer bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus-within:ring-2 focus-within:ring-primary/20 shadow-sm flex items-center justify-between group transition-all">
+                <span className="text-sm font-bold text-on-surface/60 group-hover:text-primary transition-colors truncate">
+                  {welcomeAudio ? 'Áudio selecionado' : 'Fazer upload de áudio (MP3)'}
+                </span>
+                <Volume2 size={18} className="text-primary/40 group-hover:text-primary transition-colors" />
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  accept="audio/*" 
+                  onChange={async (e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      const file = e.target.files[0];
+                      const url = await handleFileUpload(file, 'media');
+                      if (url) setWelcomeAudio(url);
+                    }
+                  }} 
+                  disabled={uploading} 
+                />
+              </label>
+              {welcomeAudio && (
+                <button 
+                  type="button"
+                  onClick={() => setWelcomeAudio('')}
+                  className="p-3.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </div>
           </div>
         </section>
 
