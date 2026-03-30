@@ -256,7 +256,9 @@ const ScreenWallet = ({ onBack }: { onBack: () => void }) => {
   );
 };
 
-const BottomNav = ({ active, onChange }: { active: Screen, onChange: (s: Screen) => void }) => (
+const MASTER_EMAIL = 'mayconrubemx@gmail.com';
+
+const BottomNav = ({ active, onChange, isMaster }: { active: Screen, onChange: (s: Screen) => void, isMaster: boolean }) => (
   <nav className="fixed bottom-0 w-full flex justify-around items-center px-4 py-3 bg-white border-t border-primary/5 z-50">
     <button onClick={() => onChange('feed')} className={`flex flex-col items-center gap-1 transition-all ${active === 'feed' ? 'text-primary' : 'text-on-surface/40'}`}>
       <Home size={24} />
@@ -266,9 +268,13 @@ const BottomNav = ({ active, onChange }: { active: Screen, onChange: (s: Screen)
       <CreditCard size={24} />
       <span className="text-[10px] font-bold">Carteira</span>
     </button>
-    <button onClick={() => onChange('create-post')} className={`p-2 bg-primary text-white rounded-full shadow-lg shadow-primary/20 transition-transform active:scale-90 ${active === 'create-post' ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
-      <PlusCircle size={28} />
-    </button>
+    
+    {isMaster && (
+      <button onClick={() => onChange('create-post')} className={`p-2 bg-primary text-white rounded-full shadow-lg shadow-primary/20 transition-transform active:scale-90 ${active === 'create-post' ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
+        <PlusCircle size={28} />
+      </button>
+    )}
+
     <button onClick={() => onChange('activity')} className={`flex flex-col items-center gap-1 transition-all ${active === 'activity' ? 'text-primary' : 'text-on-surface/40'}`}>
       <Bell size={24} />
       <span className="text-[10px] font-bold">Atividade</span>
@@ -577,7 +583,8 @@ const ScreenFeed = ({
   onDeletePost, 
   onUpdatePost,
   onDeleteStory,
-  onSubscribe
+  onSubscribe,
+  isMaster
 }: { 
   posts: Post[], 
   stories: any[], 
@@ -586,7 +593,8 @@ const ScreenFeed = ({
   onDeletePost: (id: string) => void,
   onUpdatePost: (id: string, caption: string) => void,
   onDeleteStory: (id: string) => void,
-  onSubscribe: () => void
+  onSubscribe: () => void,
+  isMaster: boolean
 }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
@@ -625,20 +633,22 @@ const ScreenFeed = ({
             if (e.target.files?.[0]) onStoryUpload(e.target.files[0]);
           }}
         />
-        <div 
-          className="flex flex-col items-center gap-2 flex-shrink-0 cursor-pointer"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <div className="relative p-[3px] rounded-full story-ring">
-            <div className="p-0.5 bg-white rounded-full">
-              <img src={creator.avatar} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
+        {isMaster && (
+          <div 
+            className="flex flex-col items-center gap-2 flex-shrink-0 cursor-pointer"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <div className="relative p-[3px] rounded-full story-ring">
+              <div className="p-0.5 bg-white rounded-full">
+                <img src={creator.avatar} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
+              </div>
+              <div className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 border-2 border-white">
+                <PlusCircle size={14} />
+              </div>
             </div>
-            <div className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 border-2 border-white">
-              <PlusCircle size={14} />
-            </div>
+            <span className="text-[10px] font-bold text-on-surface">Você</span>
           </div>
-          <span className="text-[10px] font-bold text-on-surface">Você</span>
-        </div>
+        )}
         {stories.map((story, index) => (
           <div 
             key={story.id} 
@@ -804,7 +814,8 @@ const ScreenProfile = ({
   onUpdatePost,
   onSubscribe,
   stories,
-  onDeleteStory
+  onDeleteStory,
+  isMaster
 }: { 
   onEdit: () => void, 
   creator: Creator, 
@@ -814,7 +825,8 @@ const ScreenProfile = ({
   onUpdatePost: (id: string, caption: string) => void,
   onSubscribe: () => void,
   stories: any[],
-  onDeleteStory: (id: string) => void
+  onDeleteStory: (id: string) => void,
+  isMaster: boolean
 }) => {
   const myPosts = posts.filter(p => p.creator.id === creator.id);
   const myStories = stories.filter(s => s.creator_id === creator.id);
@@ -871,26 +883,28 @@ const ScreenProfile = ({
 
         <div className="flex justify-center items-center gap-4 sm:gap-10 mb-10 py-6 px-4 sm:px-8 bg-white rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5 overflow-hidden">
           <div className="text-center min-w-[60px]">
-            <span className="block text-xl font-bold">{myPosts.length}</span>
+            <span className="block text-xl font-bold">{isMaster ? myPosts.length : '0'}</span>
             <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
           </div>
           <div className="w-px h-8 bg-primary/10 flex-shrink-0"></div>
           <div className="text-center min-w-[60px]">
-            <span className="block text-xl font-bold">{creator.stats?.followers || '0'}</span>
+            <span className="block text-xl font-bold">{isMaster ? creator.stats?.followers || '0' : '1'}</span>
             <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Seguidores</span>
           </div>
           <div className="w-px h-8 bg-primary/10 flex-shrink-0"></div>
           <div className="text-center min-w-[60px]">
-            <span className="block text-xl font-bold">{creator.stats?.likes || '0'}</span>
+            <span className="block text-xl font-bold">{isMaster ? creator.stats?.likes || '0' : '0'}</span>
             <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Curtidas</span>
           </div>
         </div>
         
         <div className="flex flex-col gap-3 mb-10 max-w-md mx-auto">
           <div className="flex flex-col sm:flex-row gap-3">
-            <button onClick={onEdit} className="flex-1 py-4 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs">
-              Editar Perfil
-            </button>
+            {isMaster && (
+              <button onClick={onEdit} className="flex-1 py-4 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs">
+                Editar Perfil
+              </button>
+            )}
             <button 
               onClick={() => {
                 const url = `${window.location.origin}/?u=${creator.username}`;
@@ -904,13 +918,15 @@ const ScreenProfile = ({
             </button>
           </div>
           
-          <button 
-            onClick={onSubscribe}
-            className="w-full py-5 bg-black text-white font-black rounded-2xl shadow-xl active:scale-95 transition-all uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-3"
-          >
-            <Crown size={20} className="text-yellow-400" fill="currentColor" />
-            Seja Membro VIP
-          </button>
+          {!isMaster && (
+            <button 
+              onClick={onSubscribe}
+              className="w-full py-5 bg-black text-white font-black rounded-2xl shadow-xl active:scale-95 transition-all uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-3"
+            >
+              <Crown size={20} className="text-yellow-400" fill="currentColor" />
+              Seja Membro VIP
+            </button>
+          )}
         </div>
         
         <button 
@@ -932,57 +948,69 @@ const ScreenProfile = ({
       </div>
 
       <section className="max-w-5xl mx-auto px-4">
-        {myPosts.length > 0 ? (
-          <div className="grid grid-cols-3 gap-2">
-            {myPosts.map((post) => (
-              <div 
-                key={post.id} 
-                className="relative aspect-square overflow-hidden rounded-2xl bg-on-surface/5 shadow-sm group cursor-pointer"
-                onClick={() => !post.isLocked && setSelectedPost(post)}
-              >
-                {post.isVideo ? (
-                  <video 
-                    src={post.image} 
-                    className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${post.isLocked ? 'blur-2xl scale-125 opacity-40' : ''}`} 
-                    preload="metadata"
-                    playsInline
-                    muted
-                  />
-                ) : (
-                  <img 
-                    src={post.image} 
-                    className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${post.isLocked ? 'blur-2xl scale-125 opacity-40' : ''}`} 
-                    referrerPolicy="no-referrer" 
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1633078654544-61b3455b9161?q=80&w=400&auto=format&fit=crop';
-                    }}
-                  />
-                )}
-                {post.isLocked && (
-                  <div className="absolute inset-0 bg-primary/10 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center text-white">
-                    <Lock size={20} fill="white" className="drop-shadow-lg" />
-                    <span className="text-[8px] font-black uppercase tracking-widest mt-1 drop-shadow-md">VIP</span>
-                  </div>
-                )}
-                {post.isVideo && !post.isLocked && (
-                  <div className="absolute top-3 left-3 z-10 text-white">
-                    <Play size={18} fill="white" />
-                  </div>
-                )}
-                <div className="absolute top-3 right-3 z-10">
-                  <div className="bg-black/20 backdrop-blur-md p-1.5 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Heart size={14} fill="white" />
+        {isMaster ? (
+          myPosts.length > 0 ? (
+            <div className="grid grid-cols-3 gap-2">
+              {myPosts.map((post) => (
+                <div 
+                  key={post.id} 
+                  className="relative aspect-square overflow-hidden rounded-2xl bg-on-surface/5 shadow-sm group cursor-pointer"
+                  onClick={() => !post.isLocked && setSelectedPost(post)}
+                >
+                  {post.isVideo ? (
+                    <video 
+                      src={post.image} 
+                      className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${post.isLocked ? 'blur-2xl scale-125 opacity-40' : ''}`} 
+                      preload="metadata"
+                      playsInline
+                      muted
+                    />
+                  ) : (
+                    <img 
+                      src={post.image} 
+                      className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${post.isLocked ? 'blur-2xl scale-125 opacity-40' : ''}`} 
+                      referrerPolicy="no-referrer" 
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1633078654544-61b3455b9161?q=80&w=400&auto=format&fit=crop';
+                      }}
+                    />
+                  )}
+                  {post.isLocked && (
+                    <div className="absolute inset-0 bg-primary/10 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center text-white">
+                      <Lock size={20} fill="white" className="drop-shadow-lg" />
+                      <span className="text-[8px] font-black uppercase tracking-widest mt-1 drop-shadow-md">VIP</span>
+                    </div>
+                  )}
+                  {post.isVideo && !post.isLocked && (
+                    <div className="absolute top-3 left-3 z-10 text-white">
+                      <Play size={18} fill="white" />
+                    </div>
+                  )}
+                  <div className="absolute top-3 right-3 z-10">
+                    <div className="bg-black/20 backdrop-blur-md p-1.5 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Heart size={14} fill="white" />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-20 bg-white rounded-3xl border border-primary/5">
-            <div className="w-16 h-16 bg-primary/5 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Camera className="text-primary/40" size={32} />
+              ))}
             </div>
-            <p className="text-on-surface/40 font-bold uppercase tracking-widest text-xs">Nenhuma publicação ainda</p>
+          ) : (
+            <div className="text-center py-20 bg-white rounded-3xl border border-primary/5">
+              <div className="w-16 h-16 bg-primary/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Camera className="text-primary/40" size={32} />
+              </div>
+              <p className="text-on-surface/40 font-bold uppercase tracking-widest text-xs">Nenhuma publicação ainda</p>
+            </div>
+          )
+        ) : (
+          <div className="py-20 text-center">
+            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Crown className="text-primary" size={32} />
+            </div>
+            <h3 className="text-lg font-black mb-2">Conta de Assinante</h3>
+            <p className="text-xs text-on-surface/50 font-bold uppercase tracking-widest leading-relaxed">
+              Você está logado como assinante.<br/>Aproveite o conteúdo exclusivo do Master!
+            </p>
           </div>
         )}
       </section>
@@ -2028,6 +2056,9 @@ export default function App() {
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [dbStatus, setDbStatus] = React.useState<'checking' | 'connected' | 'error'>('checking');
   const [editingPost, setEditingPost] = React.useState<Post | null>(null);
+  const [userEmail, setUserEmail] = React.useState<string | null>(null);
+
+  const isMaster = userEmail === MASTER_EMAIL;
 
   const handleDeletePost = async (postId: string) => {
     if (!confirm('Tem certeza que deseja excluir esta postagem?')) return;
@@ -2123,6 +2154,7 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setIsLoggedIn(true);
+        setUserEmail(session.user.email || null);
         setScreen(prev => {
           if (['login', 'register'].includes(prev)) {
             const saved = localStorage.getItem('safadinha_screen');
@@ -2138,6 +2170,7 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
         setIsLoggedIn(true);
+        setUserEmail(session.user.email || null);
         setScreen(prev => {
           if (['login', 'register'].includes(prev)) {
             const saved = localStorage.getItem('safadinha_screen');
@@ -2215,13 +2248,34 @@ export default function App() {
         }
 
         // Fetch posts
-        const { data: postsData } = await supabase.from('posts').select('*, creator:profiles(*)').order('created_at', { ascending: false });
+        const { data: masterProfile } = await supabase.from('profiles').select('id').eq('email', MASTER_EMAIL).single();
+        const masterId = masterProfile?.id;
+
+        const { data: postsData } = await supabase
+          .from('posts')
+          .select('*, creator:profiles(*)')
+          .order('created_at', { ascending: false });
+        
         if (postsData) {
-          setPosts(postsData.map((p: any) => ({
+          // Filter posts to only show master's posts if masterId exists
+          const filteredPosts = masterId 
+            ? postsData.filter((p: any) => p.creator_id === masterId)
+            : postsData;
+
+          setPosts(filteredPosts.map((p: any) => ({
             ...p,
             isLocked: p.is_locked,
             isVideo: p.is_video
           })) as any);
+        }
+
+        // Fetch stories
+        const { data: storiesData } = await supabase.from('stories').select('*').order('created_at', { ascending: false });
+        if (storiesData) {
+          const filteredStories = masterId
+            ? storiesData.filter((s: any) => s.creator_id === masterId)
+            : storiesData;
+          setStories(filteredStories);
         }
 
         // Fetch notifications
@@ -2238,10 +2292,6 @@ export default function App() {
             isOnline: m.is_online
           })) as any);
         }
-
-        // Fetch stories
-        const { data: storiesData } = await supabase.from('stories').select('*').order('created_at', { ascending: false });
-        if (storiesData) setStories(storiesData);
       } catch (error) {
         console.error('Error fetching data from Supabase:', error);
       }
@@ -2300,6 +2350,7 @@ export default function App() {
           onUpdatePost={handleUpdatePost}
           onDeleteStory={handleDeleteStory}
           onSubscribe={() => setScreen('payment')}
+          isMaster={isMaster}
         />
       );
       case 'profile': return (
@@ -2313,6 +2364,7 @@ export default function App() {
           onSubscribe={() => setScreen('payment')}
           stories={stories}
           onDeleteStory={handleDeleteStory}
+          isMaster={isMaster}
         />
       );
       case 'public-profile': 
@@ -2339,6 +2391,7 @@ export default function App() {
             onUpdatePost={handleUpdatePost}
             onDeleteStory={handleDeleteStory}
             onSubscribe={() => setScreen('payment')}
+            isMaster={isMaster}
           />
         );
       case 'activity': return <ScreenActivity notifications={notifications} />;
@@ -2357,6 +2410,7 @@ export default function App() {
           onUpdatePost={handleUpdatePost}
           onDeleteStory={handleDeleteStory}
           onSubscribe={() => setScreen('payment')}
+          isMaster={isMaster}
         />
       );
     }
@@ -2409,7 +2463,7 @@ export default function App() {
       </AnimatePresence>
 
       {showNav && (
-        <BottomNav active={screen} onChange={setScreen} />
+        <BottomNav active={screen} onChange={setScreen} isMaster={isMaster} />
       )}
     </div>
   );
