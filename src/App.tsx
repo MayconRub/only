@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Menu, 
   Search, 
@@ -27,15 +27,11 @@ import {
   Star,
   ChevronRight,
   Camera,
-  Link as LinkIcon,
-  X,
-  Image as ImageIcon,
-  Video
+  Link as LinkIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Screen, Post, Notification, Message, Creator } from './types';
 import { supabase } from './lib/supabase';
-import { supabaseService } from './services/supabaseService';
 
 // --- Mock Data ---
 
@@ -142,7 +138,7 @@ const MESSAGES: Message[] = [
 
 // --- Components ---
 
-const TopNav = ({ title = "ONLY MOC", showBack = false, onBack = () => {}, supabaseStatus, profile, onRetry }: { title?: string, showBack?: boolean, onBack?: () => void, supabaseStatus: 'checking' | 'connected' | 'error', profile: any, onRetry?: () => void }) => (
+const TopNav = ({ title = "CRIADOR", showBack = false, onBack = () => {}, avatar }: { title?: string, showBack?: boolean, onBack?: () => void, avatar?: string }) => (
   <header className="fixed top-0 w-full flex justify-between items-center px-6 py-4 glass-header z-50">
     <div className="flex items-center gap-4">
       {showBack ? (
@@ -159,26 +155,11 @@ const TopNav = ({ title = "ONLY MOC", showBack = false, onBack = () => {}, supab
       </div>
     </div>
     <div className="flex items-center gap-4">
-      <button 
-        onClick={onRetry}
-        disabled={supabaseStatus === 'checking'}
-        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border transition-all active:scale-95 ${
-        supabaseStatus === 'connected' ? 'bg-green-50 text-green-600 border-green-200' : 
-        supabaseStatus === 'error' ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100' : 
-        'bg-gray-50 text-gray-400 border-gray-200'
-      }`}>
-        <div className={`w-1.5 h-1.5 rounded-full ${
-          supabaseStatus === 'connected' ? 'bg-green-500' : 
-          supabaseStatus === 'error' ? 'bg-red-500' : 
-          'bg-gray-400 animate-pulse'
-        }`}></div>
-        {supabaseStatus === 'connected' ? 'DB Online' : supabaseStatus === 'error' ? 'DB Offline (Retry)' : 'Checking DB'}
-      </button>
       <button className="text-on-surface hover:opacity-80 transition-opacity">
         <Search size={24} />
       </button>
       <div className="w-8 h-8 rounded-full overflow-hidden border border-primary/20">
-        <img src={profile?.avatar_url || ELENA.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+        <img src={avatar || ELENA.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
       </div>
     </div>
   </header>
@@ -191,10 +172,10 @@ const BottomNav = ({ active, onChange }: { active: Screen, onChange: (s: Screen)
       <span className="text-[10px] font-bold">Início</span>
     </button>
     <button onClick={() => onChange('messages')} className={`flex flex-col items-center gap-1 transition-all ${active === 'messages' ? 'text-primary' : 'text-on-surface/40'}`}>
-      <Compass size={24} />
-      <span className="text-[10px] font-bold">Explorar</span>
+      <MessageCircle size={24} />
+      <span className="text-[10px] font-bold">Mensagens</span>
     </button>
-    <button onClick={() => onChange('create-post')} className="p-2 bg-primary text-white rounded-full shadow-lg shadow-primary/20 transition-transform active:scale-90">
+    <button onClick={() => onChange('create-post')} className={`p-2 bg-primary text-white rounded-full shadow-lg shadow-primary/20 transition-transform active:scale-90 ${active === 'create-post' ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
       <PlusCircle size={28} />
     </button>
     <button onClick={() => onChange('activity')} className={`flex flex-col items-center gap-1 transition-all ${active === 'activity' ? 'text-primary' : 'text-on-surface/40'}`}>
@@ -210,423 +191,365 @@ const BottomNav = ({ active, onChange }: { active: Screen, onChange: (s: Screen)
 
 // --- Screens ---
 
-const ScreenFeed = ({ profile }: { profile: any }) => {
-  const [posts, setPosts] = useState<any[]>([]);
-  const [stories, setStories] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [feedData, storiesData] = await Promise.all([
-          supabaseService.getFeed(),
-          supabaseService.getStories()
-        ]);
-        setPosts(feedData || []);
-        setStories(storiesData || []);
-      } catch (err) {
-        console.error('Erro ao carregar feed:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="pt-20 pb-24 flex items-center justify-center min-h-[50vh]">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+const ScreenFeed = ({ posts }: { posts: Post[] }) => (
+  <div className="pt-20 pb-24 max-w-2xl mx-auto">
+    {/* Stories */}
+    <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 py-6 bg-white border-b border-primary/5">
+      <div className="flex flex-col items-center gap-2 flex-shrink-0">
+        <div className="relative p-[3px] rounded-full story-ring">
+          <div className="p-0.5 bg-white rounded-full">
+            <img src={ELENA.avatar} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
+          </div>
+          <div className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 border-2 border-white">
+            <PlusCircle size={14} />
+          </div>
+        </div>
+        <span className="text-[10px] font-bold text-on-surface">Você</span>
       </div>
-    );
-  }
-
-  return (
-    <div className="pt-20 pb-24 max-w-2xl mx-auto">
-      {/* Stories */}
-      <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 py-6 bg-white border-b border-primary/5">
-        <div className="flex flex-col items-center gap-2 flex-shrink-0">
-          <div className="relative p-[3px] rounded-full story-ring">
+      {['Valentina', 'Kael', 'Mariana', 'Thiago', 'Lucas', 'Bia'].map((name) => (
+        <div key={name} className="flex flex-col items-center gap-2 flex-shrink-0">
+          <div className="p-[3px] rounded-full story-ring">
             <div className="p-0.5 bg-white rounded-full">
-              <img src={profile?.avatar_url || ELENA.avatar} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
-            </div>
-            <div className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 border-2 border-white">
-              <PlusCircle size={14} />
+              <img src={`https://picsum.photos/seed/${name}/200`} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
             </div>
           </div>
-          <span className="text-[10px] font-bold text-on-surface">Você</span>
+          <span className="text-[10px] font-bold text-on-surface/60">{name}</span>
         </div>
-        {stories.map((story) => (
-          <div key={story.id} className="flex flex-col items-center gap-2 flex-shrink-0">
-            <div className="p-[3px] rounded-full story-ring">
-              <div className="p-0.5 bg-white rounded-full">
-                <img src={story.profiles?.avatar_url || ELENA.avatar} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
-              </div>
-            </div>
-            <span className="text-[10px] font-bold text-on-surface/60">{story.profiles?.username || 'user'}</span>
-          </div>
-        ))}
-        {stories.length === 0 && ['Valentina', 'Kael', 'Mariana'].map((name) => (
-          <div key={name} className="flex flex-col items-center gap-2 flex-shrink-0">
-            <div className="p-[3px] rounded-full story-ring">
-              <div className="p-0.5 bg-white rounded-full">
-                <img src={`https://picsum.photos/seed/${name}/200`} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
-              </div>
-            </div>
-            <span className="text-[10px] font-bold text-on-surface/60">{name}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Posts */}
-      <div className="space-y-4 py-4">
-        {posts.length > 0 ? posts.map(post => (
-          <article key={post.id} className="bg-white shadow-sm">
-            <div className="flex items-center justify-between p-4">
-              <div className="flex items-center gap-3">
-                <img src={post.profiles?.avatar_url || ELENA.avatar} className="w-10 h-10 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
-                <div>
-                  <div className="flex items-center gap-1">
-                    <p className="font-bold text-sm">{post.profiles?.full_name || 'Criador'}</p>
-                    {post.profiles?.is_verified && <CheckCircle2 size={12} className="text-primary fill-primary/10" />}
-                  </div>
-                  <p className="text-[10px] text-on-surface/40 font-bold uppercase tracking-wider">
-                    {new Date(post.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-              <MoreHorizontal className="text-on-surface/40 cursor-pointer" />
-            </div>
-            
-            <div className="aspect-square relative overflow-hidden">
-              <img src={post.image_url} className={`w-full h-full object-cover ${post.is_locked ? 'blur-3xl opacity-60' : ''}`} referrerPolicy="no-referrer" />
-              {post.is_locked && (
-                <div className="absolute inset-0 flex items-center justify-center p-8">
-                  <div className="bg-white/40 backdrop-blur-xl p-8 rounded-[2.5rem] flex flex-col items-center text-center shadow-2xl border border-white/40">
-                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-6">
-                      <Lock className="text-primary" size={32} />
-                    </div>
-                    <h3 className="text-xl font-bold mb-2">Conteúdo Exclusivo</h3>
-                    <p className="text-sm text-on-surface/60 mb-8">Assine o nível premium para ter acesso total.</p>
-                    <button className="w-full py-4 px-8 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all text-sm uppercase tracking-widest">
-                      DESBLOQUEAR POR {post.price || 'R$ 15,00'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-6">
-                  <Heart className="text-on-surface cursor-pointer" />
-                  <MessageCircle className="text-on-surface cursor-pointer" />
-                  <Send className="text-on-surface cursor-pointer" />
-                </div>
-                <Bookmark className="text-on-surface cursor-pointer" />
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-on-surface/80 leading-relaxed">
-                  <span className="font-bold">{post.profiles?.full_name}</span> {post.caption}
-                </p>
-              </div>
-            </div>
-          </article>
-        )) : (
-          <div className="text-center py-20 px-6">
-            <p className="text-on-surface/40 font-bold">Nenhum post encontrado no momento.</p>
-          </div>
-        )}
-      </div>
+      ))}
     </div>
-  );
-};
 
-const ScreenProfile = ({ onEdit, profile }: { onEdit: () => void, profile: any }) => {
-  const [posts, setPosts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchUserPosts = async () => {
-      if (!profile?.id) return;
-      try {
-        const data = await supabaseService.getPostsByUserId(profile.id);
-        setPosts(data || []);
-      } catch (err) {
-        console.error('Erro ao carregar posts do usuário:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUserPosts();
-  }, [profile?.id]);
-
-  if (!profile) {
-    return (
-      <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto flex flex-col items-center justify-center min-h-[50vh]">
-        <p className="text-on-surface/60 mb-4">Perfil não carregado.</p>
-        <button onClick={() => window.location.reload()} className="text-primary font-bold">Recarregar</button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="pt-20 pb-24">
-      <section className="max-w-4xl mx-auto px-6 text-center pt-8">
-        <div className="relative inline-block mb-6">
-          <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-full p-[4px] story-ring">
-            <img src={profile?.avatar_url || ELENA.avatar} className="w-full h-full object-cover rounded-full border-4 border-white" referrerPolicy="no-referrer" />
-          </div>
-        </div>
-        <h1 className="text-4xl font-extrabold tracking-tight mb-2">{profile?.full_name || ELENA.name}</h1>
-        <p className="text-base text-primary font-bold mb-8">{profile?.bio || ELENA.bio}</p>
-
-        <div className="flex justify-center items-center gap-10 mb-10 py-6 px-8 bg-white rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5">
-          <div className="text-center">
-            <span className="block text-xl font-bold">{posts.length}</span>
-            <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
-          </div>
-          <div className="w-px h-8 bg-primary/10"></div>
-          <div className="text-center">
-            <span className="block text-xl font-bold">{ELENA.stats?.followers}</span>
-            <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Seguidores</span>
-          </div>
-          <div className="w-px h-8 bg-primary/10"></div>
-          <div className="text-center">
-            <span className="block text-xl font-bold">{ELENA.stats?.likes}</span>
-            <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Curtidas</span>
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12 max-w-md mx-auto">
-          <button className="w-full py-4 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs">
-            Assinar R$ 14,99/mês
-          </button>
-          <button onClick={onEdit} className="w-full py-4 bg-primary/5 text-primary font-bold rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase tracking-widest text-xs">
-            <Mail size={18} />
-            Mensagem
-          </button>
-        </div>
-      </section>
-
-      <div className="sticky top-16 bg-white/80 backdrop-blur-md z-40 border-b border-primary/5 mb-6">
-        <div className="max-w-4xl mx-auto px-6 flex justify-around">
-          <button className="py-4 border-b-2 border-primary text-primary font-bold text-xs uppercase tracking-widest">Criações</button>
-          <button className="py-4 border-b-2 border-transparent text-on-surface/40 font-bold text-xs uppercase tracking-widest">Exclusivos</button>
-          <button className="py-4 border-b-2 border-transparent text-on-surface/40 font-bold text-xs uppercase tracking-widest flex items-center gap-1">
-            Pro <Lock size={12} fill="currentColor" />
-          </button>
-        </div>
-      </div>
-
-      <section className="max-w-5xl mx-auto px-4">
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        ) : posts.length > 0 ? (
-          <div className="grid grid-cols-3 gap-2">
-            {posts.map(post => (
-              <div key={post.id} className="aspect-square overflow-hidden rounded-2xl bg-white shadow-sm relative">
-                <img src={post.image_url} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                {post.is_locked && (
-                  <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center text-white">
-                    <Lock size={18} fill="white" />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-20">
-            <p className="text-on-surface/40 font-bold">Nenhuma criação ainda.</p>
-          </div>
-        )}
-      </section>
-    </div>
-  );
-};
-
-const ScreenActivity = ({ user }: { user: any }) => {
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      if (!user?.id) return;
-      try {
-        const data = await supabaseService.getNotifications(user.id);
-        setNotifications(data || []);
-      } catch (err) {
-        console.error('Erro ao carregar notificações:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchNotifications();
-  }, [user?.id]);
-
-  if (loading) {
-    return (
-      <div className="pt-20 pb-24 flex items-center justify-center min-h-[50vh]">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
-      <section className="mb-8 pt-8">
-        <h2 className="text-4xl font-extrabold tracking-tight mb-1">Atividade</h2>
-        <p className="text-on-surface/60 text-sm font-medium">Sua jornada criativa em tempo real.</p>
-      </section>
-
-      <div className="space-y-10">
-        {notifications.length > 0 ? (
-          <div>
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-on-surface/30 mb-4">Recentes</h3>
-            <div className="space-y-3">
-              {notifications.map(notif => (
-                <div key={notif.id} className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-primary/5">
-                  <div className="relative">
-                    <img src={notif.actor?.avatar_url || ELENA.avatar} className="w-12 h-12 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
-                    {notif.actor?.is_verified && (
-                      <span className="absolute -bottom-1 -right-1 bg-primary text-white rounded-full p-0.5 border-2 border-white">
-                        <CheckCircle2 size={10} fill="white" />
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-medium leading-relaxed text-on-surface">
-                      <span className="font-bold">{notif.actor?.username || 'Alguém'}</span> {notif.content}
-                    </p>
-                    <span className="text-[10px] text-on-surface/40 mt-0.5 block font-bold uppercase tracking-tighter">
-                      {new Date(notif.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
+    {/* Posts */}
+    <div className="space-y-4 py-4">
+      {posts.map(post => (
+        <article key={post.id} className="bg-white shadow-sm">
+          <div className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-3">
+              <img src={post.creator.avatar} className="w-10 h-10 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
+              <div>
+                <div className="flex items-center gap-1">
+                  <p className="font-bold text-sm">{post.creator.name}</p>
+                  <CheckCircle2 size={12} className="text-primary fill-primary/10" />
                 </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="text-center py-20">
-            <p className="text-on-surface/40 font-bold">Nenhuma atividade recente.</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const ScreenMessages = ({ user }: { user: any }) => {
-  const [messages, setMessages] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchMessages = async () => {
-      if (!user?.id) return;
-      try {
-        const data = await supabaseService.getMessages(user.id);
-        setMessages(data || []);
-      } catch (err) {
-        console.error('Erro ao carregar mensagens:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchMessages();
-  }, [user?.id]);
-
-  if (loading) {
-    return (
-      <div className="pt-20 pb-24 flex items-center justify-center min-h-[50vh]">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="pt-20 pb-24 max-w-2xl mx-auto px-6">
-      <section className="mb-8 pt-8">
-        <h1 className="text-4xl font-extrabold tracking-tight mb-1">Mensagens</h1>
-        <p className="text-on-surface/60 text-sm font-medium">Gerencie suas conexões e conversas exclusivas.</p>
-      </section>
-
-      <div className="flex gap-2 overflow-x-auto no-scrollbar mb-6">
-        <button className="px-5 py-2 rounded-full premium-gradient text-white font-bold text-xs shadow-sm">Todas</button>
-        <button className="px-5 py-2 rounded-full bg-white text-on-surface/60 font-bold text-xs border border-primary/5">Não Lidas</button>
-      </div>
-
-      <div className="space-y-3">
-        {messages.length > 0 ? messages.map(msg => (
-          <div key={msg.id} className="group relative flex items-center gap-4 p-4 rounded-2xl bg-white transition-all hover:shadow-md cursor-pointer border border-primary/5">
-            <div className="relative flex-shrink-0">
-              <img 
-                src={msg.sender_id === user.id ? msg.receiver?.avatar_url : msg.sender?.avatar_url || ELENA.avatar} 
-                className="w-14 h-14 rounded-full object-cover border border-primary/10 p-0.5" 
-                referrerPolicy="no-referrer" 
-              />
-            </div>
-            <div className="flex-grow min-w-0">
-              <div className="flex justify-between items-baseline mb-0.5">
-                <h3 className="font-bold text-base truncate text-on-surface">
-                  {msg.sender_id === user.id ? msg.receiver?.username : msg.sender?.username}
-                </h3>
-                <span className="text-[10px] font-bold text-on-surface/40 uppercase tracking-tighter">
-                  {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+                <p className="text-[10px] text-on-surface/40 font-bold uppercase tracking-wider">{post.time}</p>
               </div>
-              <p className="text-xs truncate text-on-surface/60 font-medium">
-                {msg.content}
+            </div>
+            <MoreHorizontal className="text-on-surface/40 cursor-pointer" />
+          </div>
+          
+          <div className="aspect-square relative overflow-hidden">
+            <img src={post.image} className={`w-full h-full object-cover ${post.isLocked ? 'blur-3xl opacity-60' : ''}`} referrerPolicy="no-referrer" />
+            {post.isLocked && (
+              <div className="absolute inset-0 flex items-center justify-center p-8">
+                <div className="bg-white/40 backdrop-blur-xl p-8 rounded-[2.5rem] flex flex-col items-center text-center shadow-2xl border border-white/40">
+                  <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+                    <Lock className="text-primary" size={32} />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">Conteúdo Exclusivo</h3>
+                  <p className="text-sm text-on-surface/60 mb-8">Assine o nível premium para ter acesso total.</p>
+                  <button className="w-full py-4 px-8 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all text-sm uppercase tracking-widest">
+                    DESBLOQUEAR POR {post.price}
+                  </button>
+                </div>
+              </div>
+            )}
+            {post.isVideo && !post.isLocked && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
+                  <Play className="text-white fill-white" size={40} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-6">
+                <Heart className="text-on-surface cursor-pointer" fill={post.id === '1' ? '#E11D48' : 'none'} stroke={post.id === '1' ? '#E11D48' : 'currentColor'} />
+                <MessageCircle className="text-on-surface cursor-pointer" />
+                <Send className="text-on-surface cursor-pointer" />
+              </div>
+              <Bookmark className="text-on-surface cursor-pointer" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-bold">{post.likes} curtidas</p>
+              <p className="text-sm text-on-surface/80 leading-relaxed">
+                <span className="font-bold">{post.creator.name}</span> {post.caption}
               </p>
             </div>
           </div>
-        )) : (
-          <div className="text-center py-20">
-            <p className="text-on-surface/40 font-bold">Nenhuma mensagem ainda.</p>
-          </div>
-        )}
+        </article>
+      ))}
+    </div>
+  </div>
+);
+
+const ScreenProfile = ({ onEdit, creator, onLogout }: { onEdit: () => void, creator: Creator, onLogout: () => void }) => (
+  <div className="pt-20 pb-24">
+    <section className="max-w-4xl mx-auto px-6 text-center pt-8">
+      <div className="relative inline-block mb-6">
+        <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-full p-[4px] story-ring">
+          <img src={creator.avatar} className="w-full h-full object-cover rounded-full border-4 border-white" referrerPolicy="no-referrer" />
+        </div>
+      </div>
+      <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator.name}</h1>
+      <p className="text-base text-primary font-bold mb-8">{creator.bio}</p>
+
+      <div className="flex justify-center items-center gap-10 mb-10 py-6 px-8 bg-white rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5">
+        <div className="text-center">
+          <span className="block text-xl font-bold">{creator.stats?.posts}</span>
+          <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
+        </div>
+        <div className="w-px h-8 bg-primary/10"></div>
+        <div className="text-center">
+          <span className="block text-xl font-bold">{creator.stats?.followers}</span>
+          <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Seguidores</span>
+        </div>
+        <div className="w-px h-8 bg-primary/10"></div>
+        <div className="text-center">
+          <span className="block text-xl font-bold">{creator.stats?.likes}</span>
+          <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Curtidas</span>
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6 max-w-md mx-auto">
+        <button onClick={onEdit} className="w-full py-4 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs">
+          Editar Perfil
+        </button>
+        <button className="w-full py-4 bg-primary/5 text-primary font-bold rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase tracking-widest text-xs">
+          <Mail size={18} />
+          Mensagem
+        </button>
+      </div>
+      
+      <button 
+        onClick={onLogout}
+        className="text-red-500 font-bold text-xs uppercase tracking-widest hover:underline mb-12"
+      >
+        Sair da Conta
+      </button>
+    </section>
+
+    <div className="sticky top-16 bg-white/80 backdrop-blur-md z-40 border-b border-primary/5 mb-6">
+      <div className="max-w-4xl mx-auto px-6 flex justify-around">
+        <button className="py-4 border-b-2 border-primary text-primary font-bold text-xs uppercase tracking-widest">Criações</button>
+        <button className="py-4 border-b-2 border-transparent text-on-surface/40 font-bold text-xs uppercase tracking-widest">Exclusivos</button>
+        <button className="py-4 border-b-2 border-transparent text-on-surface/40 font-bold text-xs uppercase tracking-widest flex items-center gap-1">
+          Pro <Lock size={12} fill="currentColor" />
+        </button>
       </div>
     </div>
-  );
-};
 
-const ScreenEditProfile = ({ onBack, profile, onUpdate }: { onBack: () => void, profile: any, onUpdate: (updates: any) => void }) => {
-  const [fullName, setFullName] = useState(profile?.full_name || '');
-  const [username, setUsername] = useState(profile?.username || '');
-  const [bio, setBio] = useState(profile?.bio || '');
+    <section className="max-w-5xl mx-auto px-4">
+      <div className="grid grid-cols-3 gap-2">
+        <div className="col-span-2 row-span-2 relative overflow-hidden rounded-2xl bg-white aspect-square">
+          <img src="https://images.unsplash.com/photo-1539109132314-34a9c615b2b1?auto=format&fit=crop&q=80&w=800" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          <div className="absolute top-4 right-4">
+            <div className="bg-black/20 backdrop-blur-md p-2 rounded-full text-white">
+              <Heart size={18} fill="white" />
+            </div>
+          </div>
+        </div>
+        <div className="relative aspect-square overflow-hidden rounded-2xl bg-white">
+          <div className="absolute inset-0 bg-primary/40 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center text-white">
+            <Lock size={24} fill="white" />
+            <span className="text-[8px] font-bold uppercase tracking-widest mt-1">Exclusivo</span>
+          </div>
+          <img src="https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=400" className="w-full h-full object-cover blur-md" referrerPolicy="no-referrer" />
+        </div>
+        <div className="aspect-square overflow-hidden rounded-2xl bg-white shadow-sm">
+          <img src="https://images.unsplash.com/photo-1529139513477-323c66b8d5b5?auto=format&fit=crop&q=80&w=400" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+        </div>
+        <div className="aspect-square overflow-hidden rounded-2xl bg-white shadow-sm relative">
+          <div className="absolute top-3 left-3 z-10 text-white">
+            <Play size={18} fill="white" />
+          </div>
+          <img src="https://images.unsplash.com/photo-1492707892479-7bc8d5a4ee93?auto=format&fit=crop&q=80&w=400" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+        </div>
+        <div className="aspect-square overflow-hidden rounded-2xl bg-white shadow-sm">
+          <img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=400" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+        </div>
+        <div className="aspect-square overflow-hidden rounded-2xl bg-white shadow-sm">
+          <img src="https://images.unsplash.com/photo-1554048612-b6a482bc67e5?auto=format&fit=crop&q=80&w=400" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+        </div>
+        <div className="aspect-square overflow-hidden rounded-2xl bg-white shadow-sm">
+          <img src="https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&q=80&w=400" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+        </div>
+      </div>
+    </section>
+  </div>
+);
+
+const ScreenActivity = ({ notifications }: { notifications: Notification[] }) => (
+  <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
+    <section className="mb-8 pt-8">
+      <h2 className="text-4xl font-extrabold tracking-tight mb-1">Atividade</h2>
+      <p className="text-on-surface/60 text-sm font-medium">Sua jornada criativa em tempo real.</p>
+    </section>
+
+    <div className="space-y-10">
+      <div>
+        <h3 className="text-[10px] font-bold uppercase tracking-widest text-on-surface/30 mb-4">Hoje</h3>
+        <div className="space-y-3">
+          {notifications.map(notif => (
+            <div key={notif.id} className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-primary/5">
+              <div className="relative">
+                <img src={notif.user.avatar} className="w-12 h-12 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
+                {notif.user.isVerified && (
+                  <span className="absolute -bottom-1 -right-1 bg-primary text-white rounded-full p-0.5 border-2 border-white">
+                    <CheckCircle2 size={10} fill="white" />
+                  </span>
+                )}
+              </div>
+              <div className="flex-1">
+                {notif.badge && (
+                  <span className="bg-primary/10 text-primary text-[8px] font-black px-2 py-0.5 rounded-full tracking-wider mb-1 inline-block uppercase">
+                    {notif.badge}
+                  </span>
+                )}
+                <p className="text-xs font-medium leading-relaxed text-on-surface">
+                  <span className="font-bold">{notif.user.name}</span> {notif.content}
+                </p>
+                <span className="text-[10px] text-on-surface/40 mt-0.5 block font-bold uppercase tracking-tighter">{notif.time}</span>
+              </div>
+              {notif.thumbnail && (
+                <img src={notif.thumbnail} className="w-12 h-12 rounded-lg object-cover" referrerPolicy="no-referrer" />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      <div>
+        <h3 className="text-[10px] font-bold uppercase tracking-widest text-on-surface/30 mb-4">Ontem</h3>
+        <div className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-primary/5 opacity-60">
+          <img src="https://picsum.photos/seed/user/100" className="w-12 h-12 rounded-full object-cover" referrerPolicy="no-referrer" />
+          <div className="flex-1">
+            <p className="text-xs font-medium text-on-surface">
+              <span className="font-bold">Marco Aurélio</span> comentou no seu post: "Incrível!"
+            </p>
+            <span className="text-[10px] text-on-surface/40 mt-0.5 block font-bold uppercase tracking-tighter">Há 24 horas</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const ScreenMessages = ({ messages }: { messages: Message[] }) => (
+  <div className="pt-20 pb-24 max-w-2xl mx-auto px-6">
+    <section className="mb-8 pt-8">
+      <h1 className="text-4xl font-extrabold tracking-tight mb-1">Mensagens</h1>
+      <p className="text-on-surface/60 text-sm font-medium">Gerencie suas conexões e conversas exclusivas.</p>
+    </section>
+
+    <div className="flex gap-2 overflow-x-auto no-scrollbar mb-6">
+      <button className="px-5 py-2 rounded-full premium-gradient text-white font-bold text-xs shadow-sm">Todas</button>
+      <button className="px-5 py-2 rounded-full bg-white text-on-surface/60 font-bold text-xs border border-primary/5">Não Lidas</button>
+      <button className="px-5 py-2 rounded-full bg-white text-on-surface/60 font-bold text-xs border border-primary/5 flex items-center gap-1.5">
+        <Star size={14} className="text-primary" fill="currentColor" />
+        Premium
+      </button>
+    </div>
+
+    <div className="space-y-3">
+      {messages.map(msg => (
+        <div key={msg.id} className="group relative flex items-center gap-4 p-4 rounded-2xl bg-white transition-all hover:shadow-md cursor-pointer border border-primary/5">
+          <div className="relative flex-shrink-0">
+            <img src={msg.user.avatar} className={`w-14 h-14 rounded-full object-cover border border-primary/10 p-0.5 ${msg.isLocked ? 'grayscale opacity-50' : ''}`} referrerPolicy="no-referrer" />
+            {msg.isOnline && <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></div>}
+          </div>
+          <div className="flex-grow min-w-0">
+            <div className="flex justify-between items-baseline mb-0.5">
+              <h3 className={`font-bold text-base truncate ${msg.isLocked ? 'text-on-surface/60' : 'text-on-surface'}`}>{msg.user.name}</h3>
+              <span className="text-[10px] font-bold text-on-surface/40 uppercase tracking-tighter">{msg.time}</span>
+            </div>
+            <p className={`text-xs truncate ${msg.isLocked ? 'text-primary font-bold' : 'text-on-surface/60 font-medium'}`}>
+              {msg.isLocked ? (
+                <span className="flex items-center gap-1"><Lock size={12} /> {msg.lastMessage}</span>
+              ) : msg.lastMessage}
+            </p>
+          </div>
+          {msg.unreadCount && (
+            <div className="bg-primary text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">
+              {msg.unreadCount}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+
+    <section className="mt-12">
+      <div className="flex justify-between items-end mb-6">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight">Descobrir Novos</h2>
+          <p className="text-xs text-on-surface/60 font-medium">Recomendações baseadas no seu perfil</p>
+        </div>
+        <button className="text-primary font-bold text-xs flex items-center gap-0.5">Ver todos <ChevronRight size={14} /></button>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="relative h-48 rounded-2xl overflow-hidden group">
+          <img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=400" className="absolute inset-0 w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+          <div className="absolute bottom-0 left-0 p-4 w-full">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className="w-1.5 h-1.5 bg-primary rounded-full"></span>
+              <span className="text-[8px] font-black text-white uppercase tracking-widest">Fashion</span>
+            </div>
+            <p className="text-white font-bold text-sm">Alana Costa</p>
+          </div>
+        </div>
+        <div className="grid grid-rows-2 gap-3">
+          <div className="relative rounded-2xl overflow-hidden bg-white flex items-center p-3 gap-3 border border-primary/5">
+            <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200" className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
+            <div>
+              <p className="font-bold text-xs">Lucas M.</p>
+              <p className="text-[8px] font-black text-primary uppercase tracking-widest">Música</p>
+            </div>
+          </div>
+          <div className="relative rounded-2xl overflow-hidden bg-primary/5 flex items-center p-3 gap-3 border border-primary/10">
+            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm">
+              <PlusCircle size={18} className="text-primary" />
+            </div>
+            <div>
+              <p className="font-bold text-xs text-primary">Explorar</p>
+              <p className="text-[8px] font-black text-primary/70 uppercase tracking-widest">Tendências</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+);
+
+const ScreenEditProfile = ({ onBack, creator }: { onBack: () => void, creator: Creator }) => {
+  const [name, setName] = useState(creator.name);
+  const [username, setUsername] = useState(creator.username);
+  const [bio, setBio] = useState(creator.bio);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSave = async () => {
-    if (!profile?.id) {
-      alert('Erro: Perfil não carregado corretamente.');
-      return;
-    }
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
-      await supabaseService.updateProfile(profile.id, {
-        full_name: fullName,
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      const { error } = await supabase.from('profiles').update({
+        name,
         username,
         bio
-      });
-      onUpdate({ full_name: fullName, username, bio });
+      }).eq('id', user.id);
+
+      if (error) throw error;
       onBack();
-    } catch (err) {
-      console.error('Erro ao salvar perfil:', err);
-      alert('Erro ao salvar perfil');
+    } catch (err: any) {
+      setError(err.message || 'Erro ao salvar perfil');
     } finally {
       setLoading(false);
     }
   };
-
-  if (!profile) {
-    return (
-      <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto flex flex-col items-center justify-center min-h-[50vh]">
-        <p className="text-on-surface/60 mb-4">Perfil não carregado.</p>
-        <button onClick={onBack} className="text-primary font-bold">Voltar</button>
-      </div>
-    );
-  }
 
   return (
     <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
@@ -635,7 +558,7 @@ const ScreenEditProfile = ({ onBack, profile, onUpdate }: { onBack: () => void, 
         <p className="text-on-surface/60 text-sm font-medium">Curadoria do seu espaço digital</p>
       </section>
 
-      <form className="space-y-10" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+      <form className="space-y-10" onSubmit={handleSave}>
         <section className="relative">
           <div className="group relative h-40 w-full rounded-2xl overflow-hidden bg-white shadow-sm border border-primary/5">
             <img src="https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=800" className="w-full h-full object-cover opacity-80" referrerPolicy="no-referrer" />
@@ -648,7 +571,7 @@ const ScreenEditProfile = ({ onBack, profile, onUpdate }: { onBack: () => void, 
           </div>
           <div className="absolute -bottom-6 left-6">
             <div className="relative w-24 h-24 rounded-full border-4 border-white overflow-hidden shadow-xl bg-white story-ring p-0.5">
-              <img src={profile?.avatar_url || ELENA.avatar} className="w-full h-full object-cover rounded-full border-2 border-white" referrerPolicy="no-referrer" />
+              <img src={creator.avatar} className="w-full h-full object-cover rounded-full border-2 border-white" referrerPolicy="no-referrer" />
               <div className="absolute inset-0 bg-black/30 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
                 <Camera className="text-white" size={20} />
               </div>
@@ -661,8 +584,9 @@ const ScreenEditProfile = ({ onBack, profile, onUpdate }: { onBack: () => void, 
             <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Nome de Exibição</label>
             <input 
               className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
             />
           </div>
           <div className="space-y-1.5">
@@ -673,6 +597,7 @@ const ScreenEditProfile = ({ onBack, profile, onUpdate }: { onBack: () => void, 
                 className="w-full bg-white border border-primary/10 rounded-xl pl-8 pr-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                required
               />
             </div>
           </div>
@@ -682,7 +607,6 @@ const ScreenEditProfile = ({ onBack, profile, onUpdate }: { onBack: () => void, 
               className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm text-sm leading-relaxed min-h-[100px] resize-none font-medium text-on-surface/80" 
               value={bio}
               onChange={(e) => setBio(e.target.value)}
-              placeholder="Fale um pouco sobre você..."
             />
           </div>
         </section>
@@ -702,11 +626,13 @@ const ScreenEditProfile = ({ onBack, profile, onUpdate }: { onBack: () => void, 
           </div>
         </section>
 
+        {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
+
         <div className="flex items-center justify-end gap-4 pt-4">
           <button onClick={onBack} type="button" className="text-on-surface/40 font-bold uppercase tracking-widest text-[10px] px-6 py-3">Cancelar</button>
           <button 
-            type="submit" 
             disabled={loading}
+            type="submit" 
             className="premium-gradient text-white px-10 py-4 rounded-xl shadow-lg font-black tracking-widest uppercase text-xs active:scale-95 transition-all disabled:opacity-50"
           >
             {loading ? 'Salvando...' : 'Salvar Alterações'}
@@ -717,52 +643,35 @@ const ScreenEditProfile = ({ onBack, profile, onUpdate }: { onBack: () => void, 
   );
 };
 
-const ScreenCreatePost = ({ onBack, user }: { onBack: () => void, user: any }) => {
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+const ScreenCreatePost = ({ onBack, onPostCreated }: { onBack: () => void, onPostCreated: () => void }) => {
+  const [image, setImage] = useState('');
   const [caption, setCaption] = useState('');
+  const [price, setPrice] = useState('');
   const [isLocked, setIsLocked] = useState(false);
-  const [price, setPrice] = useState('R$ 15,00');
   const [loading, setLoading] = useState(false);
-  const [type, setType] = useState<'post' | 'story'>('post');
+  const [error, setError] = useState<string | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result as string);
-      };
-      reader.readAsDataURL(selectedFile);
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!file || !user) return;
+  const handleCreatePost = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
 
-      // Upload to 'posts' bucket
-      const imageUrl = await supabaseService.uploadFile('posts', filePath, file);
-
-      // Create post record
-      await supabaseService.createPost({
-        author_id: user.id,
-        image_url: imageUrl,
+      const { error } = await supabase.from('posts').insert({
+        creator_id: user.id,
+        image,
         caption,
-        type,
+        price: isLocked ? price : null,
         is_locked: isLocked,
-        price: isLocked ? price : undefined
+        time: 'Agora mesmo'
       });
 
-      onBack();
-    } catch (err) {
-      console.error('Erro ao criar post:', err);
-      alert('Erro ao criar post. Verifique se o bucket "posts" existe no Supabase e tem permissões públicas.');
+      if (error) throw error;
+      onPostCreated();
+    } catch (err: any) {
+      setError(err.message || 'Erro ao criar postagem');
     } finally {
       setLoading(false);
     }
@@ -770,110 +679,92 @@ const ScreenCreatePost = ({ onBack, user }: { onBack: () => void, user: any }) =
 
   return (
     <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
-      <div className="flex items-center justify-between mb-8 pt-8">
-        <h1 className="text-4xl font-extrabold tracking-tight">Novo Post</h1>
-        <button onClick={onBack} className="p-2 bg-primary/5 rounded-full text-primary"><X size={24} /></button>
-      </div>
+      <section className="mb-8 pt-8">
+        <h1 className="text-4xl font-extrabold tracking-tight mb-1">Nova Postagem</h1>
+        <p className="text-on-surface/60 text-sm font-medium">Compartilhe sua arte com o mundo.</p>
+      </section>
 
-      <div className="space-y-8">
-        <div className="flex gap-4 mb-4">
-          <button 
-            onClick={() => setType('post')}
-            className={`flex-1 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${type === 'post' ? 'premium-gradient text-white shadow-lg' : 'bg-white text-on-surface/40 border border-primary/5'}`}
-          >
-            Feed
-          </button>
-          <button 
-            onClick={() => setType('story')}
-            className={`flex-1 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${type === 'story' ? 'premium-gradient text-white shadow-lg' : 'bg-white text-on-surface/40 border border-primary/5'}`}
-          >
-            Story
-          </button>
-        </div>
-
-        {!preview ? (
-          <label className="aspect-square w-full border-2 border-dashed border-primary/20 rounded-3xl flex flex-col items-center justify-center gap-4 bg-white cursor-pointer hover:bg-primary/5 transition-colors">
-            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center text-primary">
-              <PlusCircle size={32} />
-            </div>
-            <div className="text-center">
-              <p className="font-bold text-on-surface">Selecionar Foto ou Vídeo</p>
-              <p className="text-[10px] text-on-surface/40 uppercase tracking-widest font-black mt-1">Máximo 50MB</p>
-            </div>
-            <input type="file" accept="image/*,video/*" className="hidden" onChange={handleFileChange} />
-          </label>
-        ) : (
-          <div className="relative aspect-square w-full rounded-3xl overflow-hidden bg-black shadow-xl">
-            {file?.type.startsWith('video') ? (
-              <video src={preview} className="w-full h-full object-cover" controls />
-            ) : (
-              <img src={preview} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-            )}
-            <button 
-              onClick={() => { setFile(null); setPreview(null); }}
-              className="absolute top-4 right-4 p-2 bg-black/40 backdrop-blur-md rounded-full text-white"
-            >
-              <X size={20} />
-            </button>
-          </div>
-        )}
-
-        <div className="space-y-6">
+      <form className="space-y-8" onSubmit={handleCreatePost}>
+        <div className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Legenda</label>
+            <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">URL da Imagem</label>
+            <input 
+              className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
+              placeholder="https://exemplo.com/imagem.jpg" 
+              value={image}
+              onChange={(e) => setImage(e.target.value)}
+              required
+            />
+          </div>
+          
+          {image && (
+            <div className="aspect-square rounded-2xl overflow-hidden border border-primary/5 shadow-sm">
+              <img src={image} className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={() => setError('URL de imagem inválida')} />
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">Legenda</label>
             <textarea 
-              className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm text-sm leading-relaxed min-h-[100px] resize-none font-medium text-on-surface/80" 
-              placeholder="Escreva algo sobre este conteúdo..."
+              className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-medium text-on-surface min-h-[100px] resize-none" 
+              placeholder="Escreva algo sobre sua postagem..." 
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
+              required
             />
           </div>
 
-          <div className="bg-white p-6 rounded-2xl border border-primary/5 shadow-sm space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
-                  <Lock size={20} />
-                </div>
-                <div>
-                  <p className="font-bold text-sm">Conteúdo Exclusivo</p>
-                  <p className="text-[10px] text-on-surface/40 font-bold uppercase tracking-widest">Apenas para assinantes</p>
-                </div>
+          <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-primary/5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isLocked ? 'bg-primary/10 text-primary' : 'bg-on-surface/5 text-on-surface/40'}`}>
+                <Lock size={20} />
               </div>
-              <button 
-                onClick={() => setIsLocked(!isLocked)}
-                className={`w-12 h-6 rounded-full transition-colors relative ${isLocked ? 'bg-primary' : 'bg-on-surface/10'}`}
-              >
-                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isLocked ? 'right-1' : 'left-1'}`}></div>
-              </button>
+              <div>
+                <p className="text-sm font-bold">Conteúdo Exclusivo</p>
+                <p className="text-[10px] text-on-surface/40 font-bold uppercase tracking-widest">Apenas para assinantes</p>
+              </div>
             </div>
-
-            {isLocked && (
-              <div className="pt-4 border-t border-primary/5 space-y-1.5">
-                <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Preço Sugerido</label>
-                <input 
-                  className="w-full bg-background border border-primary/5 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/10 font-bold" 
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                />
-              </div>
-            )}
+            <button 
+              type="button"
+              onClick={() => setIsLocked(!isLocked)}
+              className={`w-12 h-6 rounded-full relative transition-colors ${isLocked ? 'bg-primary' : 'bg-on-surface/10'}`}
+            >
+              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all ${isLocked ? 'right-1' : 'left-1'}`}></div>
+            </button>
           </div>
+
+          {isLocked && (
+            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
+              <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">Preço para Desbloquear</label>
+              <input 
+                className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
+                placeholder="R$ 15,00" 
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                required={isLocked}
+              />
+            </div>
+          )}
         </div>
 
-        <button 
-          onClick={handleUpload}
-          disabled={loading || !file}
-          className="w-full premium-gradient text-white font-black py-5 rounded-2xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all uppercase tracking-widest text-sm disabled:opacity-50"
-        >
-          {loading ? 'Publicando...' : 'Publicar Conteúdo'}
-        </button>
-      </div>
+        {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
+
+        <div className="flex items-center justify-end gap-4">
+          <button onClick={onBack} type="button" className="text-on-surface/40 font-bold uppercase tracking-widest text-[10px] px-6 py-3">Cancelar</button>
+          <button 
+            disabled={loading}
+            type="submit" 
+            className="premium-gradient text-white px-10 py-4 rounded-xl shadow-lg font-black tracking-widest uppercase text-xs active:scale-95 transition-all disabled:opacity-50"
+          >
+            {loading ? 'Publicando...' : 'Publicar Agora'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 };
 
-const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: (user: any) => void, onNavigateToRegister: () => void }) => {
+const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, onNavigateToRegister: () => void }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -884,8 +775,9 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: (user: any) =
     setLoading(true);
     setError(null);
     try {
-      const data = await supabaseService.signIn(email, password);
-      if (data.user) onLogin(data.user);
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      onLogin();
     } catch (err: any) {
       setError(err.message || 'Erro ao entrar');
     } finally {
@@ -897,7 +789,7 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: (user: any) =
     <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12 bg-background">
       <div className="w-full max-w-md space-y-12">
         <div className="flex flex-col items-center space-y-6">
-          <div className="text-4xl font-black premium-gradient bg-clip-text text-transparent tracking-tighter">ONLY MOC</div>
+          <div className="text-4xl font-black premium-gradient bg-clip-text text-transparent tracking-tighter">CRIADOR</div>
           <div className="text-center space-y-2">
             <h1 className="text-5xl font-black tracking-tight leading-none text-on-surface">Bem-vindo de volta.</h1>
             <p className="text-on-surface/60 text-base font-bold max-w-[280px] mx-auto">Acesse sua galeria digital e gerencie seu legado.</p>
@@ -905,13 +797,13 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: (user: any) =
         </div>
 
         <form className="space-y-6" onSubmit={handleLogin}>
-          {error && <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-xs font-bold border border-red-100">{error}</div>}
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">E-mail ou Usuário</label>
+              <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">E-mail</label>
               <input 
                 className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4.5 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
                 placeholder="exemplo@criador.com" 
+                type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -932,10 +824,11 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: (user: any) =
               </div>
             </div>
           </div>
-          <div className="flex justify-end"><button className="text-xs font-black text-primary uppercase tracking-widest">Esqueceu a senha?</button></div>
+          {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
+          <div className="flex justify-end"><button className="text-xs font-black text-primary uppercase tracking-widest" type="button">Esqueceu a senha?</button></div>
           <button 
-            type="submit" 
             disabled={loading}
+            type="submit" 
             className="w-full premium-gradient text-white font-black py-5 rounded-2xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all uppercase tracking-widest text-sm disabled:opacity-50"
           >
             {loading ? 'Entrando...' : 'Entrar na Galeria'}
@@ -967,10 +860,10 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: (user: any) =
   );
 };
 
-const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: (user: any) => void, onNavigateToLogin: () => void }) => {
+const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => void, onNavigateToLogin: () => void }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
+  const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -979,8 +872,31 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: (user: 
     setLoading(true);
     setError(null);
     try {
-      const data = await supabaseService.signUp(email, password, fullName);
-      if (data.user) onRegister(data.user);
+      const { data, error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          data: {
+            full_name: name,
+          }
+        }
+      });
+      if (error) throw error;
+      
+      // Create profile in profiles table
+      if (data.user) {
+        const { error: profileError } = await supabase.from('profiles').insert({
+          id: data.user.id,
+          name: name,
+          username: email.split('@')[0],
+          avatar: `https://picsum.photos/seed/${data.user.id}/400`,
+          bio: 'Novo criador no pedaço!',
+          stats: { posts: '0', followers: '0', likes: '0' }
+        });
+        if (profileError) console.error('Error creating profile:', profileError);
+      }
+
+      onRegister();
     } catch (err: any) {
       setError(err.message || 'Erro ao cadastrar');
     } finally {
@@ -992,7 +908,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: (user: 
     <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12 bg-background">
       <div className="w-full max-w-md space-y-10">
         <div className="flex flex-col items-center space-y-6">
-          <div className="text-4xl font-black premium-gradient bg-clip-text text-transparent tracking-tighter">ONLY MOC</div>
+          <div className="text-4xl font-black premium-gradient bg-clip-text text-transparent tracking-tighter">CRIADOR</div>
           <div className="text-center space-y-2">
             <h1 className="text-5xl font-black tracking-tight leading-none text-on-surface">Criar Conta.</h1>
             <p className="text-on-surface/60 text-base font-bold max-w-[280px] mx-auto">Junte-se à elite dos criadores digitais.</p>
@@ -1000,15 +916,14 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: (user: 
         </div>
 
         <form className="space-y-6" onSubmit={handleRegister}>
-          {error && <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-xs font-bold border border-red-100">{error}</div>}
           <div className="space-y-4">
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">Nome Completo</label>
               <input 
                 className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
                 placeholder="Seu nome" 
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 required
               />
             </div>
@@ -1017,6 +932,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: (user: 
               <input 
                 className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
                 placeholder="exemplo@criador.com" 
+                type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -1035,6 +951,8 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: (user: 
             </div>
           </div>
           
+          {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
+
           <div className="flex items-center gap-3 px-1">
             <div className="w-12 h-6 bg-primary/10 rounded-full relative cursor-pointer">
               <div className="absolute right-1 top-1 w-4 h-4 bg-primary rounded-full shadow-sm"></div>
@@ -1050,11 +968,11 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: (user: 
           </div>
 
           <button 
-            type="submit" 
             disabled={loading}
+            type="submit" 
             className="w-full premium-gradient text-white font-black py-5 rounded-2xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all uppercase tracking-widest text-sm disabled:opacity-50"
           >
-            {loading ? 'Criando Conta...' : 'Criar Conta Gratuita'}
+            {loading ? 'Criando...' : 'Criar Conta Gratuita'}
           </button>
         </form>
 
@@ -1068,56 +986,33 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: (user: 
 
 // --- Main App ---
 
-import { testSupabaseConnection } from './lib/supabase';
-
 export default function App() {
-  const [screen, setScreen] = useState<Screen>('login');
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
-  const [profileLoading, setProfileLoading] = useState(true);
-  const [supabaseStatus, setSupabaseStatus] = useState<'checking' | 'connected' | 'error'>('checking');
-  const [connectionDetails, setConnectionDetails] = useState<string | null>(null);
+  const [screen, setScreen] = React.useState<Screen>('login');
+  const [isLoggedIn, setIsLoggedIn] = React.useState(false);
+  const [posts, setPosts] = React.useState<Post[]>(POSTS);
+  const [notifications, setNotifications] = React.useState<Notification[]>(NOTIFICATIONS);
+  const [messages, setMessages] = React.useState<Message[]>(MESSAGES);
+  const [creator, setCreator] = React.useState<Creator>(ELENA);
+  const [loading, setLoading] = React.useState(true);
+  const [refreshKey, setRefreshKey] = React.useState(0);
 
-  const checkConnection = async () => {
-    setSupabaseStatus('checking');
-    setConnectionDetails(null);
-    const result = await testSupabaseConnection();
-    setSupabaseStatus(result.success ? 'connected' : 'error');
-    if (result.details) setConnectionDetails(result.details);
-    
-    // Se falhar, libera o loading inicial para mostrar a tela de login
-    if (!result.success) {
-      setProfileLoading(false);
-    }
-  };
+  React.useEffect(() => {
+    // Check active sessions and sets the user
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setIsLoggedIn(true);
+        setScreen('feed');
+      }
+      setLoading(false);
+    });
 
-  useEffect(() => {
-    checkConnection();
-
-    // Timeout de segurança para o loading inicial
-    const loadingTimeout = setTimeout(() => {
-      setProfileLoading(false);
-    }, 8000);
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      clearTimeout(loadingTimeout);
-      if (session?.user) {
-        setUser(session.user);
-        setProfileLoading(true);
-        try {
-          const userProfile = await supabaseService.getProfile(session.user.id);
-          setProfile(userProfile);
-        } catch (err) {
-          console.error('Erro ao carregar perfil:', err);
-        } finally {
-          setProfileLoading(false);
-        }
+    // Listen for changes on auth state
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setIsLoggedIn(true);
         setScreen('feed');
       } else {
-        setUser(null);
-        setProfile(null);
-        setProfileLoading(false);
+        setIsLoggedIn(false);
         setScreen('login');
       }
     });
@@ -1125,36 +1020,74 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const renderScreen = () => {
-    if (!user) {
-      if (screen === 'register') {
-        return <ScreenRegister onRegister={(u) => setUser(u)} onNavigateToLogin={() => setScreen('login')} />;
-      }
-      return <ScreenLogin onLogin={(u) => setUser(u)} onNavigateToRegister={() => setScreen('register')} />;
-    }
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-    if (profileLoading) {
-      return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-        </div>
-      );
+        // Fetch profile
+        const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+        if (profileData) setCreator(profileData as any);
+
+        // Fetch posts
+        const { data: postsData } = await supabase.from('posts').select('*, creator:profiles(*)').order('created_at', { ascending: false });
+        if (postsData) {
+          setPosts(postsData.map((p: any) => ({
+            ...p,
+            isLocked: p.is_locked,
+            isVideo: p.is_video
+          })) as any);
+        }
+
+        // Fetch notifications
+        const { data: notificationsData } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
+        if (notificationsData) setNotifications(notificationsData as any);
+
+        // Fetch messages
+        const { data: messagesData } = await supabase.from('messages').select('*, user:profiles(*)').order('created_at', { ascending: false });
+        if (messagesData) {
+          setMessages(messagesData.map((m: any) => ({
+            ...m,
+            unreadCount: m.unread_count,
+            isLocked: m.is_locked,
+            isOnline: m.is_online
+          })) as any);
+        }
+      } catch (error) {
+        console.error('Error fetching data from Supabase:', error);
+      }
+    };
+
+    if (isLoggedIn) {
+      fetchData();
+    }
+  }, [isLoggedIn, refreshKey]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-primary font-bold animate-pulse">CARREGANDO...</div>
+      </div>
+    );
+  }
+
+  const renderScreen = () => {
+    if (!isLoggedIn) {
+      if (screen === 'register') {
+        return <ScreenRegister onRegister={() => setScreen('feed')} onNavigateToLogin={() => setScreen('login')} />;
+      }
+      return <ScreenLogin onLogin={() => setScreen('feed')} onNavigateToRegister={() => setScreen('register')} />;
     }
 
     switch (screen) {
-      case 'feed': return <ScreenFeed profile={profile} />;
-      case 'profile': return <ScreenProfile onEdit={() => setScreen('edit-profile')} profile={profile} />;
-      case 'activity': return <ScreenActivity user={user} />;
-      case 'messages': return <ScreenMessages user={user} />;
-      case 'create-post': return <ScreenCreatePost onBack={() => setScreen('feed')} user={user} />;
-      case 'edit-profile': return (
-        <ScreenEditProfile 
-          onBack={() => setScreen('profile')} 
-          profile={profile} 
-          onUpdate={(updates) => setProfile((prev: any) => ({ ...prev, ...updates }))} 
-        />
-      );
-      default: return <ScreenFeed profile={profile} />;
+      case 'feed': return <ScreenFeed posts={posts} />;
+      case 'profile': return <ScreenProfile onEdit={() => setScreen('edit-profile')} creator={creator} onLogout={() => supabase.auth.signOut()} />;
+      case 'activity': return <ScreenActivity notifications={notifications} />;
+      case 'messages': return <ScreenMessages messages={messages} />;
+      case 'edit-profile': return <ScreenEditProfile onBack={() => setScreen('profile')} creator={creator} />;
+      case 'create-post': return <ScreenCreatePost onBack={() => setScreen('feed')} onPostCreated={() => { setRefreshKey(prev => prev + 1); setScreen('feed'); }} />;
+      default: return <ScreenFeed posts={posts} />;
     }
   };
 
@@ -1163,60 +1096,21 @@ export default function App() {
     if (screen === 'activity') return 'ATIVIDADE';
     if (screen === 'messages') return 'MENSAGENS';
     if (screen === 'edit-profile') return 'EDITAR';
-    return 'ONLY MOC';
+    if (screen === 'create-post') return 'POSTAR';
+    return 'CRIADOR';
   };
 
-  const isLoggedIn = !!user;
-  const showNav = isLoggedIn && screen !== 'edit-profile';
+  const showNav = isLoggedIn && !['edit-profile', 'create-post'].includes(screen);
 
   return (
     <div className="min-h-screen bg-background">
       {isLoggedIn && (
         <TopNav 
           title={getTitle()} 
-          showBack={screen === 'edit-profile'} 
-          onBack={() => setScreen('profile')} 
-          supabaseStatus={supabaseStatus}
-          profile={profile}
-          onRetry={checkConnection}
+          showBack={['edit-profile', 'create-post'].includes(screen)} 
+          onBack={() => setScreen(screen === 'edit-profile' ? 'profile' : 'feed')} 
+          avatar={creator.avatar}
         />
-      )}
-
-      {supabaseStatus === 'error' && (
-        <div className="fixed top-20 left-6 right-6 z-[60] bg-red-50 border border-red-100 p-4 rounded-2xl shadow-lg flex items-start gap-3 animate-in fade-in slide-in-from-top-4">
-          <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center text-red-600 flex-shrink-0">
-            <X size={16} />
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs font-black text-red-600 uppercase tracking-widest">Erro de Conexão</p>
-            <p className="text-[10px] font-bold text-red-500 leading-relaxed">
-              Não foi possível conectar ao Supabase. Isso geralmente acontece se o projeto estiver <strong>Pausado</strong> ou se as chaves estiverem incorretas.
-              {connectionDetails && <span className="block mt-1 opacity-60">Diagnóstico: {connectionDetails}</span>}
-            </p>
-            <div className="flex flex-wrap gap-3 mt-2">
-              <button 
-                onClick={checkConnection}
-                className="text-[10px] font-black text-red-600 uppercase tracking-widest underline"
-              >
-                Tentar novamente
-              </button>
-              <button 
-                onClick={() => window.location.reload()}
-                className="text-[10px] font-black text-red-600 uppercase tracking-widest underline"
-              >
-                Reiniciar App
-              </button>
-              <a 
-                href="https://supabase.com/dashboard" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-[10px] font-black text-red-600 uppercase tracking-widest underline"
-              >
-                Dashboard Supabase
-              </a>
-            </div>
-          </div>
-        </div>
       )}
       
       <AnimatePresence mode="wait">
