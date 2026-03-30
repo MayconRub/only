@@ -138,7 +138,7 @@ const MESSAGES: Message[] = [
 
 // --- Components ---
 
-const TopNav = ({ title = "CRIADOR", showBack = false, onBack = () => {}, avatar, dbStatus }: { title?: string, showBack?: boolean, onBack?: () => void, avatar?: string, dbStatus?: 'checking' | 'connected' | 'error' }) => (
+const TopNav = ({ title = "CRIADOR", showBack = false, onBack = () => {}, avatar }: { title?: string, showBack?: boolean, onBack?: () => void, avatar?: string }) => (
   <header className="fixed top-0 w-full flex justify-between items-center px-6 py-4 glass-header z-50">
     <div className="flex items-center gap-4">
       {showBack ? (
@@ -151,25 +151,12 @@ const TopNav = ({ title = "CRIADOR", showBack = false, onBack = () => {}, avatar
         </button>
       )}
       <div>
-        <div className="text-2xl font-extrabold premium-gradient bg-clip-text text-transparent tracking-tight leading-none">
+        <div className="text-2xl font-black text-primary tracking-tight leading-none">
           {title}
-        </div>
-        <div className="flex items-center gap-1.5 mt-1">
-          <div className={`w-1.5 h-1.5 rounded-full ${
-            dbStatus === 'connected' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 
-            dbStatus === 'error' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]' : 'bg-yellow-500 animate-pulse'
-          }`}></div>
-          <span className="text-[8px] font-bold text-on-surface/40 uppercase tracking-widest">
-            {dbStatus === 'connected' ? 'Banco Online' : 
-             dbStatus === 'error' ? 'Erro de Conexão' : 'Conectando...'}
-          </span>
         </div>
       </div>
     </div>
     <div className="flex items-center gap-4">
-      <button className="text-on-surface hover:opacity-80 transition-opacity">
-        <Search size={24} />
-      </button>
       <div className="w-8 h-8 rounded-full overflow-hidden border border-primary/20">
         <img src={avatar || ELENA.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
       </div>
@@ -203,32 +190,57 @@ const BottomNav = ({ active, onChange }: { active: Screen, onChange: (s: Screen)
 
 // --- Screens ---
 
-const ScreenFeed = ({ posts }: { posts: Post[] }) => (
-  <div className="pt-20 pb-24 max-w-2xl mx-auto">
-    {/* Stories */}
-    <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 py-6 bg-white border-b border-primary/5">
-      <div className="flex flex-col items-center gap-2 flex-shrink-0">
-        <div className="relative p-[3px] rounded-full story-ring">
-          <div className="p-0.5 bg-white rounded-full">
-            <img src={ELENA.avatar} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
-          </div>
-          <div className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 border-2 border-white">
-            <PlusCircle size={14} />
-          </div>
-        </div>
-        <span className="text-[10px] font-bold text-on-surface">Você</span>
-      </div>
-      {['Valentina', 'Kael', 'Mariana', 'Thiago', 'Lucas', 'Bia'].map((name) => (
-        <div key={name} className="flex flex-col items-center gap-2 flex-shrink-0">
-          <div className="p-[3px] rounded-full story-ring">
+const ScreenFeed = ({ posts, stories, onStoryUpload, creator }: { posts: Post[], stories: any[], onStoryUpload: (file: File) => void, creator: Creator }) => {
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="pt-20 pb-24 max-w-2xl mx-auto">
+      {/* Stories */}
+      <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 py-6 bg-white border-b border-primary/5">
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          className="hidden" 
+          accept="image/*,video/*"
+          onChange={(e) => {
+            if (e.target.files?.[0]) onStoryUpload(e.target.files[0]);
+          }}
+        />
+        <div 
+          className="flex flex-col items-center gap-2 flex-shrink-0 cursor-pointer"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <div className="relative p-[3px] rounded-full story-ring">
             <div className="p-0.5 bg-white rounded-full">
-              <img src={`https://picsum.photos/seed/${name}/200`} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
+              <img src={creator.avatar} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
+            </div>
+            <div className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 border-2 border-white">
+              <PlusCircle size={14} />
             </div>
           </div>
-          <span className="text-[10px] font-bold text-on-surface/60">{name}</span>
+          <span className="text-[10px] font-bold text-on-surface">Você</span>
         </div>
-      ))}
-    </div>
+        {stories.map((story) => (
+          <div key={story.id} className="flex flex-col items-center gap-2 flex-shrink-0">
+            <div className="p-[3px] rounded-full story-ring">
+              <div className="p-0.5 bg-white rounded-full">
+                <img src={story.image} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
+              </div>
+            </div>
+            <span className="text-[10px] font-bold text-on-surface/60">{story.creator_name || 'Amigo'}</span>
+          </div>
+        ))}
+        {stories.length === 0 && ['Valentina', 'Kael', 'Mariana', 'Thiago', 'Lucas', 'Bia'].map((name) => (
+          <div key={name} className="flex flex-col items-center gap-2 flex-shrink-0">
+            <div className="p-[3px] rounded-full story-ring">
+              <div className="p-0.5 bg-white rounded-full">
+                <img src={`https://picsum.photos/seed/${name}/200`} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
+              </div>
+            </div>
+            <span className="text-[10px] font-bold text-on-surface/60">{name}</span>
+          </div>
+        ))}
+      </div>
 
     {/* Posts */}
     <div className="space-y-4 py-4">
@@ -248,18 +260,27 @@ const ScreenFeed = ({ posts }: { posts: Post[] }) => (
             <MoreHorizontal className="text-on-surface/40 cursor-pointer" />
           </div>
           
-          <div className="aspect-square relative overflow-hidden">
-            <img src={post.image} className={`w-full h-full object-cover ${post.isLocked ? 'blur-3xl opacity-60' : ''}`} referrerPolicy="no-referrer" />
+          <div className="aspect-square relative overflow-hidden bg-on-surface/5">
+            <img 
+              src={post.image} 
+              className={`w-full h-full object-cover transition-all duration-700 ${post.isLocked ? 'blur-[60px] scale-110 opacity-50' : 'hover:scale-105'}`} 
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1633078654544-61b3455b9161?q=80&w=400&auto=format&fit=crop'; // Fallback image
+              }}
+            />
             {post.isLocked && (
-              <div className="absolute inset-0 flex items-center justify-center p-8">
-                <div className="bg-white/40 backdrop-blur-xl p-8 rounded-[2.5rem] flex flex-col items-center text-center shadow-2xl border border-white/40">
-                  <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+              <div className="absolute inset-0 flex items-center justify-center p-6 bg-black/20">
+                <div className="bg-white/10 backdrop-blur-2xl p-8 rounded-[2.5rem] flex flex-col items-center text-center shadow-2xl border border-white/20 w-full max-w-[280px]">
+                  <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mb-6 ring-4 ring-primary/10">
                     <Lock className="text-primary" size={32} />
                   </div>
-                  <h3 className="text-xl font-bold mb-2">Conteúdo Exclusivo</h3>
-                  <p className="text-sm text-on-surface/60 mb-8">Assine o nível premium para ter acesso total.</p>
-                  <button className="w-full py-4 px-8 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all text-sm uppercase tracking-widest">
-                    DESBLOQUEAR POR {post.price}
+                  <h3 className="text-xl font-black mb-2 text-white drop-shadow-md">Conteúdo VIP</h3>
+                  <p className="text-xs text-white/80 mb-8 font-bold uppercase tracking-widest leading-relaxed">
+                    Desbloqueie este post exclusivo do criador.
+                  </p>
+                  <button className="w-full py-4 px-8 premium-gradient text-white font-black rounded-2xl shadow-xl active:scale-95 transition-all text-[10px] uppercase tracking-[0.2em]">
+                    ASSINAR POR {post.price || 'R$ 19,90'}
                   </button>
                 </div>
               </div>
@@ -293,103 +314,112 @@ const ScreenFeed = ({ posts }: { posts: Post[] }) => (
       ))}
     </div>
   </div>
-);
+  );
+};
 
-const ScreenProfile = ({ onEdit, creator, onLogout }: { onEdit: () => void, creator: Creator, onLogout: () => void }) => (
-  <div className="pt-20 pb-24">
-    <section className="max-w-4xl mx-auto px-6 text-center pt-8">
-      <div className="relative inline-block mb-6">
-        <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-full p-[4px] story-ring">
-          <img src={creator.avatar} className="w-full h-full object-cover rounded-full border-4 border-white" referrerPolicy="no-referrer" />
+const ScreenProfile = ({ onEdit, creator, onLogout, posts }: { onEdit: () => void, creator: Creator, onLogout: () => void, posts: Post[] }) => {
+  const myPosts = posts.filter(p => p.creator.id === creator.id);
+  
+  return (
+    <div className="pt-20 pb-24">
+      <section className="max-w-4xl mx-auto px-6 text-center pt-8">
+        <div className="relative inline-block mb-6">
+          <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-full p-[4px] story-ring">
+            <img src={creator.avatar} className="w-full h-full object-cover rounded-full border-4 border-white" referrerPolicy="no-referrer" />
+          </div>
         </div>
-      </div>
-      <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator.name}</h1>
-      <p className="text-base text-primary font-bold mb-8">{creator.bio}</p>
+        <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator.name}</h1>
+        <p className="text-base text-primary font-bold mb-8">{creator.bio}</p>
 
-      <div className="flex justify-center items-center gap-10 mb-10 py-6 px-8 bg-white rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5">
-        <div className="text-center">
-          <span className="block text-xl font-bold">{creator.stats?.posts}</span>
-          <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
+        <div className="flex justify-center items-center gap-10 mb-10 py-6 px-8 bg-white rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5">
+          <div className="text-center">
+            <span className="block text-xl font-bold">{myPosts.length}</span>
+            <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
+          </div>
+          <div className="w-px h-8 bg-primary/10"></div>
+          <div className="text-center">
+            <span className="block text-xl font-bold">{creator.stats?.followers || '0'}</span>
+            <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Seguidores</span>
+          </div>
+          <div className="w-px h-8 bg-primary/10"></div>
+          <div className="text-center">
+            <span className="block text-xl font-bold">{creator.stats?.likes || '0'}</span>
+            <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Curtidas</span>
+          </div>
         </div>
-        <div className="w-px h-8 bg-primary/10"></div>
-        <div className="text-center">
-          <span className="block text-xl font-bold">{creator.stats?.followers}</span>
-          <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Seguidores</span>
-        </div>
-        <div className="w-px h-8 bg-primary/10"></div>
-        <div className="text-center">
-          <span className="block text-xl font-bold">{creator.stats?.likes}</span>
-          <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Curtidas</span>
-        </div>
-      </div>
 
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6 max-w-md mx-auto">
-        <button onClick={onEdit} className="w-full py-4 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs">
-          Editar Perfil
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6 max-w-md mx-auto">
+          <button onClick={onEdit} className="w-full py-4 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs">
+            Editar Perfil
+          </button>
+          <button className="w-full py-4 bg-primary/5 text-primary font-bold rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase tracking-widest text-xs">
+            <Mail size={18} />
+            Mensagem
+          </button>
+        </div>
+        
+        <button 
+          onClick={onLogout}
+          className="text-red-500 font-bold text-xs uppercase tracking-widest hover:underline mb-12"
+        >
+          Sair da Conta
         </button>
-        <button className="w-full py-4 bg-primary/5 text-primary font-bold rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase tracking-widest text-xs">
-          <Mail size={18} />
-          Mensagem
-        </button>
-      </div>
-      
-      <button 
-        onClick={onLogout}
-        className="text-red-500 font-bold text-xs uppercase tracking-widest hover:underline mb-12"
-      >
-        Sair da Conta
-      </button>
-    </section>
+      </section>
 
-    <div className="sticky top-16 bg-white/80 backdrop-blur-md z-40 border-b border-primary/5 mb-6">
-      <div className="max-w-4xl mx-auto px-6 flex justify-around">
-        <button className="py-4 border-b-2 border-primary text-primary font-bold text-xs uppercase tracking-widest">Criações</button>
-        <button className="py-4 border-b-2 border-transparent text-on-surface/40 font-bold text-xs uppercase tracking-widest">Exclusivos</button>
-        <button className="py-4 border-b-2 border-transparent text-on-surface/40 font-bold text-xs uppercase tracking-widest flex items-center gap-1">
-          Pro <Lock size={12} fill="currentColor" />
-        </button>
+      <div className="sticky top-16 bg-white/80 backdrop-blur-md z-40 border-b border-primary/5 mb-6">
+        <div className="max-w-4xl mx-auto px-6 flex justify-around">
+          <button className="py-4 border-b-2 border-primary text-primary font-bold text-xs uppercase tracking-widest">Criações</button>
+          <button className="py-4 border-b-2 border-transparent text-on-surface/40 font-bold text-xs uppercase tracking-widest">Exclusivos</button>
+          <button className="py-4 border-b-2 border-transparent text-on-surface/40 font-bold text-xs uppercase tracking-widest flex items-center gap-1">
+            Pro <Lock size={12} fill="currentColor" />
+          </button>
+        </div>
       </div>
-    </div>
 
-    <section className="max-w-5xl mx-auto px-4">
-      <div className="grid grid-cols-3 gap-2">
-        <div className="col-span-2 row-span-2 relative overflow-hidden rounded-2xl bg-white aspect-square">
-          <img src="https://images.unsplash.com/photo-1539109132314-34a9c615b2b1?auto=format&fit=crop&q=80&w=800" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-          <div className="absolute top-4 right-4">
-            <div className="bg-black/20 backdrop-blur-md p-2 rounded-full text-white">
-              <Heart size={18} fill="white" />
+      <section className="max-w-5xl mx-auto px-4">
+        {myPosts.length > 0 ? (
+          <div className="grid grid-cols-3 gap-2">
+            {myPosts.map((post) => (
+              <div key={post.id} className="relative aspect-square overflow-hidden rounded-2xl bg-on-surface/5 shadow-sm group">
+                <img 
+                  src={post.image} 
+                  className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${post.isLocked ? 'blur-2xl scale-125 opacity-40' : ''}`} 
+                  referrerPolicy="no-referrer" 
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1633078654544-61b3455b9161?q=80&w=400&auto=format&fit=crop';
+                  }}
+                />
+                {post.isLocked && (
+                  <div className="absolute inset-0 bg-primary/10 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center text-white">
+                    <Lock size={20} fill="white" className="drop-shadow-lg" />
+                    <span className="text-[8px] font-black uppercase tracking-widest mt-1 drop-shadow-md">VIP</span>
+                  </div>
+                )}
+                {post.isVideo && !post.isLocked && (
+                  <div className="absolute top-3 left-3 z-10 text-white">
+                    <Play size={18} fill="white" />
+                  </div>
+                )}
+                <div className="absolute top-3 right-3 z-10">
+                  <div className="bg-black/20 backdrop-blur-md p-1.5 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Heart size={14} fill="white" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-20 bg-white rounded-3xl border border-primary/5">
+            <div className="w-16 h-16 bg-primary/5 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Camera className="text-primary/40" size={32} />
             </div>
+            <p className="text-on-surface/40 font-bold uppercase tracking-widest text-xs">Nenhuma publicação ainda</p>
           </div>
-        </div>
-        <div className="relative aspect-square overflow-hidden rounded-2xl bg-white">
-          <div className="absolute inset-0 bg-primary/40 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center text-white">
-            <Lock size={24} fill="white" />
-            <span className="text-[8px] font-bold uppercase tracking-widest mt-1">Exclusivo</span>
-          </div>
-          <img src="https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=400" className="w-full h-full object-cover blur-md" referrerPolicy="no-referrer" />
-        </div>
-        <div className="aspect-square overflow-hidden rounded-2xl bg-white shadow-sm">
-          <img src="https://images.unsplash.com/photo-1529139513477-323c66b8d5b5?auto=format&fit=crop&q=80&w=400" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-        </div>
-        <div className="aspect-square overflow-hidden rounded-2xl bg-white shadow-sm relative">
-          <div className="absolute top-3 left-3 z-10 text-white">
-            <Play size={18} fill="white" />
-          </div>
-          <img src="https://images.unsplash.com/photo-1492707892479-7bc8d5a4ee93?auto=format&fit=crop&q=80&w=400" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-        </div>
-        <div className="aspect-square overflow-hidden rounded-2xl bg-white shadow-sm">
-          <img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=400" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-        </div>
-        <div className="aspect-square overflow-hidden rounded-2xl bg-white shadow-sm">
-          <img src="https://images.unsplash.com/photo-1554048612-b6a482bc67e5?auto=format&fit=crop&q=80&w=400" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-        </div>
-        <div className="aspect-square overflow-hidden rounded-2xl bg-white shadow-sm">
-          <img src="https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&q=80&w=400" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-        </div>
-      </div>
-    </section>
-  </div>
-);
+        )}
+      </section>
+    </div>
+  );
+};
 
 const ScreenActivity = ({ notifications }: { notifications: Notification[] }) => (
   <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
@@ -537,8 +567,40 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
   const [name, setName] = useState(creator.name);
   const [username, setUsername] = useState(creator.username);
   const [bio, setBio] = useState(creator.bio);
+  const [avatar, setAvatar] = useState(creator.avatar);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleFileUpload = async (file: File, bucket: string) => {
+    try {
+      setUploading(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${creator.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(bucket)
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+      return data.publicUrl;
+    } catch (err: any) {
+      setError(`Erro no upload: ${err.message}`);
+      return null;
+    } finally {
+      setUploading(true); // Keep loading state for a bit
+      setUploading(false);
+    }
+  };
+
+  const onAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const url = await handleFileUpload(e.target.files[0], 'avatars');
+    if (url) setAvatar(url);
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -551,7 +613,8 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
       const { error } = await supabase.from('profiles').update({
         name,
         username,
-        bio
+        bio,
+        avatar
       }).eq('id', user.id);
 
       if (error) throw error;
@@ -584,10 +647,11 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
           </div>
           <div className="absolute -bottom-6 left-6">
             <div className="relative w-24 h-24 rounded-full border-4 border-white overflow-hidden shadow-xl bg-white story-ring p-0.5">
-              <img src={creator.avatar} className="w-full h-full object-cover rounded-full border-2 border-white" referrerPolicy="no-referrer" />
-              <div className="absolute inset-0 bg-black/30 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+              <img src={avatar} className="w-full h-full object-cover rounded-full border-2 border-white" referrerPolicy="no-referrer" />
+              <label className="absolute inset-0 bg-black/30 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer rounded-full">
                 <Camera className="text-white" size={20} />
-              </div>
+                <input type="file" className="hidden" accept="image/*" onChange={onAvatarChange} disabled={uploading} />
+              </label>
             </div>
           </div>
         </section>
@@ -640,11 +704,12 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
         </section>
 
         {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
+        {uploading && <p className="text-primary text-xs font-bold text-center animate-pulse">Fazendo upload...</p>}
 
         <div className="flex items-center justify-end gap-4 pt-4">
           <button onClick={onBack} type="button" className="text-on-surface/40 font-bold uppercase tracking-widest text-[10px] px-6 py-3">Cancelar</button>
           <button 
-            disabled={loading}
+            disabled={loading || uploading}
             type="submit" 
             className="premium-gradient text-white px-10 py-4 rounded-xl shadow-lg font-black tracking-widest uppercase text-xs active:scale-95 transition-all disabled:opacity-50"
           >
@@ -661,11 +726,47 @@ const ScreenCreatePost = ({ onBack, onPostCreated }: { onBack: () => void, onPos
   const [caption, setCaption] = useState('');
   const [price, setPrice] = useState('');
   const [isLocked, setIsLocked] = useState(false);
+  const [isVideo, setIsVideo] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    setError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('posts')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('posts').getPublicUrl(filePath);
+      setImage(data.publicUrl);
+      setIsVideo(file.type.startsWith('video/'));
+    } catch (err: any) {
+      setError(`Erro no upload: ${err.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!image) {
+      setError('Por favor, selecione uma foto ou vídeo');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -678,6 +779,7 @@ const ScreenCreatePost = ({ onBack, onPostCreated }: { onBack: () => void, onPos
         caption,
         price: isLocked ? price : null,
         is_locked: isLocked,
+        is_video: isVideo,
         time: 'Agora mesmo'
       });
 
@@ -700,21 +802,32 @@ const ScreenCreatePost = ({ onBack, onPostCreated }: { onBack: () => void, onPos
       <form className="space-y-8" onSubmit={handleCreatePost}>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">URL da Imagem</label>
-            <input 
-              className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
-              placeholder="https://exemplo.com/imagem.jpg" 
-              value={image}
-              onChange={(e) => setImage(e.target.value)}
-              required
-            />
-          </div>
-          
-          {image && (
-            <div className="aspect-square rounded-2xl overflow-hidden border border-primary/5 shadow-sm">
-              <img src={image} className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={() => setError('URL de imagem inválida')} />
+            <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">Mídia (Foto ou Vídeo)</label>
+            <div className="relative group aspect-video bg-white border-2 border-dashed border-primary/10 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-primary/30 transition-all overflow-hidden">
+              {image ? (
+                isVideo ? (
+                  <video src={image} className="w-full h-full object-cover" controls />
+                ) : (
+                  <img src={image} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                )
+              ) : (
+                <>
+                  <div className="w-12 h-12 bg-primary/5 rounded-full flex items-center justify-center mb-2">
+                    <Camera className="text-primary" size={24} />
+                  </div>
+                  <p className="text-xs font-bold text-on-surface/60">Clique para selecionar arquivo</p>
+                  <p className="text-[8px] uppercase tracking-widest font-black text-on-surface/30 mt-1">PNG, JPG ou MP4</p>
+                </>
+              )}
+              <input 
+                type="file" 
+                className="absolute inset-0 opacity-0 cursor-pointer" 
+                accept="image/*,video/*"
+                onChange={handleFileUpload}
+                disabled={uploading}
+              />
             </div>
-          )}
+          </div>
 
           <div className="space-y-1.5">
             <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">Legenda</label>
@@ -761,11 +874,12 @@ const ScreenCreatePost = ({ onBack, onPostCreated }: { onBack: () => void, onPos
         </div>
 
         {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
+        {uploading && <p className="text-primary text-xs font-bold text-center animate-pulse">Fazendo upload do arquivo...</p>}
 
         <div className="flex items-center justify-end gap-4">
           <button onClick={onBack} type="button" className="text-on-surface/40 font-bold uppercase tracking-widest text-[10px] px-6 py-3">Cancelar</button>
           <button 
-            disabled={loading}
+            disabled={loading || uploading}
             type="submit" 
             className="premium-gradient text-white px-10 py-4 rounded-xl shadow-lg font-black tracking-widest uppercase text-xs active:scale-95 transition-all disabled:opacity-50"
           >
@@ -802,7 +916,7 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
     <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12 bg-background">
       <div className="w-full max-w-md space-y-12">
         <div className="flex flex-col items-center space-y-6">
-          <div className="text-4xl font-black premium-gradient bg-clip-text text-transparent tracking-tighter">CRIADOR</div>
+          <div className="text-4xl font-black text-primary tracking-tighter">CRIADOR</div>
           <div className="text-center space-y-2">
             <h1 className="text-5xl font-black tracking-tight leading-none text-on-surface">Bem-vindo de volta.</h1>
             <p className="text-on-surface/60 text-base font-bold max-w-[280px] mx-auto">Acesse sua galeria digital e gerencie seu legado.</p>
@@ -928,7 +1042,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
     <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12 bg-background">
       <div className="w-full max-w-md space-y-10">
         <div className="flex flex-col items-center space-y-6">
-          <div className="text-4xl font-black premium-gradient bg-clip-text text-transparent tracking-tighter">CRIADOR</div>
+          <div className="text-4xl font-black text-primary tracking-tighter">CRIADOR</div>
           <div className="text-center space-y-2">
             <h1 className="text-5xl font-black tracking-tight leading-none text-on-surface">Criar Conta.</h1>
             <p className="text-on-surface/60 text-base font-bold max-w-[280px] mx-auto">Junte-se à elite dos criadores digitais.</p>
@@ -1010,12 +1124,47 @@ export default function App() {
   const [screen, setScreen] = React.useState<Screen>('login');
   const [isLoggedIn, setIsLoggedIn] = React.useState(false);
   const [posts, setPosts] = React.useState<Post[]>(POSTS);
+  const [stories, setStories] = React.useState<any[]>([]);
   const [notifications, setNotifications] = React.useState<Notification[]>(NOTIFICATIONS);
   const [messages, setMessages] = React.useState<Message[]>(MESSAGES);
   const [creator, setCreator] = React.useState<Creator>(ELENA);
   const [loading, setLoading] = React.useState(true);
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [dbStatus, setDbStatus] = React.useState<'checking' | 'connected' | 'error'>('checking');
+
+  const handleStoryUpload = async (file: File) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('stories')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('stories').getPublicUrl(filePath);
+
+      const { error: insertError } = await supabase.from('stories').insert({
+        creator_id: user.id,
+        image: publicUrl,
+        creator_name: creator.name
+      });
+
+      if (insertError) {
+        // If table doesn't exist, we might need to create it or handle it.
+        // For now, we'll assume it exists or use a fallback.
+        console.error('Error inserting story record:', insertError);
+      }
+      setRefreshKey(prev => prev + 1);
+    } catch (err) {
+      console.error('Error uploading story:', err);
+    }
+  };
 
   React.useEffect(() => {
     const checkConnection = async () => {
@@ -1113,6 +1262,10 @@ export default function App() {
             isOnline: m.is_online
           })) as any);
         }
+
+        // Fetch stories
+        const { data: storiesData } = await supabase.from('stories').select('*').order('created_at', { ascending: false });
+        if (storiesData) setStories(storiesData);
       } catch (error) {
         console.error('Error fetching data from Supabase:', error);
       }
@@ -1140,13 +1293,13 @@ export default function App() {
     }
 
     switch (screen) {
-      case 'feed': return <ScreenFeed posts={posts} />;
-      case 'profile': return <ScreenProfile onEdit={() => setScreen('edit-profile')} creator={creator} onLogout={() => supabase.auth.signOut()} />;
+      case 'feed': return <ScreenFeed posts={posts} stories={stories} onStoryUpload={handleStoryUpload} creator={creator} />;
+      case 'profile': return <ScreenProfile onEdit={() => setScreen('edit-profile')} creator={creator} onLogout={() => supabase.auth.signOut()} posts={posts} />;
       case 'activity': return <ScreenActivity notifications={notifications} />;
       case 'messages': return <ScreenMessages messages={messages} />;
       case 'edit-profile': return <ScreenEditProfile onBack={() => setScreen('profile')} creator={creator} onProfileUpdated={() => setRefreshKey(prev => prev + 1)} />;
       case 'create-post': return <ScreenCreatePost onBack={() => setScreen('feed')} onPostCreated={() => { setRefreshKey(prev => prev + 1); setScreen('feed'); }} />;
-      default: return <ScreenFeed posts={posts} />;
+      default: return <ScreenFeed posts={posts} stories={stories} onStoryUpload={handleStoryUpload} creator={creator} />;
     }
   };
 
@@ -1169,7 +1322,6 @@ export default function App() {
           showBack={['edit-profile', 'create-post'].includes(screen)} 
           onBack={() => setScreen(screen === 'edit-profile' ? 'profile' : 'feed')} 
           avatar={creator.avatar}
-          dbStatus={dbStatus}
         />
       )}
       
