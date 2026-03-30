@@ -170,15 +170,101 @@ const TopNav = ({ title = "Safadinha +18", showBack = false, onBack = () => {}, 
   </header>
 );
 
+const ScreenWallet = ({ onBack }: { onBack: () => void }) => {
+  const [balance, setBalance] = useState('R$ 45,00');
+  const [loading, setLoading] = useState(false);
+
+  const creditOptions = [
+    { id: '1', amount: 'R$ 20,00', credits: '20' },
+    { id: '2', amount: 'R$ 50,00', credits: '55', badge: '+5 BÔNUS' },
+    { id: '3', amount: 'R$ 100,00', credits: '120', badge: '+20 BÔNUS' },
+    { id: '4', amount: 'R$ 200,00', credits: '250', badge: '+50 BÔNUS' },
+  ];
+
+  const handleAddCredits = (amount: string) => {
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      alert(`Simulação: Pagamento de ${amount} iniciado.`);
+    }, 1500);
+  };
+
+  return (
+    <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
+      <section className="mb-8 pt-8">
+        <h1 className="text-4xl font-extrabold tracking-tight mb-1">Minha Carteira</h1>
+        <p className="text-on-surface/60 text-sm font-medium">Gerencie seus créditos e pagamentos.</p>
+      </section>
+
+      <div className="bg-white p-8 rounded-3xl border border-primary/5 shadow-sm mb-10 text-center relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-4 opacity-5">
+          <CreditCard size={120} />
+        </div>
+        <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-2">Saldo Disponível</p>
+        <h2 className="text-5xl font-black text-on-surface tracking-tighter">{balance}</h2>
+        <div className="mt-6 flex justify-center gap-2">
+          <div className="px-4 py-1.5 bg-primary/10 rounded-full flex items-center gap-2">
+            <Crown size={14} className="text-primary" />
+            <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Membro VIP</span>
+          </div>
+        </div>
+      </div>
+
+      <section className="space-y-6">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="font-bold text-lg text-on-surface">Adicionar Créditos</h3>
+          <span className="text-[10px] font-black text-primary uppercase tracking-widest">Melhor Valor</span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4">
+          {creditOptions.map((option) => (
+            <button
+              key={option.id}
+              onClick={() => handleAddCredits(option.amount)}
+              disabled={loading}
+              className="bg-white p-5 rounded-2xl border border-primary/5 shadow-sm flex items-center justify-between hover:border-primary/30 transition-all active:scale-[0.98]"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-primary/5 rounded-full flex items-center justify-center">
+                  <PlusCircle size={24} className="text-primary" />
+                </div>
+                <div className="text-left">
+                  <h4 className="font-black text-on-surface text-lg leading-none">{option.credits} Créditos</h4>
+                  {option.badge && (
+                    <span className="text-[8px] font-black text-primary uppercase tracking-widest">{option.badge}</span>
+                  )}
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="block font-black text-primary text-xl">{option.amount}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-12 bg-primary/5 p-6 rounded-3xl border border-primary/10">
+        <div className="flex items-center gap-3 mb-4">
+          <ShieldCheck className="text-primary" size={20} />
+          <h3 className="font-bold text-sm text-on-surface uppercase tracking-widest">Segurança Garantida</h3>
+        </div>
+        <p className="text-xs text-on-surface/60 leading-relaxed font-medium">
+          Todas as transações são criptografadas e processadas de forma segura. Seus dados financeiros nunca são armazenados em nossos servidores.
+        </p>
+      </section>
+    </div>
+  );
+};
+
 const BottomNav = ({ active, onChange }: { active: Screen, onChange: (s: Screen) => void }) => (
   <nav className="fixed bottom-0 w-full flex justify-around items-center px-4 py-3 bg-white border-t border-primary/5 z-50">
     <button onClick={() => onChange('feed')} className={`flex flex-col items-center gap-1 transition-all ${active === 'feed' ? 'text-primary' : 'text-on-surface/40'}`}>
       <Home size={24} />
       <span className="text-[10px] font-bold">Início</span>
     </button>
-    <button onClick={() => onChange('messages')} className={`flex flex-col items-center gap-1 transition-all ${active === 'messages' ? 'text-primary' : 'text-on-surface/40'}`}>
-      <MessageCircle size={24} />
-      <span className="text-[10px] font-bold">Mensagens</span>
+    <button onClick={() => onChange('wallet')} className={`flex flex-col items-center gap-1 transition-all ${active === 'wallet' ? 'text-primary' : 'text-on-surface/40'}`}>
+      <CreditCard size={24} />
+      <span className="text-[10px] font-bold">Carteira</span>
     </button>
     <button onClick={() => onChange('create-post')} className={`p-2 bg-primary text-white rounded-full shadow-lg shadow-primary/20 transition-transform active:scale-90 ${active === 'create-post' ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
       <PlusCircle size={28} />
@@ -196,54 +282,91 @@ const BottomNav = ({ active, onChange }: { active: Screen, onChange: (s: Screen)
 
 // --- Components ---
 
-const FullScreenPostModal = ({ post, onClose }: { post: Post | null, onClose: () => void }) => (
-  <AnimatePresence>
-    {post && (
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center"
-      >
-        <button 
-          onClick={onClose}
-          className="absolute top-6 right-6 text-white/70 hover:text-white z-[110]"
-        >
-          <X size={32} />
-        </button>
-        
-        <div className="w-full h-full flex items-center justify-center p-4">
-          {post.isVideo ? (
-            <video 
-              src={post.image} 
-              className="max-w-full max-h-full rounded-lg shadow-2xl" 
-              controls 
-              autoPlay 
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <img 
-              src={post.image} 
-              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" 
-              referrerPolicy="no-referrer"
-            />
-          )}
-        </div>
+const FullScreenPostModal = ({ 
+  post, 
+  onClose, 
+  onDelete, 
+  onEdit, 
+  currentUserId 
+}: { 
+  post: Post | null, 
+  onClose: () => void, 
+  onDelete?: (id: string) => void, 
+  onEdit?: (post: Post) => void,
+  currentUserId?: string 
+}) => {
+  const isOwner = post?.creator.id === currentUserId;
 
-        <div className="absolute bottom-0 w-full p-8 bg-gradient-to-t from-black/80 to-transparent text-white">
-          <div className="flex items-center gap-3 mb-4">
-            <img src={post.creator.avatar} className="w-10 h-10 rounded-full object-cover border border-white/20" referrerPolicy="no-referrer" />
-            <div>
-              <p className="font-bold text-sm">{post.creator.name}</p>
-              <p className="text-[10px] text-white/60 uppercase tracking-widest">{post.time}</p>
-            </div>
+  return (
+    <AnimatePresence>
+      {post && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center"
+        >
+          <div className="absolute top-6 right-6 flex items-center gap-4 z-[110]">
+            {isOwner && onDelete && onEdit && (
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => onEdit(post)}
+                  className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-colors"
+                >
+                  Editar
+                </button>
+                <button 
+                  onClick={() => {
+                    onDelete(post.id);
+                    onClose();
+                  }}
+                  className="bg-red-500/20 hover:bg-red-500/40 text-red-500 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-colors"
+                >
+                  Excluir
+                </button>
+              </div>
+            )}
+            <button 
+              onClick={onClose}
+              className="text-white/70 hover:text-white"
+            >
+              <X size={32} />
+            </button>
           </div>
-          <p className="text-sm text-white/80 leading-relaxed">{post.caption}</p>
-        </div>
-      </motion.div>
-    )}
-  </AnimatePresence>
-);
+          
+          <div className="w-full h-full flex items-center justify-center p-4">
+            {post.isVideo ? (
+              <video 
+                src={post.image} 
+                className="max-w-full max-h-full rounded-lg shadow-2xl" 
+                controls 
+                autoPlay 
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <img 
+                src={post.image} 
+                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" 
+                referrerPolicy="no-referrer"
+              />
+            )}
+          </div>
+
+          <div className="absolute bottom-0 w-full p-8 bg-gradient-to-t from-black/80 to-transparent text-white">
+            <div className="flex items-center gap-3 mb-4">
+              <img src={post.creator.avatar} className="w-10 h-10 rounded-full object-cover border border-white/20" referrerPolicy="no-referrer" />
+              <div>
+                <p className="font-bold text-sm">{post.creator.name}</p>
+                <p className="text-[10px] text-white/60 uppercase tracking-widest">{post.time}</p>
+              </div>
+            </div>
+            <p className="text-sm text-white/80 leading-relaxed">{post.caption}</p>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
 
 const CropModal = ({ image, onCropComplete, onClose, aspect = 1 }: { image: string, onCropComplete: (croppedImage: Blob) => void, onClose: () => void, aspect?: number }) => {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
@@ -341,16 +464,155 @@ const CropModal = ({ image, onCropComplete, onClose, aspect = 1 }: { image: stri
   );
 };
 
+const StoryViewer = ({ stories, initialIndex, onClose, onDelete }: { stories: any[], initialIndex: number, onClose: () => void, onDelete: (id: string) => void }) => {
+  const [currentIndex, setCurrentIndex] = React.useState(initialIndex);
+  const story = stories[currentIndex];
+
+  React.useEffect(() => {
+    if (!story) return;
+    const timer = setTimeout(() => {
+      if (currentIndex < stories.length - 1) {
+        setCurrentIndex(prev => prev + 1);
+      } else {
+        onClose();
+      }
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [currentIndex, stories.length, story, onClose]);
+
+  if (!story) return null;
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center">
+      <div className="absolute top-0 w-full p-4 flex gap-1 z-[210]">
+        {stories.map((_, i) => (
+          <div key={i} className="h-1 flex-1 bg-white/20 rounded-full overflow-hidden">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: i === currentIndex ? '100%' : i < currentIndex ? '100%' : '0%' }}
+              transition={{ duration: i === currentIndex ? 5 : 0, ease: 'linear' }}
+              className="h-full bg-white"
+            />
+          </div>
+        ))}
+      </div>
+      
+      <div className="absolute top-8 left-0 right-0 p-4 flex justify-between items-center z-[210]">
+        <div className="flex items-center gap-3">
+          <img src={story.image} className="w-10 h-10 rounded-full object-cover border border-white/20" referrerPolicy="no-referrer" />
+          <span className="text-white font-bold text-sm">{story.creator_name || 'Você'}</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => {
+              if (confirm('Excluir este story?')) {
+                onDelete(story.id);
+                if (stories.length === 1) onClose();
+                else if (currentIndex === stories.length - 1) setCurrentIndex(prev => prev - 1);
+              }
+            }}
+            className="text-white/70 hover:text-red-500 transition-colors"
+          >
+            Excluir
+          </button>
+          <button onClick={onClose} className="text-white/70 hover:text-white">
+            <X size={32} />
+          </button>
+        </div>
+      </div>
+
+      <div className="w-full h-full flex items-center justify-center">
+        <img src={story.image} className="max-w-full max-h-full object-contain" referrerPolicy="no-referrer" />
+      </div>
+    </div>
+  );
+};
+
+const EditPostModal = ({ post, onSave, onClose }: { post: Post, onSave: (id: string, caption: string) => void, onClose: () => void }) => {
+  const [caption, setCaption] = React.useState(post.caption);
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl"
+      >
+        <div className="p-6 border-b border-primary/5 flex justify-between items-center">
+          <h3 className="font-black uppercase tracking-widest text-xs">Editar Postagem</h3>
+          <button onClick={onClose} className="text-on-surface/40"><X size={20} /></button>
+        </div>
+        <div className="p-6 space-y-6">
+          <div className="aspect-square rounded-2xl overflow-hidden bg-on-surface/5">
+            <img src={post.image} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-on-surface/40 mb-2">Legenda</label>
+            <textarea 
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              className="w-full p-4 bg-on-surface/5 rounded-2xl text-sm focus:ring-2 focus:ring-primary outline-none min-h-[100px]"
+              placeholder="Escreva algo..."
+            />
+          </div>
+          <button 
+            onClick={() => onSave(post.id, caption)}
+            className="w-full py-4 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs"
+          >
+            Salvar Alterações
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 // --- Screens ---
 
-const ScreenFeed = ({ posts, stories, onStoryUpload, creator }: { posts: Post[], stories: any[], onStoryUpload: (file: File) => void, creator: Creator }) => {
+const ScreenFeed = ({ 
+  posts, 
+  stories, 
+  onStoryUpload, 
+  creator, 
+  onDeletePost, 
+  onUpdatePost,
+  onDeleteStory,
+  onSubscribe
+}: { 
+  posts: Post[], 
+  stories: any[], 
+  onStoryUpload: (file: File) => void, 
+  creator: Creator,
+  onDeletePost: (id: string) => void,
+  onUpdatePost: (id: string, caption: string) => void,
+  onDeleteStory: (id: string) => void,
+  onSubscribe: () => void
+}) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
+  const [editingPost, setEditingPost] = React.useState<Post | null>(null);
+  const [activeStoryIndex, setActiveStoryIndex] = React.useState<number | null>(null);
+  const [showPostMenu, setShowPostMenu] = React.useState<string | null>(null);
 
   return (
     <div className="pt-20 pb-24 max-w-2xl mx-auto">
-      {/* Full Screen Modal */}
-      <FullScreenPostModal post={selectedPost} onClose={() => setSelectedPost(null)} />
+      {/* Modals */}
+      <FullScreenPostModal 
+        post={selectedPost} 
+        onClose={() => setSelectedPost(null)} 
+        onDelete={onDeletePost}
+        onEdit={setEditingPost}
+        currentUserId={creator.id}
+      />
+      {editingPost && <EditPostModal post={editingPost} onSave={onUpdatePost} onClose={() => setEditingPost(null)} />}
+      {activeStoryIndex !== null && (
+        <StoryViewer 
+          stories={stories} 
+          initialIndex={activeStoryIndex} 
+          onClose={() => setActiveStoryIndex(null)} 
+          onDelete={onDeleteStory}
+        />
+      )}
 
       {/* Stories */}
       <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 py-6 bg-white border-b border-primary/5">
@@ -377,45 +639,87 @@ const ScreenFeed = ({ posts, stories, onStoryUpload, creator }: { posts: Post[],
           </div>
           <span className="text-[10px] font-bold text-on-surface">Você</span>
         </div>
-        {stories.map((story) => (
-          <div key={story.id} className="flex flex-col items-center gap-2 flex-shrink-0">
+        {stories.map((story, index) => (
+          <div 
+            key={story.id} 
+            className="flex flex-col items-center gap-2 flex-shrink-0 cursor-pointer"
+            onClick={() => setActiveStoryIndex(index)}
+          >
             <div className="p-[3px] rounded-full story-ring">
               <div className="p-0.5 bg-white rounded-full">
                 <img src={story.image} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
               </div>
             </div>
-            <span className="text-[10px] font-bold text-on-surface/60">{story.creator_name || 'Amigo'}</span>
-          </div>
-        ))}
-        {stories.length === 0 && ['Valentina', 'Kael', 'Mariana', 'Thiago', 'Lucas', 'Bia'].map((name) => (
-          <div key={name} className="flex flex-col items-center gap-2 flex-shrink-0">
-            <div className="p-[3px] rounded-full story-ring">
-              <div className="p-0.5 bg-white rounded-full">
-                <img src={`https://picsum.photos/seed/${name}/200`} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
-              </div>
-            </div>
-            <span className="text-[10px] font-bold text-on-surface/60">{name}</span>
+            <span className="text-[10px] font-bold text-on-surface/60">{story.creator_name || 'Você'}</span>
           </div>
         ))}
       </div>
 
     {/* Posts */}
     <div className="space-y-4 py-4">
-      {posts.map(post => (
-        <article key={post.id} className="bg-white shadow-sm">
-          <div className="flex items-center justify-between p-4">
-            <div className="flex items-center gap-3">
-              <img src={post.creator.avatar} className="w-10 h-10 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
-              <div>
-                <div className="flex items-center gap-1">
-                  <p className="font-bold text-sm">{post.creator.name}</p>
-                  <CheckCircle2 size={12} className="text-primary fill-primary/10" />
+      {posts.map(post => {
+        const isOwner = post.creator.id === creator.id;
+        
+        return (
+          <article key={post.id} className="bg-white shadow-sm">
+            <div className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-3">
+                <img src={post.creator.avatar} className="w-10 h-10 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
+                <div>
+                  <div className="flex items-center gap-1">
+                    <p className="font-bold text-sm">{post.creator.name}</p>
+                    <CheckCircle2 size={12} className="text-primary fill-primary/10" />
+                  </div>
+                  <p className="text-[10px] text-on-surface/40 font-bold uppercase tracking-wider">{post.time}</p>
                 </div>
-                <p className="text-[10px] text-on-surface/40 font-bold uppercase tracking-wider">{post.time}</p>
+              </div>
+              
+              <div className="relative">
+                <button 
+                  onClick={() => setShowPostMenu(showPostMenu === post.id ? null : post.id)}
+                  className="text-on-surface/40 hover:text-primary transition-colors"
+                >
+                  <MoreHorizontal size={20} />
+                </button>
+                
+                {showPostMenu === post.id && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-primary/5 z-50 overflow-hidden">
+                    {isOwner ? (
+                      <>
+                        <button 
+                          onClick={() => {
+                            setEditingPost(post);
+                            setShowPostMenu(null);
+                          }}
+                          className="w-full px-4 py-3 text-left text-sm font-bold hover:bg-primary/5 flex items-center gap-2"
+                        >
+                          Editar Postagem
+                        </button>
+                        <button 
+                          onClick={() => {
+                            onDeletePost(post.id);
+                            setShowPostMenu(null);
+                          }}
+                          className="w-full px-4 py-3 text-left text-sm font-bold text-red-500 hover:bg-red-50 flex items-center gap-2"
+                        >
+                          Excluir Postagem
+                        </button>
+                      </>
+                    ) : (
+                      <button 
+                        onClick={() => {
+                          alert('Denunciado com sucesso!');
+                          setShowPostMenu(null);
+                        }}
+                        className="w-full px-4 py-3 text-left text-sm font-bold text-red-500 hover:bg-red-50"
+                      >
+                        Denunciar
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
-            <MoreHorizontal className="text-on-surface/40 cursor-pointer" />
-          </div>
           
           <div 
             className="aspect-square relative overflow-hidden bg-on-surface/5 cursor-pointer"
@@ -449,7 +753,10 @@ const ScreenFeed = ({ posts, stories, onStoryUpload, creator }: { posts: Post[],
                   <p className="text-xs text-white/80 mb-8 font-bold uppercase tracking-widest leading-relaxed">
                     Desbloqueie este post exclusivo do criador.
                   </p>
-                  <button className="w-full py-4 px-8 premium-gradient text-white font-black rounded-2xl shadow-xl active:scale-95 transition-all text-[10px] uppercase tracking-[0.2em]">
+                  <button 
+                    onClick={onSubscribe}
+                    className="w-full py-4 px-8 premium-gradient text-white font-black rounded-2xl shadow-xl active:scale-95 transition-all text-[10px] uppercase tracking-[0.2em]"
+                  >
                     ASSINAR POR {post.price || 'R$ 19,90'}
                   </button>
                 </div>
@@ -481,21 +788,59 @@ const ScreenFeed = ({ posts, stories, onStoryUpload, creator }: { posts: Post[],
             </div>
           </div>
         </article>
-      ))}
-    </div>
+      );
+    })}
   </div>
-  );
+</div>
+);
 };
 
-const ScreenProfile = ({ onEdit, creator, onLogout, posts }: { onEdit: () => void, creator: Creator, onLogout: () => void, posts: Post[] }) => {
+const ScreenProfile = ({ 
+  onEdit, 
+  creator, 
+  onLogout, 
+  posts,
+  onDeletePost,
+  onUpdatePost,
+  onSubscribe,
+  stories,
+  onDeleteStory
+}: { 
+  onEdit: () => void, 
+  creator: Creator, 
+  onLogout: () => void, 
+  posts: Post[],
+  onDeletePost: (id: string) => void,
+  onUpdatePost: (id: string, caption: string) => void,
+  onSubscribe: () => void,
+  stories: any[],
+  onDeleteStory: (id: string) => void
+}) => {
   const myPosts = posts.filter(p => p.creator.id === creator.id);
+  const myStories = stories.filter(s => s.creator_id === creator.id);
   const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
+  const [editingPost, setEditingPost] = React.useState<Post | null>(null);
+  const [activeStoryIndex, setActiveStoryIndex] = React.useState<number | null>(null);
   
   return (
     <div className="pt-0 pb-24">
-      {/* Full Screen Modal */}
-      <FullScreenPostModal post={selectedPost} onClose={() => setSelectedPost(null)} />
-
+      {/* Modals */}
+      <FullScreenPostModal 
+        post={selectedPost} 
+        onClose={() => setSelectedPost(null)} 
+        onDelete={onDeletePost}
+        onEdit={setEditingPost}
+        currentUserId={creator.id}
+      />
+      {editingPost && <EditPostModal post={editingPost} onSave={onUpdatePost} onClose={() => setEditingPost(null)} />}
+      {activeStoryIndex !== null && (
+        <StoryViewer 
+          stories={myStories} 
+          initialIndex={activeStoryIndex} 
+          onClose={() => setActiveStoryIndex(null)} 
+          onDelete={onDeleteStory}
+        />
+      )}
       {/* Cover Image */}
       <div className="h-48 md:h-64 w-full relative overflow-hidden bg-on-surface/5">
         <img 
@@ -511,8 +856,14 @@ const ScreenProfile = ({ onEdit, creator, onLogout, posts }: { onEdit: () => voi
 
       <section className="max-w-4xl mx-auto px-6 text-center -mt-20 relative z-10">
         <div className="relative inline-block mb-6">
-          <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-full p-[4px] story-ring bg-background shadow-2xl">
+          <div 
+            className="relative w-40 h-40 md:w-48 md:h-48 rounded-full p-[4px] story-ring bg-background shadow-2xl cursor-pointer"
+            onClick={() => myStories.length > 0 && setActiveStoryIndex(0)}
+          >
             <img src={creator.avatar} className="w-full h-full object-cover rounded-full border-4 border-white" referrerPolicy="no-referrer" />
+            {myStories.length > 0 && (
+              <div className="absolute inset-0 rounded-full border-4 border-primary animate-pulse pointer-events-none"></div>
+            )}
           </div>
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator.name}</h1>
@@ -554,7 +905,7 @@ const ScreenProfile = ({ onEdit, creator, onLogout, posts }: { onEdit: () => voi
           </div>
           
           <button 
-            onClick={() => (window as any).setScreen('payment')}
+            onClick={onSubscribe}
             className="w-full py-5 bg-black text-white font-black rounded-2xl shadow-xl active:scale-95 transition-all uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-3"
           >
             <Crown size={20} className="text-yellow-400" fill="currentColor" />
@@ -639,14 +990,24 @@ const ScreenProfile = ({ onEdit, creator, onLogout, posts }: { onEdit: () => voi
   );
 };
 
-const ScreenPublicProfile = ({ creator, posts, onSubscribe }: { creator: Creator, posts: Post[], onSubscribe: () => void }) => {
+const ScreenPublicProfile = ({ creator, posts, onSubscribe, stories }: { creator: Creator, posts: Post[], onSubscribe: () => void, stories: any[] }) => {
   const myPosts = posts.filter(p => p.creator.id === creator.id);
+  const myStories = stories.filter(s => s.creator_id === creator.id);
   const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
+  const [activeStoryIndex, setActiveStoryIndex] = React.useState<number | null>(null);
   
   return (
     <div className="pt-0 pb-24">
       {/* Full Screen Modal */}
       <FullScreenPostModal post={selectedPost} onClose={() => setSelectedPost(null)} />
+      {activeStoryIndex !== null && (
+        <StoryViewer 
+          stories={myStories} 
+          initialIndex={activeStoryIndex} 
+          onClose={() => setActiveStoryIndex(null)} 
+          onDelete={() => {}} // Can't delete other people's stories
+        />
+      )}
 
       {/* Cover Image */}
       <div className="h-48 md:h-64 w-full relative overflow-hidden bg-on-surface/5">
@@ -663,8 +1024,14 @@ const ScreenPublicProfile = ({ creator, posts, onSubscribe }: { creator: Creator
 
       <section className="max-w-4xl mx-auto px-6 text-center -mt-20 relative z-10">
         <div className="relative inline-block mb-6">
-          <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-full p-[4px] story-ring bg-background shadow-2xl">
+          <div 
+            className="relative w-40 h-40 md:w-48 md:h-48 rounded-full p-[4px] story-ring bg-background shadow-2xl cursor-pointer"
+            onClick={() => myStories.length > 0 && setActiveStoryIndex(0)}
+          >
             <img src={creator.avatar} className="w-full h-full object-cover rounded-full border-4 border-white" referrerPolicy="no-referrer" />
+            {myStories.length > 0 && (
+              <div className="absolute inset-0 rounded-full border-4 border-primary animate-pulse pointer-events-none"></div>
+            )}
           </div>
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator.name}</h1>
@@ -1644,7 +2011,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
 export default function App() {
   const [screen, setScreen] = React.useState<Screen>(() => {
     const saved = localStorage.getItem('safadinha_screen');
-    if (saved && ['feed', 'profile', 'activity', 'messages', 'edit-profile', 'create-post'].includes(saved)) {
+    if (saved && ['feed', 'profile', 'activity', 'messages', 'edit-profile', 'create-post', 'wallet', 'payment'].includes(saved)) {
       return saved as Screen;
     }
     return 'login';
@@ -1660,10 +2027,47 @@ export default function App() {
   const [loading, setLoading] = React.useState(true);
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [dbStatus, setDbStatus] = React.useState<'checking' | 'connected' | 'error'>('checking');
+  const [editingPost, setEditingPost] = React.useState<Post | null>(null);
+
+  const handleDeletePost = async (postId: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta postagem?')) return;
+    try {
+      const { error } = await supabase.from('posts').delete().eq('id', postId);
+      if (error) throw error;
+      setPosts(prev => prev.filter(p => p.id !== postId));
+    } catch (err) {
+      console.error('Error deleting post:', err);
+      alert('Erro ao excluir postagem.');
+    }
+  };
+
+  const handleUpdatePost = async (postId: string, newCaption: string) => {
+    try {
+      const { error } = await supabase.from('posts').update({ caption: newCaption }).eq('id', postId);
+      if (error) throw error;
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, caption: newCaption } : p));
+      setEditingPost(null);
+    } catch (err) {
+      console.error('Error updating post:', err);
+      alert('Erro ao atualizar postagem.');
+    }
+  };
+
+  const handleDeleteStory = async (storyId: string) => {
+    if (!confirm('Tem certeza que deseja excluir este story?')) return;
+    try {
+      const { error } = await supabase.from('stories').delete().eq('id', storyId);
+      if (error) throw error;
+      setStories(prev => prev.filter(s => s.id !== storyId));
+    } catch (err) {
+      console.error('Error deleting story:', err);
+      alert('Erro ao excluir story.');
+    }
+  };
 
   // Save screen to localStorage whenever it changes
   React.useEffect(() => {
-    if (isLoggedIn && !['login', 'register', 'public-profile', 'payment'].includes(screen)) {
+    if (isLoggedIn && !['login', 'register', 'public-profile'].includes(screen)) {
       localStorage.setItem('safadinha_screen', screen);
     }
   }, [screen, isLoggedIn]);
@@ -1868,6 +2272,7 @@ export default function App() {
           <ScreenPublicProfile 
             creator={publicCreator} 
             posts={publicPosts} 
+            stories={stories}
             onSubscribe={() => {
               if (isLoggedIn) {
                 alert('Você já está logado! Processando assinatura...');
@@ -1885,13 +2290,37 @@ export default function App() {
     }
 
     switch (screen) {
-      case 'feed': return <ScreenFeed posts={posts} stories={stories} onStoryUpload={handleStoryUpload} creator={creator} />;
-      case 'profile': return <ScreenProfile onEdit={() => setScreen('edit-profile')} creator={creator} onLogout={() => supabase.auth.signOut()} posts={posts} />;
+      case 'feed': return (
+        <ScreenFeed 
+          posts={posts} 
+          stories={stories.filter(s => s.creator_id === creator.id)} 
+          onStoryUpload={handleStoryUpload} 
+          creator={creator} 
+          onDeletePost={handleDeletePost}
+          onUpdatePost={handleUpdatePost}
+          onDeleteStory={handleDeleteStory}
+          onSubscribe={() => setScreen('payment')}
+        />
+      );
+      case 'profile': return (
+        <ScreenProfile 
+          onEdit={() => setScreen('edit-profile')} 
+          creator={creator} 
+          onLogout={() => supabase.auth.signOut()} 
+          posts={posts}
+          onDeletePost={handleDeletePost}
+          onUpdatePost={handleUpdatePost}
+          onSubscribe={() => setScreen('payment')}
+          stories={stories}
+          onDeleteStory={handleDeleteStory}
+        />
+      );
       case 'public-profile': 
         return publicCreator ? (
           <ScreenPublicProfile 
             creator={publicCreator} 
             posts={publicPosts} 
+            stories={stories}
             onSubscribe={() => {
               if (isLoggedIn) {
                 setScreen('payment');
@@ -1901,14 +2330,35 @@ export default function App() {
             }} 
           />
         ) : (
-          <ScreenFeed posts={posts} stories={stories} onStoryUpload={handleStoryUpload} creator={creator} />
+          <ScreenFeed 
+            posts={posts} 
+            stories={stories.filter(s => s.creator_id === creator.id)} 
+            onStoryUpload={handleStoryUpload} 
+            creator={creator} 
+            onDeletePost={handleDeletePost}
+            onUpdatePost={handleUpdatePost}
+            onDeleteStory={handleDeleteStory}
+            onSubscribe={() => setScreen('payment')}
+          />
         );
       case 'activity': return <ScreenActivity notifications={notifications} />;
       case 'messages': return <ScreenMessages messages={messages} />;
+      case 'wallet': return <ScreenWallet onBack={() => setScreen('feed')} />;
       case 'edit-profile': return <ScreenEditProfile onBack={() => setScreen('profile')} creator={creator} onProfileUpdated={() => setRefreshKey(prev => prev + 1)} />;
       case 'create-post': return <ScreenCreatePost onBack={() => setScreen('feed')} onPostCreated={() => { setRefreshKey(prev => prev + 1); setScreen('feed'); }} />;
       case 'payment': return <ScreenPayment onBack={() => setScreen('feed')} creator={publicCreator || creator} />;
-      default: return <ScreenFeed posts={posts} stories={stories} onStoryUpload={handleStoryUpload} creator={creator} />;
+      default: return (
+        <ScreenFeed 
+          posts={posts} 
+          stories={stories.filter(s => s.creator_id === creator.id)} 
+          onStoryUpload={handleStoryUpload} 
+          creator={creator} 
+          onDeletePost={handleDeletePost}
+          onUpdatePost={handleUpdatePost}
+          onDeleteStory={handleDeleteStory}
+          onSubscribe={() => setScreen('payment')}
+        />
+      );
     }
   };
 
@@ -1916,6 +2366,7 @@ export default function App() {
     if (screen === 'profile') return 'PERFIL';
     if (screen === 'activity') return 'ATIVIDADE';
     if (screen === 'messages') return 'MENSAGENS';
+    if (screen === 'wallet') return 'CARTEIRA';
     if (screen === 'edit-profile') return 'EDITAR';
     if (screen === 'create-post') return 'POSTAR';
     if (screen === 'payment') return 'ASSINAR';
