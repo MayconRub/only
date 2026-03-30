@@ -61,90 +61,15 @@ const GABRIEL: Creator = {
   avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400',
 };
 
-const POSTS: Post[] = [
-  {
-    id: '1',
-    creator: ELENA,
-    image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=800',
-    likes: '1.248',
-    caption: 'Novas ideias florescendo para a próxima coleção. O que acham dessa paleta? ✨ #fashion #creative',
-    time: 'Há 2 horas'
-  },
-  {
-    id: '2',
-    creator: { ...ELENA, name: 'Kael', id: 'kael' },
-    image: 'https://images.unsplash.com/photo-1554048612-b6a482bc67e5?auto=format&fit=crop&q=80&w=800',
-    likes: '850',
-    caption: 'Atrás desta cortina digital está o meu trabalho mais pessoal...',
-    time: 'Há 5 horas',
-    isLocked: true,
-    price: 'R$ 15,00'
-  },
-  {
-    id: '3',
-    creator: { ...ELENA, name: 'Mariana', id: 'mariana' },
-    image: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&q=80&w=800',
-    likes: '3.402',
-    caption: 'Vlog de hoje em SP. Energia tá lá em cima! 🏙️⚡️',
-    time: 'Há 8 horas',
-    isVideo: true
-  }
-];
+const POSTS: Post[] = [];
 
-const NOTIFICATIONS: Notification[] = [
-  {
-    id: '1',
-    type: 'sale',
-    user: { name: 'Marina Silva', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200', isVerified: true },
-    content: 'comprou seu conteúdo exclusivo "Masterclass de Design".',
-    time: 'Agora mesmo',
-    badge: 'VENDA PREMIUM',
-    thumbnail: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=200'
-  },
-  {
-    id: '2',
-    type: 'subscription',
-    user: { name: 'Ricardo Oliveira', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200' },
-    content: 'assinou seu perfil anual.',
-    time: '2h atrás'
-  },
-  {
-    id: '3',
-    type: 'like',
-    user: { name: 'André Santos', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200' },
-    content: 'e outras 12 pessoas curtiram seu post.',
-    time: '5h atrás',
-    thumbnail: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&q=80&w=200'
-  }
-];
+const NOTIFICATIONS: Notification[] = [];
 
-const MESSAGES: Message[] = [
-  {
-    id: '1',
-    user: { ...ELENA, name: 'Valentina Lima', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200' },
-    lastMessage: 'Acabei de postar as fotos novas do ensaio!',
-    time: '14:20',
-    unreadCount: 2,
-    isOnline: true
-  },
-  {
-    id: '2',
-    user: { ...ELENA, name: 'Marco Aurélio', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200' },
-    lastMessage: 'Mensagem trancada. Faça upgrade para Ouro.',
-    time: 'Ontem',
-    isLocked: true
-  },
-  {
-    id: '3',
-    user: { ...ELENA, name: 'Bia Nunes', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200' },
-    lastMessage: 'Obrigado pelo apoio no projeto!',
-    time: 'Ontem'
-  }
-];
+const MESSAGES: Message[] = [];
 
 // --- Components ---
 
-const TopNav = ({ title = "Safadinha +18", showBack = false, onBack = () => {}, avatar }: { title?: string, showBack?: boolean, onBack?: () => void, avatar?: string }) => (
+const TopNav = ({ title = "Novinha do JOB MOC", showBack = false, onBack = () => {}, avatar }: { title?: string, showBack?: boolean, onBack?: () => void, avatar?: string }) => (
   <header className="fixed top-0 w-full flex justify-between items-center px-6 py-4 glass-header z-50">
     <div className="flex items-center gap-4">
       {showBack ? (
@@ -1676,7 +1601,7 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
     <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12 bg-background">
       <div className="w-full max-w-md space-y-12">
         <div className="flex flex-col items-center space-y-6">
-          <div className="text-4xl font-black text-primary tracking-tighter">Safadinha +18</div>
+          <div className="text-4xl font-black text-primary tracking-tighter">Novinha do JOB MOC</div>
           <div className="text-center space-y-2">
             <p className="text-on-surface/60 text-base font-bold max-w-[280px] mx-auto">Acesse sua galeria digital e gerencie seu legado.</p>
           </div>
@@ -1801,7 +1726,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
     <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12 bg-background">
       <div className="w-full max-w-md space-y-10">
         <div className="flex flex-col items-center space-y-6">
-          <div className="text-4xl font-black text-primary tracking-tighter">Safadinha +18</div>
+          <div className="text-4xl font-black text-primary tracking-tighter">Novinha do JOB MOC</div>
           <div className="text-center space-y-2">
             <h1 className="text-5xl font-black tracking-tight leading-none text-on-surface">Criar Conta.</h1>
             <p className="text-on-surface/60 text-base font-bold max-w-[280px] mx-auto">Junte-se à elite dos criadores digitais.</p>
@@ -2038,17 +1963,17 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
 
 export default function App() {
   const [screen, setScreen] = React.useState<Screen>(() => {
-    const saved = localStorage.getItem('safadinha_screen');
+    const saved = localStorage.getItem('novinha_screen');
     if (saved && ['feed', 'profile', 'activity', 'messages', 'edit-profile', 'create-post', 'wallet', 'payment'].includes(saved)) {
       return saved as Screen;
     }
     return 'login';
   });
   const [isLoggedIn, setIsLoggedIn] = React.useState(false);
-  const [posts, setPosts] = React.useState<Post[]>(POSTS);
+  const [posts, setPosts] = React.useState<Post[]>([]);
   const [stories, setStories] = React.useState<any[]>([]);
-  const [notifications, setNotifications] = React.useState<Notification[]>(NOTIFICATIONS);
-  const [messages, setMessages] = React.useState<Message[]>(MESSAGES);
+  const [notifications, setNotifications] = React.useState<Notification[]>([]);
+  const [messages, setMessages] = React.useState<Message[]>([]);
   const [creator, setCreator] = React.useState<Creator>(ELENA);
   const [publicCreator, setPublicCreator] = React.useState<Creator | null>(null);
   const [publicPosts, setPublicPosts] = React.useState<Post[]>([]);
@@ -2099,7 +2024,7 @@ export default function App() {
   // Save screen to localStorage whenever it changes
   React.useEffect(() => {
     if (isLoggedIn && !['login', 'register', 'public-profile'].includes(screen)) {
-      localStorage.setItem('safadinha_screen', screen);
+      localStorage.setItem('novinha_screen', screen);
     }
   }, [screen, isLoggedIn]);
 
@@ -2157,7 +2082,7 @@ export default function App() {
         setUserEmail(session.user.email || null);
         setScreen(prev => {
           if (['login', 'register'].includes(prev)) {
-            const saved = localStorage.getItem('safadinha_screen');
+            const saved = localStorage.getItem('novinha_screen');
             return (saved as Screen) || 'feed';
           }
           return prev;
@@ -2173,7 +2098,7 @@ export default function App() {
         setUserEmail(session.user.email || null);
         setScreen(prev => {
           if (['login', 'register'].includes(prev)) {
-            const saved = localStorage.getItem('safadinha_screen');
+            const saved = localStorage.getItem('novinha_screen');
             return (saved as Screen) || 'feed';
           }
           return prev;
@@ -2424,7 +2349,7 @@ export default function App() {
     if (screen === 'edit-profile') return 'EDITAR';
     if (screen === 'create-post') return 'POSTAR';
     if (screen === 'payment') return 'ASSINAR';
-    return 'Safadinha +18';
+    return 'Novinha do JOB MOC';
   };
 
   const showNav = isLoggedIn && !['edit-profile', 'create-post', 'public-profile', 'payment'].includes(screen);
