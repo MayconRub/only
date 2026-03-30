@@ -138,7 +138,7 @@ const MESSAGES: Message[] = [
 
 // --- Components ---
 
-const TopNav = ({ title = "CRIADOR", showBack = false, onBack = () => {}, avatar }: { title?: string, showBack?: boolean, onBack?: () => void, avatar?: string }) => (
+const TopNav = ({ title = "Safadinha +18", showBack = false, onBack = () => {}, avatar }: { title?: string, showBack?: boolean, onBack?: () => void, avatar?: string }) => (
   <header className="fixed top-0 w-full flex justify-between items-center px-6 py-4 glass-header z-50">
     <div className="flex items-center gap-4">
       {showBack ? (
@@ -321,10 +321,23 @@ const ScreenProfile = ({ onEdit, creator, onLogout, posts }: { onEdit: () => voi
   const myPosts = posts.filter(p => p.creator.id === creator.id);
   
   return (
-    <div className="pt-20 pb-24">
-      <section className="max-w-4xl mx-auto px-6 text-center pt-8">
+    <div className="pt-0 pb-24">
+      {/* Cover Image */}
+      <div className="h-48 md:h-64 w-full relative overflow-hidden bg-on-surface/5">
+        <img 
+          src={creator.cover_image || 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=1200'} 
+          className="w-full h-full object-cover" 
+          referrerPolicy="no-referrer"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=1200';
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-background"></div>
+      </div>
+
+      <section className="max-w-4xl mx-auto px-6 text-center -mt-20 relative z-10">
         <div className="relative inline-block mb-6">
-          <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-full p-[4px] story-ring">
+          <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-full p-[4px] story-ring bg-background shadow-2xl">
             <img src={creator.avatar} className="w-full h-full object-cover rounded-full border-4 border-white" referrerPolicy="no-referrer" />
           </div>
         </div>
@@ -568,6 +581,7 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
   const [username, setUsername] = useState(creator.username);
   const [bio, setBio] = useState(creator.bio);
   const [avatar, setAvatar] = useState(creator.avatar);
+  const [coverImage, setCoverImage] = useState(creator.cover_image || '');
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -591,7 +605,6 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
       setError(`Erro no upload: ${err.message}`);
       return null;
     } finally {
-      setUploading(true); // Keep loading state for a bit
       setUploading(false);
     }
   };
@@ -600,6 +613,12 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
     if (!e.target.files || e.target.files.length === 0) return;
     const url = await handleFileUpload(e.target.files[0], 'avatars');
     if (url) setAvatar(url);
+  };
+
+  const onCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const url = await handleFileUpload(e.target.files[0], 'covers');
+    if (url) setCoverImage(url);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -614,7 +633,8 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
         name,
         username,
         bio,
-        avatar
+        avatar,
+        cover_image: coverImage
       }).eq('id', user.id);
 
       if (error) throw error;
@@ -637,11 +657,16 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
       <form className="space-y-10" onSubmit={handleSave}>
         <section className="relative">
           <div className="group relative h-40 w-full rounded-2xl overflow-hidden bg-white shadow-sm border border-primary/5">
-            <img src="https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=800" className="w-full h-full object-cover opacity-80" referrerPolicy="no-referrer" />
+            <img 
+              src={coverImage || 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=800'} 
+              className="w-full h-full object-cover opacity-80" 
+              referrerPolicy="no-referrer" 
+            />
             <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
               <label className="cursor-pointer flex flex-col items-center gap-1.5 bg-white/90 px-5 py-2.5 rounded-full backdrop-blur-sm shadow-lg">
                 <Camera className="text-primary" size={18} />
                 <span className="text-[8px] uppercase font-black tracking-widest text-primary">Alterar Capa</span>
+                <input type="file" className="hidden" accept="image/*" onChange={onCoverChange} disabled={uploading} />
               </label>
             </div>
           </div>
@@ -916,9 +941,8 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
     <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12 bg-background">
       <div className="w-full max-w-md space-y-12">
         <div className="flex flex-col items-center space-y-6">
-          <div className="text-4xl font-black text-primary tracking-tighter">CRIADOR</div>
+          <div className="text-4xl font-black text-primary tracking-tighter">Safadinha +18</div>
           <div className="text-center space-y-2">
-            <h1 className="text-5xl font-black tracking-tight leading-none text-on-surface">Bem-vindo de volta.</h1>
             <p className="text-on-surface/60 text-base font-bold max-w-[280px] mx-auto">Acesse sua galeria digital e gerencie seu legado.</p>
           </div>
         </div>
@@ -1042,7 +1066,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
     <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12 bg-background">
       <div className="w-full max-w-md space-y-10">
         <div className="flex flex-col items-center space-y-6">
-          <div className="text-4xl font-black text-primary tracking-tighter">CRIADOR</div>
+          <div className="text-4xl font-black text-primary tracking-tighter">Safadinha +18</div>
           <div className="text-center space-y-2">
             <h1 className="text-5xl font-black tracking-tight leading-none text-on-surface">Criar Conta.</h1>
             <p className="text-on-surface/60 text-base font-bold max-w-[280px] mx-auto">Junte-se à elite dos criadores digitais.</p>
@@ -1309,7 +1333,7 @@ export default function App() {
     if (screen === 'messages') return 'MENSAGENS';
     if (screen === 'edit-profile') return 'EDITAR';
     if (screen === 'create-post') return 'POSTAR';
-    return 'CRIADOR';
+    return 'Safadinha +18';
   };
 
   const showNav = isLoggedIn && !['edit-profile', 'create-post'].includes(screen);

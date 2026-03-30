@@ -5,6 +5,7 @@ export interface Creator {
   name: string;
   username: string;
   avatar: string;
+  cover_image?: string;
   bio?: string;
   stats?: {
     posts: string;
