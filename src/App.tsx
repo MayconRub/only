@@ -27,7 +27,8 @@ import {
   Star,
   ChevronRight,
   Camera,
-  Link as LinkIcon
+  Link as LinkIcon,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Screen, Post, Notification, Message, Creator } from './types';
@@ -192,9 +193,58 @@ const BottomNav = ({ active, onChange }: { active: Screen, onChange: (s: Screen)
 
 const ScreenFeed = ({ posts, stories, onStoryUpload, creator }: { posts: Post[], stories: any[], onStoryUpload: (file: File) => void, creator: Creator }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
 
   return (
     <div className="pt-20 pb-24 max-w-2xl mx-auto">
+      {/* Full Screen Modal */}
+      <AnimatePresence>
+        {selectedPost && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center"
+          >
+            <button 
+              onClick={() => setSelectedPost(null)}
+              className="absolute top-6 right-6 text-white/70 hover:text-white z-[110]"
+            >
+              <X size={32} />
+            </button>
+            
+            <div className="w-full h-full flex items-center justify-center p-4">
+              {selectedPost.isVideo ? (
+                <video 
+                  src={selectedPost.image} 
+                  className="max-w-full max-h-full rounded-lg shadow-2xl" 
+                  controls 
+                  autoPlay 
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <img 
+                  src={selectedPost.image} 
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" 
+                  referrerPolicy="no-referrer"
+                />
+              )}
+            </div>
+
+            <div className="absolute bottom-0 w-full p-8 bg-gradient-to-t from-black/80 to-transparent text-white">
+              <div className="flex items-center gap-3 mb-4">
+                <img src={selectedPost.creator.avatar} className="w-10 h-10 rounded-full object-cover border border-white/20" referrerPolicy="no-referrer" />
+                <div>
+                  <p className="font-bold text-sm">{selectedPost.creator.name}</p>
+                  <p className="text-[10px] text-white/60 uppercase tracking-widest">{selectedPost.time}</p>
+                </div>
+              </div>
+              <p className="text-sm text-white/80 leading-relaxed">{selectedPost.caption}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Stories */}
       <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 py-6 bg-white border-b border-primary/5">
         <input 
@@ -260,15 +310,28 @@ const ScreenFeed = ({ posts, stories, onStoryUpload, creator }: { posts: Post[],
             <MoreHorizontal className="text-on-surface/40 cursor-pointer" />
           </div>
           
-          <div className="aspect-square relative overflow-hidden bg-on-surface/5">
-            <img 
-              src={post.image} 
-              className={`w-full h-full object-cover transition-all duration-700 ${post.isLocked ? 'blur-[60px] scale-110 opacity-50' : 'hover:scale-105'}`} 
-              referrerPolicy="no-referrer"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1633078654544-61b3455b9161?q=80&w=400&auto=format&fit=crop'; // Fallback image
-              }}
-            />
+          <div 
+            className="aspect-square relative overflow-hidden bg-on-surface/5 cursor-pointer"
+            onClick={() => !post.isLocked && setSelectedPost(post)}
+          >
+            {post.isVideo ? (
+              <video 
+                src={post.image} 
+                className={`w-full h-full object-cover transition-all duration-700 ${post.isLocked ? 'blur-[60px] scale-110 opacity-50' : 'hover:scale-105'}`} 
+                preload="metadata"
+                playsInline
+                muted
+              />
+            ) : (
+              <img 
+                src={post.image} 
+                className={`w-full h-full object-cover transition-all duration-700 ${post.isLocked ? 'blur-[60px] scale-110 opacity-50' : 'hover:scale-105'}`} 
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1633078654544-61b3455b9161?q=80&w=400&auto=format&fit=crop'; // Fallback image
+                }}
+              />
+            )}
             {post.isLocked && (
               <div className="absolute inset-0 flex items-center justify-center p-6 bg-black/20">
                 <div className="bg-white/10 backdrop-blur-2xl p-8 rounded-[2.5rem] flex flex-col items-center text-center shadow-2xl border border-white/20 w-full max-w-[280px]">
