@@ -31,6 +31,7 @@ import {
   X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import Cropper from 'react-easy-crop';
 import { Screen, Post, Notification, Message, Creator } from './types';
 import { supabase } from './lib/supabase';
 
@@ -189,6 +190,153 @@ const BottomNav = ({ active, onChange }: { active: Screen, onChange: (s: Screen)
   </nav>
 );
 
+// --- Components ---
+
+const FullScreenPostModal = ({ post, onClose }: { post: Post | null, onClose: () => void }) => (
+  <AnimatePresence>
+    {post && (
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center"
+      >
+        <button 
+          onClick={onClose}
+          className="absolute top-6 right-6 text-white/70 hover:text-white z-[110]"
+        >
+          <X size={32} />
+        </button>
+        
+        <div className="w-full h-full flex items-center justify-center p-4">
+          {post.isVideo ? (
+            <video 
+              src={post.image} 
+              className="max-w-full max-h-full rounded-lg shadow-2xl" 
+              controls 
+              autoPlay 
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <img 
+              src={post.image} 
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" 
+              referrerPolicy="no-referrer"
+            />
+          )}
+        </div>
+
+        <div className="absolute bottom-0 w-full p-8 bg-gradient-to-t from-black/80 to-transparent text-white">
+          <div className="flex items-center gap-3 mb-4">
+            <img src={post.creator.avatar} className="w-10 h-10 rounded-full object-cover border border-white/20" referrerPolicy="no-referrer" />
+            <div>
+              <p className="font-bold text-sm">{post.creator.name}</p>
+              <p className="text-[10px] text-white/60 uppercase tracking-widest">{post.time}</p>
+            </div>
+          </div>
+          <p className="text-sm text-white/80 leading-relaxed">{post.caption}</p>
+        </div>
+      </motion.div>
+    )}
+  </AnimatePresence>
+);
+
+const CropModal = ({ image, onCropComplete, onClose, aspect = 1 }: { image: string, onCropComplete: (croppedImage: Blob) => void, onClose: () => void, aspect?: number }) => {
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+
+  const onCropChange = (crop: any) => setCrop(crop);
+  const onZoomChange = (zoom: number) => setZoom(zoom);
+  const onCropCompleteInternal = (croppedArea: any, croppedAreaPixels: any) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  };
+
+  const createImage = (url: string): Promise<HTMLImageElement> =>
+    new Promise((resolve, reject) => {
+      const image = new Image();
+      image.addEventListener('load', () => resolve(image));
+      image.addEventListener('error', (error) => reject(error));
+      image.setAttribute('crossOrigin', 'anonymous');
+      image.src = url;
+    });
+
+  const getCroppedImg = async (imageSrc: string, pixelCrop: any): Promise<Blob> => {
+    const image = await createImage(imageSrc);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) throw new Error('No 2d context');
+
+    canvas.width = pixelCrop.width;
+    canvas.height = pixelCrop.height;
+
+    ctx.drawImage(
+      image,
+      pixelCrop.x,
+      pixelCrop.y,
+      pixelCrop.width,
+      pixelCrop.height,
+      0,
+      0,
+      pixelCrop.width,
+      pixelCrop.height
+    );
+
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('Canvas is empty'));
+          return;
+        }
+        resolve(blob);
+      }, 'image/jpeg');
+    });
+  };
+
+  const handleDone = async () => {
+    try {
+      const croppedBlob = await getCroppedImg(image, croppedAreaPixels);
+      onCropComplete(croppedBlob);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-black flex flex-col">
+      <div className="flex justify-between items-center p-4 bg-white z-10">
+        <button onClick={onClose} className="text-on-surface/60 font-bold uppercase tracking-widest text-xs">Cancelar</button>
+        <h3 className="font-bold uppercase tracking-widest text-xs">Ajustar Imagem</h3>
+        <button onClick={handleDone} className="text-primary font-bold uppercase tracking-widest text-xs">Concluir</button>
+      </div>
+      <div className="relative flex-1 bg-on-surface/10">
+        <Cropper
+          image={image}
+          crop={crop}
+          zoom={zoom}
+          aspect={aspect}
+          onCropChange={onCropChange}
+          onCropComplete={onCropCompleteInternal}
+          onZoomChange={onZoomChange}
+        />
+      </div>
+      <div className="p-6 bg-white">
+        <input
+          type="range"
+          value={zoom}
+          min={1}
+          max={3}
+          step={0.1}
+          aria-labelledby="Zoom"
+          onChange={(e) => setZoom(Number(e.target.value))}
+          className="w-full h-2 bg-primary/10 rounded-lg appearance-none cursor-pointer accent-primary"
+        />
+      </div>
+    </div>
+  );
+};
+
 // --- Screens ---
 
 const ScreenFeed = ({ posts, stories, onStoryUpload, creator }: { posts: Post[], stories: any[], onStoryUpload: (file: File) => void, creator: Creator }) => {
@@ -198,52 +346,7 @@ const ScreenFeed = ({ posts, stories, onStoryUpload, creator }: { posts: Post[],
   return (
     <div className="pt-20 pb-24 max-w-2xl mx-auto">
       {/* Full Screen Modal */}
-      <AnimatePresence>
-        {selectedPost && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center"
-          >
-            <button 
-              onClick={() => setSelectedPost(null)}
-              className="absolute top-6 right-6 text-white/70 hover:text-white z-[110]"
-            >
-              <X size={32} />
-            </button>
-            
-            <div className="w-full h-full flex items-center justify-center p-4">
-              {selectedPost.isVideo ? (
-                <video 
-                  src={selectedPost.image} 
-                  className="max-w-full max-h-full rounded-lg shadow-2xl" 
-                  controls 
-                  autoPlay 
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <img 
-                  src={selectedPost.image} 
-                  className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" 
-                  referrerPolicy="no-referrer"
-                />
-              )}
-            </div>
-
-            <div className="absolute bottom-0 w-full p-8 bg-gradient-to-t from-black/80 to-transparent text-white">
-              <div className="flex items-center gap-3 mb-4">
-                <img src={selectedPost.creator.avatar} className="w-10 h-10 rounded-full object-cover border border-white/20" referrerPolicy="no-referrer" />
-                <div>
-                  <p className="font-bold text-sm">{selectedPost.creator.name}</p>
-                  <p className="text-[10px] text-white/60 uppercase tracking-widest">{selectedPost.time}</p>
-                </div>
-              </div>
-              <p className="text-sm text-white/80 leading-relaxed">{selectedPost.caption}</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <FullScreenPostModal post={selectedPost} onClose={() => setSelectedPost(null)} />
 
       {/* Stories */}
       <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 py-6 bg-white border-b border-primary/5">
@@ -382,9 +485,13 @@ const ScreenFeed = ({ posts, stories, onStoryUpload, creator }: { posts: Post[],
 
 const ScreenProfile = ({ onEdit, creator, onLogout, posts }: { onEdit: () => void, creator: Creator, onLogout: () => void, posts: Post[] }) => {
   const myPosts = posts.filter(p => p.creator.id === creator.id);
+  const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
   
   return (
     <div className="pt-0 pb-24">
+      {/* Full Screen Modal */}
+      <FullScreenPostModal post={selectedPost} onClose={() => setSelectedPost(null)} />
+
       {/* Cover Image */}
       <div className="h-48 md:h-64 w-full relative overflow-hidden bg-on-surface/5">
         <img 
@@ -407,23 +514,23 @@ const ScreenProfile = ({ onEdit, creator, onLogout, posts }: { onEdit: () => voi
         <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator.name}</h1>
         <p className="text-base text-primary font-bold mb-8">{creator.bio}</p>
 
-        <div className="flex justify-center items-center gap-10 mb-10 py-6 px-8 bg-white rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5">
-          <div className="text-center">
+        <div className="flex justify-center items-center gap-4 sm:gap-10 mb-10 py-6 px-4 sm:px-8 bg-white rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5 overflow-hidden">
+          <div className="text-center min-w-[60px]">
             <span className="block text-xl font-bold">{myPosts.length}</span>
             <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
           </div>
-          <div className="w-px h-8 bg-primary/10"></div>
-          <div className="text-center">
+          <div className="w-px h-8 bg-primary/10 flex-shrink-0"></div>
+          <div className="text-center min-w-[60px]">
             <span className="block text-xl font-bold">{creator.stats?.followers || '0'}</span>
             <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Seguidores</span>
           </div>
-          <div className="w-px h-8 bg-primary/10"></div>
-          <div className="text-center">
+          <div className="w-px h-8 bg-primary/10 flex-shrink-0"></div>
+          <div className="text-center min-w-[60px]">
             <span className="block text-xl font-bold">{creator.stats?.likes || '0'}</span>
             <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Curtidas</span>
           </div>
         </div>
-
+        
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6 max-w-md mx-auto">
           <button onClick={onEdit} className="w-full py-4 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs">
             Editar Perfil
@@ -470,15 +577,29 @@ const ScreenProfile = ({ onEdit, creator, onLogout, posts }: { onEdit: () => voi
         {myPosts.length > 0 ? (
           <div className="grid grid-cols-3 gap-2">
             {myPosts.map((post) => (
-              <div key={post.id} className="relative aspect-square overflow-hidden rounded-2xl bg-on-surface/5 shadow-sm group">
-                <img 
-                  src={post.image} 
-                  className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${post.isLocked ? 'blur-2xl scale-125 opacity-40' : ''}`} 
-                  referrerPolicy="no-referrer" 
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1633078654544-61b3455b9161?q=80&w=400&auto=format&fit=crop';
-                  }}
-                />
+              <div 
+                key={post.id} 
+                className="relative aspect-square overflow-hidden rounded-2xl bg-on-surface/5 shadow-sm group cursor-pointer"
+                onClick={() => !post.isLocked && setSelectedPost(post)}
+              >
+                {post.isVideo ? (
+                  <video 
+                    src={post.image} 
+                    className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${post.isLocked ? 'blur-2xl scale-125 opacity-40' : ''}`} 
+                    preload="metadata"
+                    playsInline
+                    muted
+                  />
+                ) : (
+                  <img 
+                    src={post.image} 
+                    className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${post.isLocked ? 'blur-2xl scale-125 opacity-40' : ''}`} 
+                    referrerPolicy="no-referrer" 
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1633078654544-61b3455b9161?q=80&w=400&auto=format&fit=crop';
+                    }}
+                  />
+                )}
                 {post.isLocked && (
                   <div className="absolute inset-0 bg-primary/10 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center text-white">
                     <Lock size={20} fill="white" className="drop-shadow-lg" />
@@ -513,9 +634,13 @@ const ScreenProfile = ({ onEdit, creator, onLogout, posts }: { onEdit: () => voi
 
 const ScreenPublicProfile = ({ creator, posts, onSubscribe }: { creator: Creator, posts: Post[], onSubscribe: () => void }) => {
   const myPosts = posts.filter(p => p.creator.id === creator.id);
+  const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
   
   return (
     <div className="pt-0 pb-24">
+      {/* Full Screen Modal */}
+      <FullScreenPostModal post={selectedPost} onClose={() => setSelectedPost(null)} />
+
       {/* Cover Image */}
       <div className="h-48 md:h-64 w-full relative overflow-hidden bg-on-surface/5">
         <img 
@@ -538,18 +663,18 @@ const ScreenPublicProfile = ({ creator, posts, onSubscribe }: { creator: Creator
         <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator.name}</h1>
         <p className="text-base text-primary font-bold mb-8">{creator.bio}</p>
 
-        <div className="flex justify-center items-center gap-10 mb-10 py-6 px-8 bg-white rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5">
-          <div className="text-center">
+        <div className="flex justify-center items-center gap-4 sm:gap-10 mb-10 py-6 px-4 sm:px-8 bg-white rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5 overflow-hidden">
+          <div className="text-center min-w-[60px]">
             <span className="block text-xl font-bold">{myPosts.length}</span>
             <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
           </div>
-          <div className="w-px h-8 bg-primary/10"></div>
-          <div className="text-center">
+          <div className="w-px h-8 bg-primary/10 flex-shrink-0"></div>
+          <div className="text-center min-w-[60px]">
             <span className="block text-xl font-bold">{creator.stats?.followers || '0'}</span>
             <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Seguidores</span>
           </div>
-          <div className="w-px h-8 bg-primary/10"></div>
-          <div className="text-center">
+          <div className="w-px h-8 bg-primary/10 flex-shrink-0"></div>
+          <div className="text-center min-w-[60px]">
             <span className="block text-xl font-bold">{creator.stats?.likes || '0'}</span>
             <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Curtidas</span>
           </div>
@@ -582,13 +707,26 @@ const ScreenPublicProfile = ({ creator, posts, onSubscribe }: { creator: Creator
             <div 
               key={post.id} 
               className="relative aspect-square overflow-hidden rounded-2xl bg-on-surface/5 shadow-sm group cursor-pointer"
-              onClick={post.isLocked ? onSubscribe : undefined}
+              onClick={() => {
+                if (post.isLocked) onSubscribe();
+                else setSelectedPost(post);
+              }}
             >
-              <img 
-                src={post.image} 
-                className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${post.isLocked ? 'blur-2xl scale-125 opacity-40' : ''}`} 
-                referrerPolicy="no-referrer" 
-              />
+              {post.isVideo ? (
+                <video 
+                  src={post.image} 
+                  className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${post.isLocked ? 'blur-2xl scale-125 opacity-40' : ''}`} 
+                  preload="metadata"
+                  playsInline
+                  muted
+                />
+              ) : (
+                <img 
+                  src={post.image} 
+                  className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${post.isLocked ? 'blur-2xl scale-125 opacity-40' : ''}`} 
+                  referrerPolicy="no-referrer" 
+                />
+              )}
               {post.isLocked && (
                 <div className="absolute inset-0 bg-primary/10 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center text-white">
                   <Lock size={20} fill="white" className="drop-shadow-lg" />
@@ -754,6 +892,7 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cropImage, setCropImage] = useState<{ url: string, bucket: string, aspect: number } | null>(null);
 
   const handleFileUpload = async (file: File, bucket: string) => {
     try {
@@ -780,14 +919,31 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
 
   const onAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-    const url = await handleFileUpload(e.target.files[0], 'avatars');
-    if (url) setAvatar(url);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropImage({ url: reader.result as string, bucket: 'avatars', aspect: 1 });
+    };
+    reader.readAsDataURL(e.target.files[0]);
   };
 
   const onCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-    const url = await handleFileUpload(e.target.files[0], 'covers');
-    if (url) setCoverImage(url);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropImage({ url: reader.result as string, bucket: 'covers', aspect: 16 / 9 });
+    };
+    reader.readAsDataURL(e.target.files[0]);
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob) => {
+    if (!cropImage) return;
+    const file = new File([croppedBlob], `cropped_${Date.now()}.jpg`, { type: 'image/jpeg' });
+    const url = await handleFileUpload(file, cropImage.bucket);
+    if (url) {
+      if (cropImage.bucket === 'avatars') setAvatar(url);
+      else setCoverImage(url);
+    }
+    setCropImage(null);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -818,6 +974,14 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
 
   return (
     <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
+      {cropImage && (
+        <CropModal 
+          image={cropImage.url} 
+          aspect={cropImage.aspect}
+          onCropComplete={handleCropComplete} 
+          onClose={() => setCropImage(null)} 
+        />
+      )}
       <section className="mb-8 pt-8">
         <h1 className="text-4xl font-extrabold tracking-tight mb-1">Editar Perfil</h1>
         <p className="text-on-surface/60 text-sm font-medium">Curadoria do seu espaço digital</p>
