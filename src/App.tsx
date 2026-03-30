@@ -28,7 +28,11 @@ import {
   ChevronRight,
   Camera,
   Link as LinkIcon,
-  X
+  X,
+  Check,
+  CreditCard,
+  ShieldCheck,
+  Crown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Cropper from 'react-easy-crop';
@@ -531,27 +535,30 @@ const ScreenProfile = ({ onEdit, creator, onLogout, posts }: { onEdit: () => voi
           </div>
         </div>
         
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6 max-w-md mx-auto">
-          <button onClick={onEdit} className="w-full py-4 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs">
-            Editar Perfil
-          </button>
+        <div className="flex flex-col gap-3 mb-10 max-w-md mx-auto">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button onClick={onEdit} className="flex-1 py-4 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs">
+              Editar Perfil
+            </button>
+            <button 
+              onClick={() => {
+                const url = `${window.location.origin}/?u=${creator.username}`;
+                navigator.clipboard.writeText(url);
+                alert('Link do perfil copiado!');
+              }}
+              className="flex-1 py-4 bg-primary/5 text-primary font-bold rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase tracking-widest text-xs"
+            >
+              <Share2 size={18} />
+              Compartilhar
+            </button>
+          </div>
+          
           <button 
-            onClick={() => {
-              const url = `${window.location.origin}/?u=${creator.username}`;
-              navigator.clipboard.writeText(url);
-              alert('Link do perfil copiado!');
-            }}
-            className="w-full py-4 bg-primary/5 text-primary font-bold rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase tracking-widest text-xs"
+            onClick={() => (window as any).setScreen('payment')}
+            className="w-full py-5 bg-black text-white font-black rounded-2xl shadow-xl active:scale-95 transition-all uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-3"
           >
-            <Share2 size={18} />
-            Compartilhar
-          </button>
-        </div>
-        
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6 max-w-md mx-auto">
-          <button className="w-full py-4 bg-primary/5 text-primary font-bold rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase tracking-widest text-xs">
-            <Mail size={18} />
-            Mensagem
+            <Crown size={20} className="text-yellow-400" fill="currentColor" />
+            Seja Membro VIP
           </button>
         </div>
         
@@ -1475,10 +1482,173 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
   );
 };
 
+const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creator | null }) => {
+  const [selectedPlan, setSelectedPlan] = useState('monthly');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const plans = [
+    { id: 'monthly', name: 'Mensal', price: 'R$ 29,90', description: 'Acesso total por 30 dias' },
+    { id: 'quarterly', name: 'Trimestral', price: 'R$ 79,90', description: 'Economize 15% - 90 dias', badge: 'Popular' },
+    { id: 'yearly', name: 'Anual', price: 'R$ 249,90', description: 'Economize 30% - 365 dias', badge: 'Melhor Valor' },
+  ];
+
+  const handlePayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    // Simulate payment processing
+    setTimeout(() => {
+      setLoading(false);
+      setSuccess(true);
+    }, 2000);
+  };
+
+  if (success) {
+    return (
+      <div className="fixed inset-0 z-[200] bg-white flex flex-col items-center justify-center p-8 text-center">
+        <motion.div 
+          initial={{ scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center text-white mb-6 shadow-xl shadow-green-200"
+        >
+          <Check size={48} strokeWidth={3} />
+        </motion.div>
+        <h2 className="text-3xl font-black mb-4 uppercase tracking-tight">Assinatura Ativa!</h2>
+        <p className="text-on-surface/60 font-medium mb-10 leading-relaxed">
+          Parabéns! Agora você tem acesso total ao conteúdo exclusivo de <span className="text-primary font-bold">{creator?.name}</span>.
+        </p>
+        <button 
+          onClick={onBack}
+          className="w-full py-5 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-95 transition-all uppercase tracking-widest text-sm"
+        >
+          Começar a Ver
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-background flex flex-col overflow-y-auto no-scrollbar">
+      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md px-6 py-4 flex items-center gap-4 border-b border-primary/5">
+        <button onClick={onBack} className="p-2 -ml-2 text-on-surface/60 hover:text-primary transition-colors">
+          <ArrowLeft size={24} />
+        </button>
+        <h2 className="font-black uppercase tracking-widest text-xs">Pagamento Seguro</h2>
+      </div>
+
+      <div className="p-6 max-w-2xl mx-auto w-full space-y-8 pb-24">
+        <section className="text-center py-4">
+          <div className="relative inline-block mb-4">
+            <img src={creator?.avatar} className="w-24 h-24 rounded-full border-4 border-white shadow-xl object-cover" referrerPolicy="no-referrer" />
+            <div className="absolute -bottom-1 -right-1 bg-primary text-white p-1.5 rounded-full border-2 border-white">
+              <Lock size={14} fill="white" />
+            </div>
+          </div>
+          <h1 className="text-2xl font-black mb-1 uppercase tracking-tight">Assinar {creator?.name}</h1>
+          <p className="text-xs font-bold text-on-surface/40 uppercase tracking-widest">Escolha seu plano de acesso</p>
+        </section>
+
+        <div className="space-y-4">
+          {plans.map((plan) => (
+            <div 
+              key={plan.id}
+              onClick={() => setSelectedPlan(plan.id)}
+              className={`relative p-5 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between ${
+                selectedPlan === plan.id ? 'border-primary bg-primary/5 shadow-lg shadow-primary/5' : 'border-primary/5 bg-white'
+              }`}
+            >
+              {plan.badge && (
+                <span className="absolute -top-2.5 right-6 bg-primary text-white text-[8px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
+                  {plan.badge}
+                </span>
+              )}
+              <div className="flex items-center gap-4">
+                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                  selectedPlan === plan.id ? 'border-primary' : 'border-primary/20'
+                }`}>
+                  {selectedPlan === plan.id && <div className="w-3 h-3 bg-primary rounded-full" />}
+                </div>
+                <div>
+                  <h3 className="font-black text-sm uppercase tracking-tight">{plan.name}</h3>
+                  <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">{plan.description}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="block font-black text-primary text-lg">{plan.price}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <form onSubmit={handlePayment} className="bg-white p-6 rounded-3xl border border-primary/5 shadow-sm space-y-6">
+          <div className="flex items-center gap-2 mb-2">
+            <CreditCard className="text-primary" size={20} />
+            <h3 className="font-bold text-sm text-on-surface uppercase tracking-widest">Detalhes do Cartão</h3>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase tracking-widest font-black text-on-surface/40 px-1">Número do Cartão</label>
+              <input 
+                className="w-full bg-background border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 font-bold text-on-surface" 
+                placeholder="0000 0000 0000 0000"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase tracking-widest font-black text-on-surface/40 px-1">Validade</label>
+                <input 
+                  className="w-full bg-background border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 font-bold text-on-surface" 
+                  placeholder="MM/AA"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase tracking-widest font-black text-on-surface/40 px-1">CVV</label>
+                <input 
+                  className="w-full bg-background border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 font-bold text-on-surface" 
+                  placeholder="123"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          <button 
+            disabled={loading}
+            type="submit"
+            className="w-full py-5 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all uppercase tracking-widest text-sm flex items-center justify-center gap-3"
+          >
+            {loading ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <>
+                <ShieldCheck size={20} />
+                Confirmar Pagamento
+              </>
+            )}
+          </button>
+          
+          <p className="text-[9px] text-center text-on-surface/30 font-bold uppercase tracking-widest leading-relaxed">
+            Pagamento processado de forma segura e criptografada.<br/>Sua privacidade é nossa prioridade.
+          </p>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 // --- Main App ---
 
 export default function App() {
-  const [screen, setScreen] = React.useState<Screen>('login');
+  const [screen, setScreen] = React.useState<Screen>(() => {
+    const saved = localStorage.getItem('safadinha_screen');
+    if (saved && ['feed', 'profile', 'activity', 'messages', 'edit-profile', 'create-post'].includes(saved)) {
+      return saved as Screen;
+    }
+    return 'login';
+  });
   const [isLoggedIn, setIsLoggedIn] = React.useState(false);
   const [posts, setPosts] = React.useState<Post[]>(POSTS);
   const [stories, setStories] = React.useState<any[]>([]);
@@ -1490,6 +1660,13 @@ export default function App() {
   const [loading, setLoading] = React.useState(true);
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [dbStatus, setDbStatus] = React.useState<'checking' | 'connected' | 'error'>('checking');
+
+  // Save screen to localStorage whenever it changes
+  React.useEffect(() => {
+    if (isLoggedIn && !['login', 'register', 'public-profile', 'payment'].includes(screen)) {
+      localStorage.setItem('safadinha_screen', screen);
+    }
+  }, [screen, isLoggedIn]);
 
   const handleStoryUpload = async (file: File) => {
     try {
@@ -1542,7 +1719,13 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setIsLoggedIn(true);
-        setScreen('feed');
+        setScreen(prev => {
+          if (['login', 'register'].includes(prev)) {
+            const saved = localStorage.getItem('safadinha_screen');
+            return (saved as Screen) || 'feed';
+          }
+          return prev;
+        });
       }
       setLoading(false);
     });
@@ -1551,7 +1734,13 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
         setIsLoggedIn(true);
-        setScreen('feed');
+        setScreen(prev => {
+          if (['login', 'register'].includes(prev)) {
+            const saved = localStorage.getItem('safadinha_screen');
+            return (saved as Screen) || 'feed';
+          }
+          return prev;
+        });
       } else {
         setIsLoggedIn(false);
         setScreen('login');
@@ -1659,6 +1848,11 @@ export default function App() {
     }
   }, [isLoggedIn, refreshKey]);
 
+  // Expose setScreen globally for the VIP button in ScreenProfile
+  React.useEffect(() => {
+    (window as any).setScreen = setScreen;
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -1700,7 +1894,7 @@ export default function App() {
             posts={publicPosts} 
             onSubscribe={() => {
               if (isLoggedIn) {
-                alert('Você já está logado! Processando assinatura...');
+                setScreen('payment');
               } else {
                 setScreen('register');
               }
@@ -1713,6 +1907,7 @@ export default function App() {
       case 'messages': return <ScreenMessages messages={messages} />;
       case 'edit-profile': return <ScreenEditProfile onBack={() => setScreen('profile')} creator={creator} onProfileUpdated={() => setRefreshKey(prev => prev + 1)} />;
       case 'create-post': return <ScreenCreatePost onBack={() => setScreen('feed')} onPostCreated={() => { setRefreshKey(prev => prev + 1); setScreen('feed'); }} />;
+      case 'payment': return <ScreenPayment onBack={() => setScreen('feed')} creator={publicCreator || creator} />;
       default: return <ScreenFeed posts={posts} stories={stories} onStoryUpload={handleStoryUpload} creator={creator} />;
     }
   };
@@ -1723,22 +1918,25 @@ export default function App() {
     if (screen === 'messages') return 'MENSAGENS';
     if (screen === 'edit-profile') return 'EDITAR';
     if (screen === 'create-post') return 'POSTAR';
+    if (screen === 'payment') return 'ASSINAR';
     return 'Safadinha +18';
   };
 
-  const showNav = isLoggedIn && !['edit-profile', 'create-post', 'public-profile'].includes(screen);
-  const showTopNav = (isLoggedIn || screen === 'public-profile') && !['login', 'register'].includes(screen);
+  const showNav = isLoggedIn && !['edit-profile', 'create-post', 'public-profile', 'payment'].includes(screen);
+  const showTopNav = (isLoggedIn || screen === 'public-profile' || screen === 'payment') && !['login', 'register'].includes(screen);
 
   return (
     <div className="min-h-screen bg-background">
       {showTopNav && (
         <TopNav 
           title={screen === 'public-profile' ? (publicCreator?.name || 'PERFIL') : getTitle()} 
-          showBack={['edit-profile', 'create-post', 'public-profile'].includes(screen)} 
+          showBack={['edit-profile', 'create-post', 'public-profile', 'payment'].includes(screen)} 
           onBack={() => {
             if (screen === 'public-profile') {
               if (isLoggedIn) setScreen('feed');
               else setScreen('login');
+            } else if (screen === 'payment') {
+              setScreen('feed');
             } else {
               setScreen(screen === 'edit-profile' ? 'profile' : 'feed');
             }
