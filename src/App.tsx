@@ -32,7 +32,9 @@ import {
   Check,
   CreditCard,
   ShieldCheck,
-  Crown
+  Crown,
+  QrCode,
+  Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Cropper from 'react-easy-crop';
@@ -268,7 +270,7 @@ const FullScreenPostModal = ({
           <div className="w-full h-full flex items-center justify-center p-4">
             {post.isVideo ? (
               <video 
-                src={post.image} 
+                src={`${post.image}#t=0.001`} 
                 className="max-w-full max-h-full rounded-lg shadow-2xl" 
                 controls 
                 autoPlay 
@@ -662,7 +664,7 @@ const ScreenFeed = ({
           >
             {post.isVideo ? (
               <video 
-                src={post.image} 
+                src={`${post.image}#t=0.001`} 
                 className={`w-full h-full object-cover transition-all duration-700 ${post.isLocked ? 'blur-[60px] scale-110 opacity-50' : 'hover:scale-105'}`} 
                 preload="metadata"
                 playsInline
@@ -884,7 +886,7 @@ const ScreenProfile = ({
                 >
                   {post.isVideo ? (
                     <video 
-                      src={post.image} 
+                      src={`${post.image}#t=0.001`} 
                       className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${post.isLocked ? 'blur-2xl scale-125 opacity-40' : ''}`} 
                       preload="metadata"
                       playsInline
@@ -1041,7 +1043,7 @@ const ScreenPublicProfile = ({ creator, posts, onSubscribe, stories }: { creator
             >
               {post.isVideo ? (
                 <video 
-                  src={post.image} 
+                  src={`${post.image}#t=0.001`} 
                   className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${post.isLocked ? 'blur-2xl scale-125 opacity-40' : ''}`} 
                   preload="metadata"
                   playsInline
@@ -1491,7 +1493,7 @@ const ScreenCreatePost = ({ onBack, onPostCreated }: { onBack: () => void, onPos
             <div className="relative group aspect-video bg-white border-2 border-dashed border-primary/10 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-primary/30 transition-all overflow-hidden">
               {image ? (
                 isVideo ? (
-                  <video src={image} className="w-full h-full object-cover" controls />
+                  <video src={`${image}#t=0.001`} className="w-full h-full object-cover" controls />
                 ) : (
                   <img src={image} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 )
@@ -1601,7 +1603,7 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
     <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12 bg-background">
       <div className="w-full max-w-md space-y-12">
         <div className="flex flex-col items-center space-y-6">
-          <div className="text-4xl font-black text-primary tracking-tighter">Novinha do JOB MOC</div>
+          <div className="text-4xl font-black text-primary tracking-tighter">Novinha +18</div>
           <div className="text-center space-y-2">
             <p className="text-on-surface/60 text-base font-bold max-w-[280px] mx-auto">Acesse sua galeria digital e gerencie seu legado.</p>
           </div>
@@ -1804,14 +1806,24 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
 
 const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creator | null }) => {
   const [selectedPlan, setSelectedPlan] = useState('monthly');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'pix'>('card');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const plans = [
     { id: 'monthly', name: 'Mensal', price: 'R$ 29,90', description: 'Acesso total por 30 dias' },
     { id: 'quarterly', name: 'Trimestral', price: 'R$ 79,90', description: 'Economize 15% - 90 dias', badge: 'Popular' },
     { id: 'yearly', name: 'Anual', price: 'R$ 249,90', description: 'Economize 30% - 365 dias', badge: 'Melhor Valor' },
   ];
+
+  const pixCode = "00020126580014br.gov.bcb.pix0136123e4567-e89b-12d3-a456-4266141740005204000053039865802BR5913Novinha do JOB6008MOC62070503***6304E2B8";
+
+  const handleCopyPix = () => {
+    navigator.clipboard.writeText(pixCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const handlePayment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1900,60 +1912,124 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
           ))}
         </div>
 
-        <form onSubmit={handlePayment} className="bg-white p-6 rounded-3xl border border-primary/5 shadow-sm space-y-6">
-          <div className="flex items-center gap-2 mb-2">
-            <CreditCard className="text-primary" size={20} />
-            <h3 className="font-bold text-sm text-on-surface uppercase tracking-widest">Detalhes do Cartão</h3>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-[10px] uppercase tracking-widest font-black text-on-surface/40 px-1">Número do Cartão</label>
-              <input 
-                className="w-full bg-background border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 font-bold text-on-surface" 
-                placeholder="0000 0000 0000 0000"
-                required
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] uppercase tracking-widest font-black text-on-surface/40 px-1">Validade</label>
-                <input 
-                  className="w-full bg-background border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 font-bold text-on-surface" 
-                  placeholder="MM/AA"
-                  required
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] uppercase tracking-widest font-black text-on-surface/40 px-1">CVV</label>
-                <input 
-                  className="w-full bg-background border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 font-bold text-on-surface" 
-                  placeholder="123"
-                  required
-                />
-              </div>
-            </div>
-          </div>
-
+        <div className="flex gap-2 p-1 bg-on-surface/5 rounded-2xl">
           <button 
-            disabled={loading}
-            type="submit"
-            className="w-full py-5 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all uppercase tracking-widest text-sm flex items-center justify-center gap-3"
+            onClick={() => setPaymentMethod('card')}
+            className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${paymentMethod === 'card' ? 'bg-white shadow-sm text-primary' : 'text-on-surface/40'}`}
           >
-            {loading ? (
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <>
-                <ShieldCheck size={20} />
-                Confirmar Pagamento
-              </>
-            )}
+            Cartão
           </button>
-          
-          <p className="text-[9px] text-center text-on-surface/30 font-bold uppercase tracking-widest leading-relaxed">
-            Pagamento processado de forma segura e criptografada.<br/>Sua privacidade é nossa prioridade.
-          </p>
-        </form>
+          <button 
+            onClick={() => setPaymentMethod('pix')}
+            className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${paymentMethod === 'pix' ? 'bg-white shadow-sm text-primary' : 'text-on-surface/40'}`}
+          >
+            Pix
+          </button>
+        </div>
+
+        {paymentMethod === 'card' ? (
+          <form onSubmit={handlePayment} className="bg-white p-6 rounded-3xl border border-primary/5 shadow-sm space-y-6">
+            <div className="flex items-center gap-2 mb-2">
+              <CreditCard className="text-primary" size={20} />
+              <h3 className="font-bold text-sm text-on-surface uppercase tracking-widest">Detalhes do Cartão</h3>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase tracking-widest font-black text-on-surface/40 px-1">Número do Cartão</label>
+                <input 
+                  className="w-full bg-background border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 font-bold text-on-surface" 
+                  placeholder="0000 0000 0000 0000"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-widest font-black text-on-surface/40 px-1">Validade</label>
+                  <input 
+                    className="w-full bg-background border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 font-bold text-on-surface" 
+                    placeholder="MM/AA"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-widest font-black text-on-surface/40 px-1">CVV</label>
+                  <input 
+                    className="w-full bg-background border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 font-bold text-on-surface" 
+                    placeholder="123"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button 
+              disabled={loading}
+              type="submit"
+              className="w-full py-5 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all uppercase tracking-widest text-sm flex items-center justify-center gap-3"
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <ShieldCheck size={20} />
+                  Confirmar Pagamento
+                </>
+              )}
+            </button>
+          </form>
+        ) : (
+          <div className="bg-white p-8 rounded-3xl border border-primary/5 shadow-sm space-y-8 text-center">
+            <div className="flex flex-col items-center">
+              <div className="w-48 h-48 bg-background rounded-2xl p-4 mb-6 border border-primary/5">
+                <img 
+                  src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=pix-payload-mock" 
+                  alt="Pix QR Code" 
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <h3 className="font-black text-lg uppercase tracking-tight mb-2">Pague com Pix</h3>
+              <p className="text-xs text-on-surface/40 font-bold uppercase tracking-widest max-w-[240px]">
+                Escaneie o QR Code acima ou copie o código abaixo para pagar.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-[10px] uppercase tracking-widest font-black text-on-surface/40 px-1 block text-left">Código Pix Copia e Cola</label>
+              <div className="flex gap-2">
+                <div className="flex-1 bg-background border border-primary/10 rounded-xl px-4 py-3.5 font-mono text-[10px] break-all text-left overflow-hidden h-12 flex items-center">
+                  {pixCode.substring(0, 40)}...
+                </div>
+                <button 
+                  onClick={handleCopyPix}
+                  className="bg-primary text-white px-4 rounded-xl flex items-center justify-center active:scale-95 transition-all"
+                >
+                  {copied ? <Check size={18} /> : <Copy size={18} />}
+                </button>
+              </div>
+              {copied && <p className="text-[10px] text-green-500 font-bold uppercase tracking-widest">Código copiado!</p>}
+            </div>
+
+            <button 
+              onClick={handlePayment}
+              disabled={loading}
+              className="w-full py-5 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all uppercase tracking-widest text-sm flex items-center justify-center gap-3"
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <CheckCircle2 size={20} />
+                  Já realizei o pagamento
+                </>
+              )}
+            </button>
+          </div>
+        )}
+        
+        <p className="text-[9px] text-center text-on-surface/30 font-bold uppercase tracking-widest leading-relaxed">
+          Pagamento processado de forma segura e criptografada.<br/>Sua privacidade é nossa prioridade.
+        </p>
       </div>
     </div>
   );
