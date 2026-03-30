@@ -428,6 +428,20 @@ const ScreenProfile = ({ onEdit, creator, onLogout, posts }: { onEdit: () => voi
           <button onClick={onEdit} className="w-full py-4 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs">
             Editar Perfil
           </button>
+          <button 
+            onClick={() => {
+              const url = `${window.location.origin}/?u=${creator.username}`;
+              navigator.clipboard.writeText(url);
+              alert('Link do perfil copiado!');
+            }}
+            className="w-full py-4 bg-primary/5 text-primary font-bold rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase tracking-widest text-xs"
+          >
+            <Share2 size={18} />
+            Compartilhar
+          </button>
+        </div>
+        
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6 max-w-md mx-auto">
           <button className="w-full py-4 bg-primary/5 text-primary font-bold rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase tracking-widest text-xs">
             <Mail size={18} />
             Mensagem
@@ -492,6 +506,98 @@ const ScreenProfile = ({ onEdit, creator, onLogout, posts }: { onEdit: () => voi
             <p className="text-on-surface/40 font-bold uppercase tracking-widest text-xs">Nenhuma publicação ainda</p>
           </div>
         )}
+      </section>
+    </div>
+  );
+};
+
+const ScreenPublicProfile = ({ creator, posts, onSubscribe }: { creator: Creator, posts: Post[], onSubscribe: () => void }) => {
+  const myPosts = posts.filter(p => p.creator.id === creator.id);
+  
+  return (
+    <div className="pt-0 pb-24">
+      {/* Cover Image */}
+      <div className="h-48 md:h-64 w-full relative overflow-hidden bg-on-surface/5">
+        <img 
+          src={creator.cover_image || 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=1200'} 
+          className="w-full h-full object-cover" 
+          referrerPolicy="no-referrer"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=1200';
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-background"></div>
+      </div>
+
+      <section className="max-w-4xl mx-auto px-6 text-center -mt-20 relative z-10">
+        <div className="relative inline-block mb-6">
+          <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-full p-[4px] story-ring bg-background shadow-2xl">
+            <img src={creator.avatar} className="w-full h-full object-cover rounded-full border-4 border-white" referrerPolicy="no-referrer" />
+          </div>
+        </div>
+        <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator.name}</h1>
+        <p className="text-base text-primary font-bold mb-8">{creator.bio}</p>
+
+        <div className="flex justify-center items-center gap-10 mb-10 py-6 px-8 bg-white rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5">
+          <div className="text-center">
+            <span className="block text-xl font-bold">{myPosts.length}</span>
+            <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
+          </div>
+          <div className="w-px h-8 bg-primary/10"></div>
+          <div className="text-center">
+            <span className="block text-xl font-bold">{creator.stats?.followers || '0'}</span>
+            <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Seguidores</span>
+          </div>
+          <div className="w-px h-8 bg-primary/10"></div>
+          <div className="text-center">
+            <span className="block text-xl font-bold">{creator.stats?.likes || '0'}</span>
+            <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Curtidas</span>
+          </div>
+        </div>
+
+        <div className="max-w-md mx-auto space-y-4 mb-12">
+          <button 
+            onClick={onSubscribe}
+            className="w-full py-5 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-95 transition-all uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-3"
+          >
+            <Lock size={20} fill="white" />
+            Assinar Agora
+          </button>
+          <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">
+            Acesso imediato a todo o conteúdo exclusivo
+          </p>
+        </div>
+      </section>
+
+      <div className="sticky top-16 bg-white/80 backdrop-blur-md z-40 border-b border-primary/5 mb-6">
+        <div className="max-w-4xl mx-auto px-6 flex justify-around">
+          <button className="py-4 border-b-2 border-primary text-primary font-bold text-xs uppercase tracking-widest">Criações</button>
+          <button className="py-4 border-b-2 border-transparent text-on-surface/40 font-bold text-xs uppercase tracking-widest">Exclusivos</button>
+        </div>
+      </div>
+
+      <section className="max-w-5xl mx-auto px-4">
+        <div className="grid grid-cols-3 gap-2">
+          {myPosts.map((post) => (
+            <div 
+              key={post.id} 
+              className="relative aspect-square overflow-hidden rounded-2xl bg-on-surface/5 shadow-sm group cursor-pointer"
+              onClick={post.isLocked ? onSubscribe : undefined}
+            >
+              <img 
+                src={post.image} 
+                className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${post.isLocked ? 'blur-2xl scale-125 opacity-40' : ''}`} 
+                referrerPolicy="no-referrer" 
+              />
+              {post.isLocked && (
+                <div className="absolute inset-0 bg-primary/10 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center text-white">
+                  <Lock size={20} fill="white" className="drop-shadow-lg" />
+                  <span className="text-[8px] font-black uppercase tracking-widest mt-1 drop-shadow-md">VIP</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </section>
     </div>
   );
@@ -1215,6 +1321,8 @@ export default function App() {
   const [notifications, setNotifications] = React.useState<Notification[]>(NOTIFICATIONS);
   const [messages, setMessages] = React.useState<Message[]>(MESSAGES);
   const [creator, setCreator] = React.useState<Creator>(ELENA);
+  const [publicCreator, setPublicCreator] = React.useState<Creator | null>(null);
+  const [publicPosts, setPublicPosts] = React.useState<Post[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [dbStatus, setDbStatus] = React.useState<'checking' | 'connected' | 'error'>('checking');
@@ -1287,6 +1395,30 @@ export default function App() {
     });
 
     return () => subscription.unsubscribe();
+  }, []);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const username = params.get('u');
+    
+    if (username) {
+      const fetchPublicProfile = async () => {
+        const { data: profile } = await supabase.from('profiles').select('*').eq('username', username).single();
+        if (profile) {
+          setPublicCreator(profile as any);
+          const { data: posts } = await supabase.from('posts').select('*, creator:profiles(*)').eq('creator_id', profile.id).order('created_at', { ascending: false });
+          if (posts) {
+            setPublicPosts(posts.map((p: any) => ({
+              ...p,
+              isLocked: p.is_locked,
+              isVideo: p.is_video
+            })) as any);
+          }
+          setScreen('public-profile');
+        }
+      };
+      fetchPublicProfile();
+    }
   }, []);
 
   React.useEffect(() => {
@@ -1373,6 +1505,21 @@ export default function App() {
 
   const renderScreen = () => {
     if (!isLoggedIn) {
+      if (screen === 'public-profile' && publicCreator) {
+        return (
+          <ScreenPublicProfile 
+            creator={publicCreator} 
+            posts={publicPosts} 
+            onSubscribe={() => {
+              if (isLoggedIn) {
+                alert('Você já está logado! Processando assinatura...');
+              } else {
+                setScreen('register');
+              }
+            }} 
+          />
+        );
+      }
       if (screen === 'register') {
         return <ScreenRegister onRegister={() => setScreen('feed')} onNavigateToLogin={() => setScreen('login')} />;
       }
@@ -1382,6 +1529,22 @@ export default function App() {
     switch (screen) {
       case 'feed': return <ScreenFeed posts={posts} stories={stories} onStoryUpload={handleStoryUpload} creator={creator} />;
       case 'profile': return <ScreenProfile onEdit={() => setScreen('edit-profile')} creator={creator} onLogout={() => supabase.auth.signOut()} posts={posts} />;
+      case 'public-profile': 
+        return publicCreator ? (
+          <ScreenPublicProfile 
+            creator={publicCreator} 
+            posts={publicPosts} 
+            onSubscribe={() => {
+              if (isLoggedIn) {
+                alert('Você já está logado! Processando assinatura...');
+              } else {
+                setScreen('register');
+              }
+            }} 
+          />
+        ) : (
+          <ScreenFeed posts={posts} stories={stories} onStoryUpload={handleStoryUpload} creator={creator} />
+        );
       case 'activity': return <ScreenActivity notifications={notifications} />;
       case 'messages': return <ScreenMessages messages={messages} />;
       case 'edit-profile': return <ScreenEditProfile onBack={() => setScreen('profile')} creator={creator} onProfileUpdated={() => setRefreshKey(prev => prev + 1)} />;
@@ -1399,16 +1562,24 @@ export default function App() {
     return 'Safadinha +18';
   };
 
-  const showNav = isLoggedIn && !['edit-profile', 'create-post'].includes(screen);
+  const showNav = isLoggedIn && !['edit-profile', 'create-post', 'public-profile'].includes(screen);
+  const showTopNav = (isLoggedIn || screen === 'public-profile') && !['login', 'register'].includes(screen);
 
   return (
     <div className="min-h-screen bg-background">
-      {isLoggedIn && (
+      {showTopNav && (
         <TopNav 
-          title={getTitle()} 
-          showBack={['edit-profile', 'create-post'].includes(screen)} 
-          onBack={() => setScreen(screen === 'edit-profile' ? 'profile' : 'feed')} 
-          avatar={creator.avatar}
+          title={screen === 'public-profile' ? (publicCreator?.name || 'PERFIL') : getTitle()} 
+          showBack={['edit-profile', 'create-post', 'public-profile'].includes(screen)} 
+          onBack={() => {
+            if (screen === 'public-profile') {
+              if (isLoggedIn) setScreen('feed');
+              else setScreen('login');
+            } else {
+              setScreen(screen === 'edit-profile' ? 'profile' : 'feed');
+            }
+          }} 
+          avatar={isLoggedIn ? creator.avatar : publicCreator?.avatar}
         />
       )}
       
