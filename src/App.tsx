@@ -138,7 +138,7 @@ const MESSAGES: Message[] = [
 
 // --- Components ---
 
-const TopNav = ({ title = "CRIADOR", showBack = false, onBack = () => {}, avatar }: { title?: string, showBack?: boolean, onBack?: () => void, avatar?: string }) => (
+const TopNav = ({ title = "CRIADOR", showBack = false, onBack = () => {}, avatar, dbStatus }: { title?: string, showBack?: boolean, onBack?: () => void, avatar?: string, dbStatus?: 'checking' | 'connected' | 'error' }) => (
   <header className="fixed top-0 w-full flex justify-between items-center px-6 py-4 glass-header z-50">
     <div className="flex items-center gap-4">
       {showBack ? (
@@ -150,8 +150,20 @@ const TopNav = ({ title = "CRIADOR", showBack = false, onBack = () => {}, avatar
           <Menu size={24} />
         </button>
       )}
-      <div className="text-2xl font-extrabold premium-gradient bg-clip-text text-transparent tracking-tight">
-        {title}
+      <div>
+        <div className="text-2xl font-extrabold premium-gradient bg-clip-text text-transparent tracking-tight leading-none">
+          {title}
+        </div>
+        <div className="flex items-center gap-1.5 mt-1">
+          <div className={`w-1.5 h-1.5 rounded-full ${
+            dbStatus === 'connected' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 
+            dbStatus === 'error' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]' : 'bg-yellow-500 animate-pulse'
+          }`}></div>
+          <span className="text-[8px] font-bold text-on-surface/40 uppercase tracking-widest">
+            {dbStatus === 'connected' ? 'Banco Online' : 
+             dbStatus === 'error' ? 'Erro de Conexão' : 'Conectando...'}
+          </span>
+        </div>
       </div>
     </div>
     <div className="flex items-center gap-4">
@@ -521,7 +533,7 @@ const ScreenMessages = ({ messages }: { messages: Message[] }) => (
   </div>
 );
 
-const ScreenEditProfile = ({ onBack, creator }: { onBack: () => void, creator: Creator }) => {
+const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () => void, creator: Creator, onProfileUpdated: () => void }) => {
   const [name, setName] = useState(creator.name);
   const [username, setUsername] = useState(creator.username);
   const [bio, setBio] = useState(creator.bio);
@@ -543,6 +555,7 @@ const ScreenEditProfile = ({ onBack, creator }: { onBack: () => void, creator: C
       }).eq('id', user.id);
 
       if (error) throw error;
+      onProfileUpdated();
       onBack();
     } catch (err: any) {
       setError(err.message || 'Erro ao salvar perfil');
@@ -885,15 +898,22 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
       
       // Create profile in profiles table
       if (data.user) {
+        console.log('Creating profile for user:', data.user.id);
         const { error: profileError } = await supabase.from('profiles').insert({
           id: data.user.id,
           name: name,
-          username: email.split('@')[0],
+          username: email.split('@')[0] + Math.floor(Math.random() * 1000),
           avatar: `https://picsum.photos/seed/${data.user.id}/400`,
           bio: 'Novo criador no pedaço!',
           stats: { posts: '0', followers: '0', likes: '0' }
         });
-        if (profileError) console.error('Error creating profile:', profileError);
+        if (profileError) {
+          console.error('Error creating profile:', profileError);
+          // If profile creation fails, we might want to alert the user or try again
+          // but for now we'll just log it.
+        } else {
+          console.log('Profile created successfully');
+        }
       }
 
       onRegister();
@@ -995,8 +1015,21 @@ export default function App() {
   const [creator, setCreator] = React.useState<Creator>(ELENA);
   const [loading, setLoading] = React.useState(true);
   const [refreshKey, setRefreshKey] = React.useState(0);
+  const [dbStatus, setDbStatus] = React.useState<'checking' | 'connected' | 'error'>('checking');
 
   React.useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        // Test connection by fetching a single profile or just checking health
+        const { error } = await supabase.from('profiles').select('id').limit(1);
+        if (error) throw error;
+        setDbStatus('connected');
+      } catch (err) {
+        console.error('Supabase connection test failed:', err);
+        setDbStatus('error');
+      }
+    };
+    checkConnection();
     // Check active sessions and sets the user
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
@@ -1027,8 +1060,34 @@ export default function App() {
         if (!user) return;
 
         // Fetch profile
-        const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-        if (profileData) setCreator(profileData as any);
+        const { data: profileData, error: profileFetchError } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+        
+        if (profileData) {
+          setCreator(profileData as any);
+        } else if (profileFetchError && profileFetchError.code === 'PGRST116') {
+          // PGRST116 is "The result contains 0 rows" for .single()
+          console.log('Profile not found, creating default profile for user:', user.id);
+          const newProfile = {
+            id: user.id,
+            name: user.user_metadata?.full_name || 'Novo Criador',
+            username: user.email?.split('@')[0] + Math.floor(Math.random() * 1000),
+            avatar: `https://picsum.photos/seed/${user.id}/400`,
+            bio: 'Bem-vindo ao meu perfil!',
+            stats: { posts: '0', followers: '0', likes: '0' }
+          };
+          
+          const { data: createdProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert(newProfile)
+            .select()
+            .single();
+            
+          if (createError) {
+            console.error('Error creating fallback profile:', createError);
+          } else if (createdProfile) {
+            setCreator(createdProfile as any);
+          }
+        }
 
         // Fetch posts
         const { data: postsData } = await supabase.from('posts').select('*, creator:profiles(*)').order('created_at', { ascending: false });
@@ -1085,7 +1144,7 @@ export default function App() {
       case 'profile': return <ScreenProfile onEdit={() => setScreen('edit-profile')} creator={creator} onLogout={() => supabase.auth.signOut()} />;
       case 'activity': return <ScreenActivity notifications={notifications} />;
       case 'messages': return <ScreenMessages messages={messages} />;
-      case 'edit-profile': return <ScreenEditProfile onBack={() => setScreen('profile')} creator={creator} />;
+      case 'edit-profile': return <ScreenEditProfile onBack={() => setScreen('profile')} creator={creator} onProfileUpdated={() => setRefreshKey(prev => prev + 1)} />;
       case 'create-post': return <ScreenCreatePost onBack={() => setScreen('feed')} onPostCreated={() => { setRefreshKey(prev => prev + 1); setScreen('feed'); }} />;
       default: return <ScreenFeed posts={posts} />;
     }
@@ -1110,6 +1169,7 @@ export default function App() {
           showBack={['edit-profile', 'create-post'].includes(screen)} 
           onBack={() => setScreen(screen === 'edit-profile' ? 'profile' : 'feed')} 
           avatar={creator.avatar}
+          dbStatus={dbStatus}
         />
       )}
       
