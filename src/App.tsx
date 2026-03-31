@@ -2019,12 +2019,20 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
         })
       });
 
-      const data = await response.json();
+      let data;
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(`Erro do servidor Vercel: ${text.substring(0, 100)}`);
+      }
+
       if (data.error) throw new Error(data.error);
       setPixData(data);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro ao gerar Pix:", error);
-      alert(`Erro ao gerar Pix: ${error.message}`);
+      alert("Erro ao gerar Pix. Verifique se o backend está configurado corretamente.");
     } finally {
       setLoading(false);
     }
