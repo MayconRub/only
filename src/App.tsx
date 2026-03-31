@@ -2030,9 +2030,9 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
 
       if (data.error) throw new Error(data.error);
       setPixData(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao gerar Pix:", error);
-      alert("Erro ao gerar Pix. Verifique se o backend está configurado corretamente.");
+      alert(`Erro ao gerar Pix: ${error.message}`);
     } finally {
       setLoading(false);
     }
