@@ -527,8 +527,9 @@ const StoryViewer = ({ stories, initialIndex, onClose, onDelete }: { stories: an
   );
 };
 
-const EditPostModal = ({ post, onSave, onClose }: { post: Post, onSave: (id: string, caption: string) => void, onClose: () => void }) => {
+const EditPostModal = ({ post, onSave, onClose }: { post: Post, onSave: (id: string, caption: string, isLocked: boolean) => void, onClose: () => void }) => {
   const [caption, setCaption] = React.useState(post.caption);
+  const [isLocked, setIsLocked] = React.useState(!!post.isLocked);
 
   return (
     <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
@@ -554,8 +555,28 @@ const EditPostModal = ({ post, onSave, onClose }: { post: Post, onSave: (id: str
               placeholder="Escreva algo..."
             />
           </div>
+
+          <div className="flex items-center justify-between p-4 bg-on-surface/5 rounded-2xl">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isLocked ? 'bg-primary/10 text-primary' : 'bg-on-surface/5 text-on-surface/40'}`}>
+                <Lock size={18} />
+              </div>
+              <div>
+                <h4 className="font-black text-sm uppercase tracking-tight">Conteúdo Pago</h4>
+                <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">Apenas assinantes</p>
+              </div>
+            </div>
+            <button 
+              type="button"
+              onClick={() => setIsLocked(!isLocked)}
+              className={`w-12 h-6 rounded-full relative transition-colors ${isLocked ? 'bg-primary' : 'bg-on-surface/10'}`}
+            >
+              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all ${isLocked ? 'right-1' : 'left-1'}`}></div>
+            </button>
+          </div>
+
           <button 
-            onClick={() => onSave(post.id, caption)}
+            onClick={() => onSave(post.id, caption, isLocked)}
             className="w-full py-4 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs"
           >
             Salvar Alterações
@@ -584,7 +605,7 @@ const ScreenFeed = ({
   onStoryUpload: (file: File) => void, 
   creator: Creator,
   onDeletePost: (id: string) => void,
-  onUpdatePost: (id: string, caption: string) => void,
+  onUpdatePost: (id: string, caption: string, isLocked: boolean) => void,
   onDeleteStory: (id: string) => void,
   onSubscribe: () => void,
   isMaster: boolean
@@ -726,12 +747,12 @@ const ScreenFeed = ({
           
           <div 
             className="aspect-square relative overflow-hidden bg-on-surface/5 cursor-pointer"
-            onClick={() => !post.isLocked && setSelectedPost(post)}
+            onClick={() => post.hasAccess && setSelectedPost(post)}
           >
             {post.isVideo ? (
               <video 
                 src={`${post.image}#t=0.001`} 
-                className={`w-full h-full object-cover transition-all duration-700 ${post.isLocked ? 'blur-[60px] scale-110 opacity-50' : 'hover:scale-105'}`} 
+                className={`w-full h-full object-cover transition-all duration-700 ${!post.hasAccess ? 'blur-[60px] scale-110 opacity-50' : 'hover:scale-105'}`} 
                 preload="metadata"
                 playsInline
                 muted
@@ -739,14 +760,14 @@ const ScreenFeed = ({
             ) : (
               <img 
                 src={post.image} 
-                className={`w-full h-full object-cover transition-all duration-700 ${post.isLocked ? 'blur-[60px] scale-110 opacity-50' : 'hover:scale-105'}`} 
+                className={`w-full h-full object-cover transition-all duration-700 ${!post.hasAccess ? 'blur-[60px] scale-110 opacity-50' : 'hover:scale-105'}`} 
                 referrerPolicy="no-referrer"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1633078654544-61b3455b9161?q=80&w=400&auto=format&fit=crop'; // Fallback image
                 }}
               />
             )}
-            {post.isLocked && (
+            {!post.hasAccess && (
               <div className="absolute inset-0 flex items-center justify-center p-6 bg-black/20">
                 <div className="bg-white/10 backdrop-blur-2xl p-8 rounded-[2.5rem] flex flex-col items-center text-center shadow-2xl border border-white/20 w-full max-w-[280px]">
                   <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mb-6 ring-4 ring-primary/10">
@@ -765,7 +786,12 @@ const ScreenFeed = ({
                 </div>
               </div>
             )}
-            {post.isVideo && !post.isLocked && (
+            {post.isLocked && post.hasAccess && (
+              <div className="absolute top-4 right-4 bg-primary/90 backdrop-blur-md p-2 rounded-full shadow-lg z-10">
+                <Lock className="text-white" size={16} />
+              </div>
+            )}
+            {post.isVideo && post.hasAccess && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
                   <Play className="text-white fill-white" size={40} />
@@ -876,7 +902,7 @@ const ScreenProfile = ({
   onLogout: () => void, 
   posts: Post[],
   onDeletePost: (id: string) => void,
-  onUpdatePost: (id: string, caption: string) => void,
+  onUpdatePost: (id: string, caption: string, isLocked: boolean) => void,
   onSubscribe: () => void,
   stories: any[],
   onDeleteStory: (id: string) => void,
@@ -1013,12 +1039,12 @@ const ScreenProfile = ({
                 <div 
                   key={post.id} 
                   className="relative aspect-square overflow-hidden rounded-2xl bg-on-surface/5 shadow-sm group cursor-pointer"
-                  onClick={() => !post.isLocked && setSelectedPost(post)}
+                  onClick={() => post.hasAccess && setSelectedPost(post)}
                 >
                   {post.isVideo ? (
                     <video 
                       src={`${post.image}#t=0.001`} 
-                      className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${post.isLocked ? 'blur-2xl scale-125 opacity-40' : ''}`} 
+                      className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${!post.hasAccess ? 'blur-2xl scale-125 opacity-40' : ''}`} 
                       preload="metadata"
                       playsInline
                       muted
@@ -1026,20 +1052,25 @@ const ScreenProfile = ({
                   ) : (
                     <img 
                       src={post.image} 
-                      className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${post.isLocked ? 'blur-2xl scale-125 opacity-40' : ''}`} 
+                      className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${!post.hasAccess ? 'blur-2xl scale-125 opacity-40' : ''}`} 
                       referrerPolicy="no-referrer" 
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1633078654544-61b3455b9161?q=80&w=400&auto=format&fit=crop';
                       }}
                     />
                   )}
-                  {post.isLocked && (
+                  {!post.hasAccess && (
                     <div className="absolute inset-0 bg-primary/10 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center text-white">
                       <Lock size={20} fill="white" className="drop-shadow-lg" />
                       <span className="text-[8px] font-black uppercase tracking-widest mt-1 drop-shadow-md">VIP</span>
                     </div>
                   )}
-                  {post.isVideo && !post.isLocked && (
+                  {post.isLocked && post.hasAccess && (
+                    <div className="absolute top-2 right-2 bg-primary/90 backdrop-blur-md p-1.5 rounded-full shadow-lg z-10">
+                      <Lock className="text-white" size={14} />
+                    </div>
+                  )}
+                  {post.isVideo && post.hasAccess && (
                     <div className="absolute top-3 left-3 z-10 text-white">
                       <Play size={18} fill="white" />
                     </div>
@@ -1172,14 +1203,14 @@ const ScreenPublicProfile = ({ creator, posts, onSubscribe, stories }: { creator
               key={post.id} 
               className="relative aspect-square overflow-hidden rounded-2xl bg-on-surface/5 shadow-sm group cursor-pointer"
               onClick={() => {
-                if (post.isLocked) onSubscribe();
+                if (!post.hasAccess) onSubscribe();
                 else setSelectedPost(post);
               }}
             >
               {post.isVideo ? (
                 <video 
                   src={`${post.image}#t=0.001`} 
-                  className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${post.isLocked ? 'blur-2xl scale-125 opacity-40' : ''}`} 
+                  className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${!post.hasAccess ? 'blur-2xl scale-125 opacity-40' : ''}`} 
                   preload="metadata"
                   playsInline
                   muted
@@ -1187,14 +1218,19 @@ const ScreenPublicProfile = ({ creator, posts, onSubscribe, stories }: { creator
               ) : (
                 <img 
                   src={post.image} 
-                  className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${post.isLocked ? 'blur-2xl scale-125 opacity-40' : ''}`} 
+                  className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${!post.hasAccess ? 'blur-2xl scale-125 opacity-40' : ''}`} 
                   referrerPolicy="no-referrer" 
                 />
               )}
-              {post.isLocked && (
+              {!post.hasAccess && (
                 <div className="absolute inset-0 bg-primary/10 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center text-white">
                   <Lock size={20} fill="white" className="drop-shadow-lg" />
                   <span className="text-[8px] font-black uppercase tracking-widest mt-1 drop-shadow-md">VIP</span>
+                </div>
+              )}
+              {post.isLocked && post.hasAccess && (
+                <div className="absolute top-2 right-2 bg-primary/90 backdrop-blur-md p-1.5 rounded-full shadow-lg z-10">
+                  <Lock className="text-white" size={14} />
                 </div>
               )}
             </div>
@@ -2275,11 +2311,11 @@ export default function App() {
     }
   };
 
-  const handleUpdatePost = async (postId: string, newCaption: string) => {
+  const handleUpdatePost = async (postId: string, newCaption: string, isLocked: boolean) => {
     try {
-      const { error } = await supabase.from('posts').update({ caption: newCaption }).eq('id', postId);
+      const { error } = await supabase.from('posts').update({ caption: newCaption, is_locked: isLocked }).eq('id', postId);
       if (error) throw error;
-      setPosts(prev => prev.map(p => p.id === postId ? { ...p, caption: newCaption } : p));
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, caption: newCaption, isLocked, hasAccess: p.hasAccess } : p));
       setEditingPost(null);
     } catch (err) {
       console.error('Error updating post:', err);
@@ -2400,10 +2436,23 @@ export default function App() {
         if (profile) {
           setPublicCreator(profile as any);
           const { data: posts } = await supabase.from('posts').select('*, creator:profiles(*)').eq('creator_id', profile.id).order('created_at', { ascending: false });
+          
+          let subscribedCreatorIds = new Set();
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+             const { data: userPayments } = await supabase
+              .from('payments')
+              .select('creator_id')
+              .eq('user_id', session.user.id)
+              .eq('status', 'approved');
+             subscribedCreatorIds = new Set(userPayments?.map(p => p.creator_id) || []);
+          }
+
           if (posts) {
             setPublicPosts(posts.map((p: any) => ({
               ...p,
               isLocked: p.is_locked,
+              hasAccess: session?.user?.id === p.creator_id ? true : (subscribedCreatorIds.has(p.creator_id) ? true : !p.is_locked),
               isVideo: p.is_video
             })) as any);
           }
@@ -2458,6 +2507,15 @@ export default function App() {
           .from('posts')
           .select('*, creator:profiles(*)')
           .order('created_at', { ascending: false });
+
+        // Fetch user's active payments
+        const { data: userPayments } = await supabase
+          .from('payments')
+          .select('creator_id')
+          .eq('user_id', user.id)
+          .eq('status', 'approved');
+
+        const subscribedCreatorIds = new Set(userPayments?.map(p => p.creator_id) || []);
         
         if (postsData) {
           // Filter posts to only show master's posts if masterId exists
@@ -2468,6 +2526,7 @@ export default function App() {
           setPosts(filteredPosts.map((p: any) => ({
             ...p,
             isLocked: p.is_locked,
+            hasAccess: p.creator_id === user.id ? true : (subscribedCreatorIds.has(p.creator_id) ? true : !p.is_locked),
             isVideo: p.is_video
           })) as any);
         }

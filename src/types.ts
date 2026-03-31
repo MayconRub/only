@@ -23,6 +23,7 @@ export interface Post {
   caption: string;
   time: string;
   isLocked?: boolean;
+  hasAccess?: boolean;
   isVideo?: boolean;
   price?: string;
 }
