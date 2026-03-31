@@ -99,9 +99,24 @@ const TopNav = ({ title = "Novinha do JOB MOC", showBack = false, onBack = () =>
   </header>
 );
 
-const ScreenWallet = ({ onBack }: { onBack: () => void }) => {
+const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: boolean }) => {
   const [balance, setBalance] = useState('R$ 45,00');
   const [loading, setLoading] = useState(false);
+  const [subscribers, setSubscribers] = useState<any[]>([]);
+  const [purchases, setPurchases] = useState<any[]>([]);
+
+  // Mock data for demonstration since we don't have the tables yet
+  React.useEffect(() => {
+    if (isMaster) {
+      setSubscribers([
+        { id: '1', name: 'João Silva', username: 'joaosilva', plan: 'Mensal', date: '2026-03-29', avatar: 'https://i.pravatar.cc/150?u=1' },
+        { id: '2', name: 'Maria Oliveira', username: 'maria_o', plan: 'Anual', date: '2026-03-28', avatar: 'https://i.pravatar.cc/150?u=2' },
+      ]);
+      setPurchases([
+        { id: '1', name: 'Pedro Santos', username: 'pedros', item: 'Post Exclusivo', price: 'R$ 15,00', date: '2026-03-30', avatar: 'https://i.pravatar.cc/150?u=3' },
+      ]);
+    }
+  }, [isMaster]);
 
   const creditOptions = [
     { id: '1', amount: 'R$ 20,00', credits: '20' },
@@ -114,7 +129,7 @@ const ScreenWallet = ({ onBack }: { onBack: () => void }) => {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      alert(`Simulação: Pagamento de ${amount} iniciado.`);
+      alert(`Simulação: Pagamento de ${amount} via Pix iniciado.`);
     }, 1500);
   };
 
@@ -122,7 +137,7 @@ const ScreenWallet = ({ onBack }: { onBack: () => void }) => {
     <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
       <section className="mb-8 pt-8">
         <h1 className="text-4xl font-extrabold tracking-tight mb-1">Minha Carteira</h1>
-        <p className="text-on-surface/60 text-sm font-medium">Gerencie seus créditos e pagamentos.</p>
+        <p className="text-on-surface/60 text-sm font-medium">Gerencie seus ganhos e pagamentos.</p>
       </section>
 
       <div className="bg-white p-8 rounded-3xl border border-primary/5 shadow-sm mb-10 text-center relative overflow-hidden">
@@ -139,38 +154,86 @@ const ScreenWallet = ({ onBack }: { onBack: () => void }) => {
         </div>
       </div>
 
-      <section className="space-y-6">
-        <div className="flex items-center justify-between px-1">
-          <h3 className="font-bold text-lg text-on-surface">Adicionar Créditos</h3>
-          <span className="text-[10px] font-black text-primary uppercase tracking-widest">Melhor Valor</span>
-        </div>
+      {isMaster ? (
+        <div className="space-y-8">
+          <section className="space-y-4">
+            <h3 className="font-bold text-lg text-on-surface px-1">Assinantes Recentes</h3>
+            {subscribers.length > 0 ? (
+              <div className="bg-white rounded-3xl border border-primary/5 shadow-sm overflow-hidden">
+                {subscribers.map((sub, index) => (
+                  <div key={sub.id} className={`p-4 flex items-center justify-between ${index !== subscribers.length - 1 ? 'border-b border-primary/5' : ''}`}>
+                    <div className="flex items-center gap-3">
+                      <img src={sub.avatar} alt={sub.name} className="w-10 h-10 rounded-full object-cover" />
+                      <div>
+                        <p className="font-bold text-sm text-on-surface">{sub.name}</p>
+                        <p className="text-[10px] text-on-surface/60 font-medium">@{sub.username} • {sub.plan}</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-1 rounded-md">Ativo</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-on-surface/60 px-1">Nenhum assinante ainda.</p>
+            )}
+          </section>
 
-        <div className="grid grid-cols-1 gap-4">
-          {creditOptions.map((option) => (
-            <button
-              key={option.id}
-              onClick={() => handleAddCredits(option.amount)}
-              disabled={loading}
-              className="bg-white p-5 rounded-2xl border border-primary/5 shadow-sm flex items-center justify-between hover:border-primary/30 transition-all active:scale-[0.98]"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-primary/5 rounded-full flex items-center justify-center">
-                  <PlusCircle size={24} className="text-primary" />
-                </div>
-                <div className="text-left">
-                  <h4 className="font-black text-on-surface text-lg leading-none">{option.credits} Créditos</h4>
-                  {option.badge && (
-                    <span className="text-[8px] font-black text-primary uppercase tracking-widest">{option.badge}</span>
-                  )}
-                </div>
+          <section className="space-y-4">
+            <h3 className="font-bold text-lg text-on-surface px-1">Vendas de Conteúdo</h3>
+            {purchases.length > 0 ? (
+              <div className="bg-white rounded-3xl border border-primary/5 shadow-sm overflow-hidden">
+                {purchases.map((purchase, index) => (
+                  <div key={purchase.id} className={`p-4 flex items-center justify-between ${index !== purchases.length - 1 ? 'border-b border-primary/5' : ''}`}>
+                    <div className="flex items-center gap-3">
+                      <img src={purchase.avatar} alt={purchase.name} className="w-10 h-10 rounded-full object-cover" />
+                      <div>
+                        <p className="font-bold text-sm text-on-surface">{purchase.name}</p>
+                        <p className="text-[10px] text-on-surface/60 font-medium">Comprou: {purchase.item}</p>
+                      </div>
+                    </div>
+                    <span className="font-black text-primary text-sm">{purchase.price}</span>
+                  </div>
+                ))}
               </div>
-              <div className="text-right">
-                <span className="block font-black text-primary text-xl">{option.amount}</span>
-              </div>
-            </button>
-          ))}
+            ) : (
+              <p className="text-sm text-on-surface/60 px-1">Nenhuma venda ainda.</p>
+            )}
+          </section>
         </div>
-      </section>
+      ) : (
+        <section className="space-y-6">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="font-bold text-lg text-on-surface">Adicionar Créditos</h3>
+            <span className="text-[10px] font-black text-primary uppercase tracking-widest">Melhor Valor</span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {creditOptions.map((option) => (
+              <button
+                key={option.id}
+                onClick={() => handleAddCredits(option.amount)}
+                disabled={loading}
+                className="bg-white p-5 rounded-2xl border border-primary/5 shadow-sm flex items-center justify-between hover:border-primary/30 transition-all active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-primary/5 rounded-full flex items-center justify-center">
+                    <PlusCircle size={24} className="text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <h4 className="font-black text-on-surface text-lg leading-none">{option.credits} Créditos</h4>
+                    {option.badge && (
+                      <span className="text-[8px] font-black text-primary uppercase tracking-widest">{option.badge}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="block font-black text-primary text-xl">{option.amount}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mt-12 bg-primary/5 p-6 rounded-3xl border border-primary/10">
         <div className="flex items-center gap-3 mb-4">
@@ -178,7 +241,7 @@ const ScreenWallet = ({ onBack }: { onBack: () => void }) => {
           <h3 className="font-bold text-sm text-on-surface uppercase tracking-widest">Segurança Garantida</h3>
         </div>
         <p className="text-xs text-on-surface/60 leading-relaxed font-medium">
-          Todas as transações são criptografadas e processadas de forma segura. Seus dados financeiros nunca são armazenados em nossos servidores.
+          Todas as transações são processadas de forma segura via Pix. Seus dados financeiros nunca são armazenados em nossos servidores.
         </p>
       </section>
     </div>
@@ -1912,10 +1975,11 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
 
 const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creator | null }) => {
   const [selectedPlan, setSelectedPlan] = useState('monthly');
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'pix'>('card');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [pixData, setPixData] = useState<{ qrCode: string, qrCodeBase64: string, paymentId: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const plans = [
     { id: 'monthly', name: 'Mensal', price: 'R$ 29,90', description: 'Acesso total por 30 dias' },
@@ -1923,23 +1987,68 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
     { id: 'yearly', name: 'Anual', price: 'R$ 249,90', description: 'Economize 30% - 365 dias', badge: 'Melhor Valor' },
   ];
 
-  const pixCode = "00020126580014br.gov.bcb.pix0136123e4567-e89b-12d3-a456-4266141740005204000053039865802BR5913Novinha do JOB6008MOC62070503***6304E2B8";
+  React.useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setCurrentUser(data.user));
+  }, []);
 
   const handleCopyPix = () => {
-    navigator.clipboard.writeText(pixCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (pixData?.qrCode) {
+      navigator.clipboard.writeText(pixData.qrCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
-  const handlePayment = (e: React.FormEvent) => {
-    e.preventDefault();
+  const generatePix = async () => {
+    if (!currentUser || !creator) return;
     setLoading(true);
-    // Simulate payment processing
-    setTimeout(() => {
+    try {
+      const selectedPlanData = plans.find(p => p.id === selectedPlan);
+      const amount = parseFloat(selectedPlanData?.price.replace('R$ ', '').replace(',', '.') || '0');
+
+      const response = await fetch('/api/payments/pix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount,
+          description: `Assinatura ${selectedPlanData?.name} - ${creator.name}`,
+          payerEmail: currentUser.email,
+          userId: currentUser.id,
+          creatorId: creator.id,
+          planId: selectedPlan
+        })
+      });
+
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      setPixData(data);
+    } catch (error) {
+      console.error("Erro ao gerar Pix:", error);
+      alert("Erro ao gerar Pix. Verifique se o backend está configurado corretamente.");
+    } finally {
       setLoading(false);
-      setSuccess(true);
-    }, 2000);
+    }
   };
+
+  // Polling for payment status
+  React.useEffect(() => {
+    if (!pixData?.paymentId) return;
+
+    const interval = setInterval(async () => {
+      const { data } = await supabase
+        .from('payments')
+        .select('status')
+        .eq('id', pixData.paymentId)
+        .single();
+
+      if (data && data.status === 'approved') {
+        setSuccess(true);
+        clearInterval(interval);
+      }
+    }, 5000); // Check every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [pixData?.paymentId]);
 
   if (success) {
     return (
@@ -1990,7 +2099,10 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
           {plans.map((plan) => (
             <div 
               key={plan.id}
-              onClick={() => setSelectedPlan(plan.id)}
+              onClick={() => {
+                setSelectedPlan(plan.id);
+                setPixData(null); // Reset pix data when changing plans
+              }}
               className={`relative p-5 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between ${
                 selectedPlan === plan.id ? 'border-primary bg-primary/5 shadow-lg shadow-primary/5' : 'border-primary/5 bg-white'
               }`}
@@ -2018,120 +2130,64 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
           ))}
         </div>
 
-        <div className="flex gap-2 p-1 bg-on-surface/5 rounded-2xl">
-          <button 
-            onClick={() => setPaymentMethod('card')}
-            className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${paymentMethod === 'card' ? 'bg-white shadow-sm text-primary' : 'text-on-surface/40'}`}
-          >
-            Cartão
-          </button>
-          <button 
-            onClick={() => setPaymentMethod('pix')}
-            className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${paymentMethod === 'pix' ? 'bg-white shadow-sm text-primary' : 'text-on-surface/40'}`}
-          >
-            Pix
-          </button>
-        </div>
-
-        {paymentMethod === 'card' ? (
-          <form onSubmit={handlePayment} className="bg-white p-6 rounded-3xl border border-primary/5 shadow-sm space-y-6">
-            <div className="flex items-center gap-2 mb-2">
-              <CreditCard className="text-primary" size={20} />
-              <h3 className="font-bold text-sm text-on-surface uppercase tracking-widest">Detalhes do Cartão</h3>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] uppercase tracking-widest font-black text-on-surface/40 px-1">Número do Cartão</label>
-                <input 
-                  className="w-full bg-background border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 font-bold text-on-surface" 
-                  placeholder="0000 0000 0000 0000"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-widest font-black text-on-surface/40 px-1">Validade</label>
-                  <input 
-                    className="w-full bg-background border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 font-bold text-on-surface" 
-                    placeholder="MM/AA"
-                    required
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-widest font-black text-on-surface/40 px-1">CVV</label>
-                  <input 
-                    className="w-full bg-background border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 font-bold text-on-surface" 
-                    placeholder="123"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            <button 
-              disabled={loading}
-              type="submit"
-              className="w-full py-5 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all uppercase tracking-widest text-sm flex items-center justify-center gap-3"
-            >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <ShieldCheck size={20} />
-                  Confirmar Pagamento
-                </>
-              )}
-            </button>
-          </form>
-        ) : (
-          <div className="bg-white p-8 rounded-3xl border border-primary/5 shadow-sm space-y-8 text-center">
+        <div className="bg-white p-8 rounded-3xl border border-primary/5 shadow-sm space-y-8 text-center mt-6">
+          {!pixData ? (
             <div className="flex flex-col items-center">
-              <div className="w-48 h-48 bg-background rounded-2xl p-4 mb-6 border border-primary/5">
-                <img 
-                  src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=pix-payload-mock" 
-                  alt="Pix QR Code" 
-                  className="w-full h-full object-contain"
-                />
-              </div>
-              <h3 className="font-black text-lg uppercase tracking-tight mb-2">Pague com Pix</h3>
-              <p className="text-xs text-on-surface/40 font-bold uppercase tracking-widest max-w-[240px]">
-                Escaneie o QR Code acima ou copie o código abaixo para pagar.
-              </p>
+              <h3 className="font-black text-lg uppercase tracking-tight mb-4">Pague com Pix</h3>
+              <button 
+                onClick={generatePix}
+                disabled={loading}
+                className="w-full py-5 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all uppercase tracking-widest text-sm flex items-center justify-center gap-3"
+              >
+                {loading ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <ShieldCheck size={20} />
+                    Gerar Código Pix
+                  </>
+                )}
+              </button>
             </div>
-
-            <div className="space-y-3">
-              <label className="text-[10px] uppercase tracking-widest font-black text-on-surface/40 px-1 block text-left">Código Pix Copia e Cola</label>
-              <div className="flex gap-2">
-                <div className="flex-1 bg-background border border-primary/10 rounded-xl px-4 py-3.5 font-mono text-[10px] break-all text-left overflow-hidden h-12 flex items-center">
-                  {pixCode.substring(0, 40)}...
+          ) : (
+            <>
+              <div className="flex flex-col items-center">
+                <div className="w-48 h-48 bg-background rounded-2xl p-4 mb-6 border border-primary/5">
+                  <img 
+                    src={`data:image/jpeg;base64,${pixData.qrCodeBase64}`} 
+                    alt="Pix QR Code" 
+                    className="w-full h-full object-contain"
+                  />
                 </div>
-                <button 
-                  onClick={handleCopyPix}
-                  className="bg-primary text-white px-4 rounded-xl flex items-center justify-center active:scale-95 transition-all"
-                >
-                  {copied ? <Check size={18} /> : <Copy size={18} />}
-                </button>
+                <h3 className="font-black text-lg uppercase tracking-tight mb-2">Pague com Pix</h3>
+                <p className="text-xs text-on-surface/40 font-bold uppercase tracking-widest max-w-[240px]">
+                  Escaneie o QR Code acima ou copie o código abaixo para pagar.
+                </p>
               </div>
-              {copied && <p className="text-[10px] text-green-500 font-bold uppercase tracking-widest">Código copiado!</p>}
-            </div>
 
-            <button 
-              onClick={handlePayment}
-              disabled={loading}
-              className="w-full py-5 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all uppercase tracking-widest text-sm flex items-center justify-center gap-3"
-            >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <CheckCircle2 size={20} />
-                  Já realizei o pagamento
-                </>
-              )}
-            </button>
-          </div>
-        )}
+              <div className="space-y-3">
+                <label className="text-[10px] uppercase tracking-widest font-black text-on-surface/40 px-1 block text-left">Código Pix Copia e Cola</label>
+                <div className="flex gap-2">
+                  <div className="flex-1 bg-background border border-primary/10 rounded-xl px-4 py-3.5 font-mono text-[10px] break-all text-left overflow-hidden h-12 flex items-center">
+                    {pixData.qrCode.substring(0, 40)}...
+                  </div>
+                  <button 
+                    onClick={handleCopyPix}
+                    className="bg-primary text-white px-4 rounded-xl flex items-center justify-center active:scale-95 transition-all"
+                  >
+                    {copied ? <Check size={18} /> : <Copy size={18} />}
+                  </button>
+                </div>
+                {copied && <p className="text-[10px] text-green-500 font-bold uppercase tracking-widest">Código copiado!</p>}
+              </div>
+
+              <div className="flex items-center justify-center gap-2 text-primary text-sm font-bold animate-pulse">
+                <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                Aguardando pagamento...
+              </div>
+            </>
+          )}
+        </div>
         
         <p className="text-[9px] text-center text-on-surface/30 font-bold uppercase tracking-widest leading-relaxed">
           Pagamento processado de forma segura e criptografada.<br/>Sua privacidade é nossa prioridade.
@@ -2503,7 +2559,7 @@ export default function App() {
         );
       case 'activity': return <ScreenActivity notifications={notifications} />;
       case 'messages': return <ScreenMessages messages={messages} />;
-      case 'wallet': return <ScreenWallet onBack={() => setScreen('feed')} />;
+      case 'wallet': return <ScreenWallet onBack={() => setScreen('feed')} isMaster={isMaster} />;
       case 'edit-profile': return <ScreenEditProfile onBack={() => setScreen('profile')} creator={creator} onProfileUpdated={() => setRefreshKey(prev => prev + 1)} />;
       case 'create-post': return <ScreenCreatePost onBack={() => setScreen('feed')} onPostCreated={() => { setRefreshKey(prev => prev + 1); setScreen('feed'); }} />;
       case 'payment': return <ScreenPayment onBack={() => setScreen('feed')} creator={publicCreator || creator} />;
