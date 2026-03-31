@@ -1,6 +1,6 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import { MercadoPagoConfig, Payment } from "mercadopago";
+import { createTurbofyClient } from "@turbofy/sdk";
 import { createClient } from "@supabase/supabase-js";
 import path from "path";
 import dotenv from "dotenv";
@@ -18,17 +18,21 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Initialize Mercado Pago
-const client = new MercadoPagoConfig({ accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN || "" });
-const payment = new Payment(client);
+// Initialize Turbofy Client
+const turbofyClient = createTurbofyClient({
+  credentials: {
+    clientId: process.env.TURBOFY_CLIENT_ID || "",
+    clientSecret: process.env.TURBOFY_CLIENT_SECRET || "",
+  },
+});
 
 // API Route: Create Pix Payment
 app.post("/api/payments/pix", async (req, res) => {
   try {
     const { amount, description, payerEmail, userId, creatorId, planId } = req.body;
 
-    if (!process.env.MERCADO_PAGO_ACCESS_TOKEN) {
-      return res.status(500).json({ error: "Mercado Pago token not configured." });
+    if (!process.env.TURBOFY_CLIENT_ID || !process.env.TURBOFY_CLIENT_SECRET) {
+      return res.status(500).json({ error: "Turbofy credentials not configured." });
     }
 
     // Create a payment record in Supabase first to get an ID
@@ -49,30 +53,32 @@ app.post("/api/payments/pix", async (req, res) => {
       return res.status(500).json({ error: "Failed to create payment record." });
     }
 
-    // Request to Mercado Pago
-    const paymentData = {
-      transaction_amount: amount,
+    // Convert amount to cents for Turbofy (e.g. 29.90 -> 2990)
+    const amountCents = Math.round(amount * 100);
+
+    // Request to Turbofy
+    const charge = await turbofyClient.pix.createCharge({
+      amountCents: amountCents,
       description: description || "Assinatura Novinha do JOB",
-      payment_method_id: "pix",
-      payer: {
-        email: payerEmail || "test@test.com",
-      },
-      external_reference: paymentRecord.id, // Link MP payment to our DB record
-    };
+      externalRef: paymentRecord.id, // Link Turbofy payment to our DB record
+      metadata: {
+        userId: userId,
+        creatorId: creatorId,
+        planId: planId
+      }
+    });
 
-    const mpResponse = await payment.create({ body: paymentData });
-
-    // Update the record with the MP payment ID
+    // Update the record with the Turbofy payment ID
     await supabase
       .from("payments")
-      .update({ mp_payment_id: mpResponse.id?.toString() })
+      .update({ mp_payment_id: charge.id })
       .eq("id", paymentRecord.id);
 
     // Return the Pix data to the frontend
     res.json({
       paymentId: paymentRecord.id,
-      qrCodeBase64: mpResponse.point_of_interaction?.transaction_data?.qr_code_base64,
-      qrCode: mpResponse.point_of_interaction?.transaction_data?.qr_code,
+      qrCodeBase64: charge.pix.qrCode,
+      qrCode: charge.pix.copyPaste,
     });
   } catch (error: any) {
     console.error("Error creating Pix payment:", error);
@@ -80,32 +86,32 @@ app.post("/api/payments/pix", async (req, res) => {
   }
 });
 
-// API Route: Mercado Pago Webhook
-app.post("/api/webhooks/mercadopago", async (req, res) => {
+// API Route: Turbofy Webhook
+app.post("/api/webhooks/turbofy", async (req, res) => {
   try {
-    const { type, data } = req.body;
+    // Turbofy webhook payload structure based on standard event formats
+    const { event, data } = req.body;
 
-    if (type === "payment") {
-      const paymentId = data.id;
-      
-      // Fetch payment details from MP
-      const mpPayment = await payment.get({ id: paymentId });
-      const externalReference = mpPayment.external_reference;
-      const status = mpPayment.status;
+    // We only care about when a charge is paid
+    if (event === "charge.paid" && data) {
+      const { id, status, externalRef } = data;
 
-      if (externalReference) {
+      if (id && externalRef) {
         // Update payment status in our database
+        // Turbofy uses "PAID" for successful payments
+        const newStatus = status === "PAID" ? "approved" : status.toLowerCase();
+        
         await supabase
           .from("payments")
-          .update({ status: status === "approved" ? "approved" : status })
-          .eq("id", externalReference);
+          .update({ status: newStatus })
+          .eq("id", externalRef);
 
         // If approved, create/update the subscription
-        if (status === "approved") {
+        if (status === "PAID") {
           const { data: paymentRecord } = await supabase
             .from("payments")
             .select("*")
-            .eq("id", externalReference)
+            .eq("id", externalRef)
             .single();
 
           if (paymentRecord) {
