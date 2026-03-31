@@ -21,8 +21,8 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // Initialize Turbofy Client
 const turbofyClient = createTurbofyClient({
   credentials: {
-    clientId: process.env.TURBOFY_CLIENT_ID || "",
-    clientSecret: process.env.TURBOFY_CLIENT_SECRET || "",
+    clientId: (process.env.TURBOFY_CLIENT_ID || "").trim(),
+    clientSecret: (process.env.TURBOFY_CLIENT_SECRET || "").trim(),
   },
 });
 
@@ -59,8 +59,8 @@ app.post("/api/payments/pix", async (req, res) => {
     // Request to Turbofy
     const charge = await turbofyClient.pix.createCharge({
       amountCents: amountCents,
-      description: description || "Assinatura Novinha do JOB",
-      externalRef: paymentRecord.id, // Link Turbofy payment to our DB record
+      description: (description || "Assinatura").substring(0, 100), // Limit length just in case
+      externalRef: paymentRecord.id.replace(/[^a-zA-Z0-9-]/g, ''), // Ensure safe pattern
       metadata: {
         userId: userId,
         creatorId: creatorId,
@@ -82,7 +82,14 @@ app.post("/api/payments/pix", async (req, res) => {
     });
   } catch (error: any) {
     console.error("Error creating Pix payment:", error);
-    res.status(500).json({ error: error.message || "Internal server error" });
+    
+    // Extract detailed validation errors from Turbofy SDK if available
+    let detailedError = error.message || "Internal server error";
+    if (error.fieldErrors) {
+      detailedError += " Detalhes: " + JSON.stringify(error.fieldErrors);
+    }
+    
+    res.status(500).json({ error: detailedError });
   }
 });
 
