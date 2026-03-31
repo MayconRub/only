@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import { createTurbofyClient } from "@turbofy/sdk";
 import { createClient } from "@supabase/supabase-js";
 import path from "path";
@@ -18,14 +17,6 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Initialize Turbofy Client
-const turbofyClient = createTurbofyClient({
-  credentials: {
-    clientId: (process.env.TURBOFY_CLIENT_ID || "").trim(),
-    clientSecret: (process.env.TURBOFY_CLIENT_SECRET || "").trim(),
-  },
-});
-
 // API Route: Create Pix Payment
 app.post("/api/payments/pix", async (req, res) => {
   try {
@@ -34,6 +25,14 @@ app.post("/api/payments/pix", async (req, res) => {
     if (!process.env.TURBOFY_CLIENT_ID || !process.env.TURBOFY_CLIENT_SECRET) {
       return res.status(500).json({ error: "Turbofy credentials not configured." });
     }
+
+    // Initialize Turbofy Client inside the route to prevent boot crashes
+    const turbofyClient = createTurbofyClient({
+      credentials: {
+        clientId: process.env.TURBOFY_CLIENT_ID.trim(),
+        clientSecret: process.env.TURBOFY_CLIENT_SECRET.trim(),
+      },
+    });
 
     // Create a payment record in Supabase first to get an ID
     const { data: paymentRecord, error: dbError } = await supabase
@@ -151,6 +150,7 @@ app.post("/api/webhooks/turbofy", async (req, res) => {
 async function startServer() {
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
