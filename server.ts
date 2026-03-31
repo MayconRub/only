@@ -28,6 +28,7 @@ app.post("/api/payments/pix", async (req, res) => {
 
     // Initialize Turbofy Client inside the route to prevent boot crashes
     const turbofyClient = createTurbofyClient({
+      baseUrl: "https://api.turbofypay.com",
       credentials: {
         clientId: process.env.TURBOFY_CLIENT_ID.trim(),
         clientSecret: process.env.TURBOFY_CLIENT_SECRET.trim(),
