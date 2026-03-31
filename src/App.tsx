@@ -26,6 +26,7 @@ import {
   CheckCircle2,
   Mail,
   Eye,
+  EyeOff,
   Star,
   ChevronRight,
   Camera,
@@ -1750,6 +1751,7 @@ const ScreenCreatePost = ({ onBack, onPostCreated }: { onBack: () => void, onPos
 const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, onNavigateToRegister: () => void }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1797,12 +1799,18 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
                 <input 
                   className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4.5 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
                   placeholder="••••••••" 
-                  type="password" 
+                  type={showPassword ? "text" : "password"} 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
-                <button className="absolute right-5 text-on-surface/40" type="button"><Eye size={20} /></button>
+                <button 
+                  className="absolute right-5 text-on-surface/40" 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
               </div>
             </div>
           </div>
@@ -1822,12 +1830,24 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-primary/10"></div></div>
             <span className="relative bg-background px-4 text-[10px] font-black text-on-surface/30 uppercase tracking-widest">Ou continue com</span>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <button className="flex items-center justify-center gap-2 bg-white border border-primary/5 py-4 rounded-2xl shadow-sm active:scale-95 transition-all">
-              <div className="w-5 h-5 bg-black rounded-full flex items-center justify-center text-white text-[10px]">A</div>
-              <span className="text-xs font-bold">Apple</span>
-            </button>
-            <button className="flex items-center justify-center gap-2 bg-white border border-primary/5 py-4 rounded-2xl shadow-sm active:scale-95 transition-all">
+          <div className="grid grid-cols-1 gap-4">
+            <button 
+              type="button"
+              onClick={async () => {
+                try {
+                  const { error } = await supabase.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                      redirectTo: window.location.origin
+                    }
+                  });
+                  if (error) throw error;
+                } catch (err: any) {
+                  setError(err.message || 'Erro ao entrar com Google');
+                }
+              }}
+              className="flex items-center justify-center gap-2 bg-white border border-primary/5 py-4 rounded-2xl shadow-sm active:scale-95 transition-all"
+            >
               <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px]">G</div>
               <span className="text-xs font-bold">Google</span>
             </button>
@@ -1845,6 +1865,7 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
 const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => void, onNavigateToLogin: () => void }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1929,25 +1950,27 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">Senha</label>
-              <input 
-                className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
-                placeholder="••••••••" 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+              <div className="relative flex items-center">
+                <input 
+                  className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
+                  placeholder="••••••••" 
+                  type={showPassword ? "text" : "password"} 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <button 
+                  className="absolute right-5 text-on-surface/40" 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
             </div>
           </div>
           
           {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
-
-          <div className="flex items-center gap-3 px-1">
-            <div className="w-12 h-6 bg-primary/10 rounded-full relative cursor-pointer">
-              <div className="absolute right-1 top-1 w-4 h-4 bg-primary rounded-full shadow-sm"></div>
-            </div>
-            <span className="text-xs font-bold text-on-surface/80">Eu sou um criador</span>
-          </div>
 
           <div className="flex items-start gap-3 px-1">
             <input type="checkbox" className="mt-1 w-4 h-4 rounded border-primary/20 text-primary focus:ring-primary/20" required />
@@ -2139,26 +2162,35 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
         </div>
 
         <div className="bg-white p-8 rounded-3xl border border-primary/5 shadow-sm space-y-8 text-center mt-6">
-          {!pixData ? (
-            <div className="flex flex-col items-center">
-              <h3 className="font-black text-lg uppercase tracking-tight mb-4">Pague com Pix</h3>
+          <div className="flex flex-col items-center">
+            <h3 className="font-black text-lg uppercase tracking-tight mb-4">Pague com Pix</h3>
+            <button 
+              onClick={generatePix}
+              disabled={loading}
+              className="w-full py-5 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all uppercase tracking-widest text-sm flex items-center justify-center gap-3"
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <ShieldCheck size={20} />
+                  Gerar Código Pix
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+        
+        {pixData && (
+          <div className="fixed inset-0 z-[300] bg-background/95 backdrop-blur-sm flex flex-col items-center justify-center p-6">
+            <div className="bg-white p-8 rounded-3xl w-full max-w-md shadow-2xl border border-primary/10 relative">
               <button 
-                onClick={generatePix}
-                disabled={loading}
-                className="w-full py-5 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all uppercase tracking-widest text-sm flex items-center justify-center gap-3"
+                onClick={() => setPixData(null)}
+                className="absolute top-4 right-4 text-on-surface/40 hover:text-primary transition-colors"
               >
-                {loading ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <ShieldCheck size={20} />
-                    Gerar Código Pix
-                  </>
-                )}
+                <X size={24} />
               </button>
-            </div>
-          ) : (
-            <>
+              
               <div className="flex flex-col items-center">
                 <div className="w-48 h-48 bg-background rounded-2xl p-4 mb-6 border border-primary/5">
                   <img 
@@ -2168,12 +2200,12 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
                   />
                 </div>
                 <h3 className="font-black text-lg uppercase tracking-tight mb-2">Pague com Pix</h3>
-                <p className="text-xs text-on-surface/40 font-bold uppercase tracking-widest max-w-[240px]">
+                <p className="text-xs text-on-surface/40 font-bold uppercase tracking-widest max-w-[240px] text-center mb-6">
                   Escaneie o QR Code acima ou copie o código abaixo para pagar.
                 </p>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-3 mb-6">
                 <label className="text-[10px] uppercase tracking-widest font-black text-on-surface/40 px-1 block text-left">Código Pix Copia e Cola</label>
                 <div className="flex gap-2">
                   <div className="flex-1 bg-background border border-primary/10 rounded-xl px-4 py-3.5 font-mono text-[10px] break-all text-left overflow-hidden h-12 flex items-center">
@@ -2186,16 +2218,16 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
                     {copied ? <Check size={18} /> : <Copy size={18} />}
                   </button>
                 </div>
-                {copied && <p className="text-[10px] text-green-500 font-bold uppercase tracking-widest">Código copiado!</p>}
+                {copied && <p className="text-[10px] text-green-500 font-bold uppercase tracking-widest text-center">Código copiado!</p>}
               </div>
 
               <div className="flex items-center justify-center gap-2 text-primary text-sm font-bold animate-pulse">
                 <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
                 Aguardando pagamento...
               </div>
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
         
         <p className="text-[9px] text-center text-on-surface/30 font-bold uppercase tracking-widest leading-relaxed">
           Pagamento processado de forma segura e criptografada.<br/>Sua privacidade é nossa prioridade.
