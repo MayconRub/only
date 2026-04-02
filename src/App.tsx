@@ -1790,17 +1790,40 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setResetMessage(null);
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       onLogin();
     } catch (err: any) {
       setError(err.message || 'Erro ao entrar');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError('Por favor, insira seu e-mail para redefinir a senha.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setResetMessage(null);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      setResetMessage('E-mail de redefinição de senha enviado! Verifique sua caixa de entrada.');
+    } catch (err: any) {
+      setError(err.message || 'Erro ao enviar e-mail de redefinição.');
     } finally {
       setLoading(false);
     }
@@ -1851,7 +1874,17 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
             </div>
           </div>
           {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
-          <div className="flex justify-end"><button className="text-xs font-black text-primary uppercase tracking-widest" type="button">Esqueceu a senha?</button></div>
+          {resetMessage && <p className="text-green-500 text-xs font-bold text-center">{resetMessage}</p>}
+          <div className="flex justify-end">
+            <button 
+              className="text-xs font-black text-primary uppercase tracking-widest" 
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={loading}
+            >
+              Esqueceu a senha?
+            </button>
+          </div>
           <button 
             disabled={loading}
             type="submit" 
@@ -1903,6 +1936,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('+55 ');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1917,6 +1951,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
         options: {
           data: {
             full_name: name,
+            phone: phone
           }
         }
       });
@@ -1931,7 +1966,8 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
           username: email.split('@')[0] + Math.floor(Math.random() * 1000),
           avatar: `https://picsum.photos/seed/${data.user.id}/400`,
           bio: 'Novo criador no pedaço!',
-          stats: { posts: '0', followers: '0', likes: '0' }
+          stats: { posts: '0', followers: '0', likes: '0' },
+          phone: phone
         });
         if (profileError) {
           console.error('Error creating profile:', profileError);
@@ -1981,6 +2017,24 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">Telefone</label>
+              <input 
+                className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
+                placeholder="+55 (11) 99999-9999" 
+                type="tel"
+                value={phone}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val.startsWith('+55')) {
+                    setPhone(val);
+                  } else {
+                    setPhone('+55 ' + val.replace(/^\+55\s*/, ''));
+                  }
+                }}
                 required
               />
             </div>
@@ -2162,6 +2216,17 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
           <p className="text-xs font-bold text-on-surface/40 uppercase tracking-widest">Escolha seu plano de acesso</p>
         </section>
 
+        <div className="flex items-center justify-center gap-4 py-2">
+          <div className="flex items-center gap-1.5 text-[10px] font-bold text-green-600 uppercase tracking-widest bg-green-50 px-3 py-1.5 rounded-full border border-green-100">
+            <ShieldCheck size={14} />
+            100% Seguro
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100">
+            <EyeOff size={14} />
+            Pagamento Anônimo
+          </div>
+        </div>
+
         <div className="space-y-4">
           {plans.map((plan) => (
             <div 
@@ -2218,8 +2283,9 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
         </div>
         
         {pixData && (
-          <div className="fixed inset-0 z-[300] bg-background/95 backdrop-blur-sm flex flex-col items-center justify-center p-6">
-            <div className="bg-white p-8 rounded-3xl w-full max-w-md shadow-2xl border border-primary/10 relative">
+          <div className="fixed inset-0 z-[300] bg-background/95 backdrop-blur-md flex flex-col items-center justify-center p-6">
+            <div className="bg-white p-8 rounded-3xl w-full max-w-md shadow-2xl border border-primary/10 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-2 bg-green-500"></div>
               <button 
                 onClick={() => setPixData(null)}
                 className="absolute top-4 right-4 text-on-surface/40 hover:text-primary transition-colors"
@@ -2228,46 +2294,71 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
               </button>
               
               <div className="flex flex-col items-center">
-                <div className="w-48 h-48 bg-background rounded-2xl p-4 mb-6 border border-primary/5">
+                <div className="flex items-center gap-2 text-green-600 mb-6 bg-green-50 px-4 py-2 rounded-full border border-green-100">
+                  <ShieldCheck size={16} />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Ambiente Seguro e Criptografado</span>
+                </div>
+
+                <div className="w-48 h-48 bg-white rounded-2xl p-3 mb-6 shadow-lg border border-primary/10 relative">
+                  <div className="absolute -top-3 -right-3 bg-primary text-white p-2 rounded-full shadow-md">
+                    <QrCode size={20} />
+                  </div>
                   <img 
                     src={`data:image/jpeg;base64,${pixData.qrCodeBase64}`} 
                     alt="Pix QR Code" 
                     className="w-full h-full object-contain"
                   />
                 </div>
-                <h3 className="font-black text-lg uppercase tracking-tight mb-2">Pague com Pix</h3>
-                <p className="text-xs text-on-surface/40 font-bold uppercase tracking-widest max-w-[240px] text-center mb-6">
-                  Escaneie o QR Code acima ou copie o código abaixo para pagar.
+                <h3 className="font-black text-xl uppercase tracking-tight mb-2 text-on-surface">Pague com Pix</h3>
+                <p className="text-xs text-on-surface/60 font-medium max-w-[260px] text-center mb-8 leading-relaxed">
+                  Escaneie o QR Code com o app do seu banco ou copie o código abaixo para liberar seu acesso <span className="font-bold text-primary">imediatamente</span>.
                 </p>
               </div>
 
-              <div className="space-y-3 mb-6">
-                <label className="text-[10px] uppercase tracking-widest font-black text-on-surface/40 px-1 block text-left">Código Pix Copia e Cola</label>
+              <div className="space-y-3 mb-8 bg-on-surface/5 p-4 rounded-2xl border border-on-surface/10">
+                <label className="text-[10px] uppercase tracking-widest font-black text-on-surface/60 block text-left flex items-center gap-1.5">
+                  <Copy size={12} />
+                  Código Pix Copia e Cola
+                </label>
                 <div className="flex gap-2">
-                  <div className="flex-1 bg-background border border-primary/10 rounded-xl px-4 py-3.5 font-mono text-[10px] break-all text-left overflow-hidden h-12 flex items-center">
+                  <div className="flex-1 bg-white border border-primary/10 rounded-xl px-4 py-3.5 font-mono text-[10px] break-all text-left overflow-hidden h-12 flex items-center shadow-inner">
                     {pixData.qrCode.substring(0, 40)}...
                   </div>
                   <button 
                     onClick={handleCopyPix}
-                    className="bg-primary text-white px-4 rounded-xl flex items-center justify-center active:scale-95 transition-all"
+                    className="bg-primary text-white px-4 rounded-xl flex items-center justify-center active:scale-95 transition-all shadow-md"
                   >
                     {copied ? <Check size={18} /> : <Copy size={18} />}
                   </button>
                 </div>
-                {copied && <p className="text-[10px] text-green-500 font-bold uppercase tracking-widest text-center">Código copiado!</p>}
+                {copied && <p className="text-[10px] text-green-600 font-bold uppercase tracking-widest text-center mt-2">Código copiado com sucesso!</p>}
               </div>
 
-              <div className="flex items-center justify-center gap-2 text-primary text-sm font-bold animate-pulse">
-                <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                Aguardando pagamento...
+              <div className="flex flex-col items-center justify-center gap-3">
+                <div className="flex items-center gap-2 text-primary text-sm font-bold animate-pulse bg-primary/5 px-6 py-3 rounded-full">
+                  <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                  Aguardando confirmação...
+                </div>
+                <p className="text-[9px] text-on-surface/40 font-bold uppercase tracking-widest flex items-center gap-1">
+                  <Lock size={10} />
+                  Transação 100% Anônima
+                </p>
               </div>
             </div>
           </div>
         )}
         
-        <p className="text-[9px] text-center text-on-surface/30 font-bold uppercase tracking-widest leading-relaxed">
-          Pagamento processado de forma segura e criptografada.<br/>Sua privacidade é nossa prioridade.
-        </p>
+        <div className="bg-white p-4 rounded-2xl border border-primary/5 shadow-sm flex items-start gap-4 mt-8">
+          <div className="bg-[#5c0a18] p-3 rounded-xl flex-shrink-0">
+            <ShieldCheck size={24} className="text-white" />
+          </div>
+          <div className="text-left">
+            <h4 className="font-bold text-sm text-on-surface mb-1">TRANSAÇÃO PROTEGIDA</h4>
+            <p className="text-xs text-on-surface/60 leading-relaxed">
+              Esta operação está sendo realizada em um ambiente criptografado de ponta a ponta. Sua identidade e dados bancários permanecem privados.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -2531,8 +2622,14 @@ export default function App() {
           })) as any);
         }
 
-        // Fetch stories
-        const { data: storiesData } = await supabase.from('stories').select('*').order('created_at', { ascending: false });
+        // Fetch stories (only from the last 24 hours)
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { data: storiesData } = await supabase
+          .from('stories')
+          .select('*')
+          .gte('created_at', twentyFourHoursAgo)
+          .order('created_at', { ascending: false });
+          
         if (storiesData) {
           const filteredStories = masterId
             ? storiesData.filter((s: any) => s.creator_id === masterId)
