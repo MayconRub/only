@@ -81,14 +81,16 @@ const TopNav = ({
   onBack = () => {}, 
   avatar,
   isMaster = false,
-  onMessageClick
+  onMessageClick,
+  unreadCount = 0
 }: { 
   title?: string, 
   showBack?: boolean, 
   onBack?: () => void, 
   avatar?: string,
   isMaster?: boolean,
-  onMessageClick?: () => void
+  onMessageClick?: () => void,
+  unreadCount?: number
 }) => (
   <header className="fixed top-0 w-full flex justify-between items-center px-6 py-4 glass-header z-50">
     <div className="flex items-center gap-4">
@@ -105,8 +107,13 @@ const TopNav = ({
     </div>
     <div className="flex items-center gap-4">
       {isMaster && onMessageClick && (
-        <button onClick={onMessageClick} className="text-on-surface/60 hover:text-primary transition-colors">
+        <button onClick={onMessageClick} className="text-on-surface/60 hover:text-primary transition-colors relative">
           <MessageCircle size={24} />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-primary text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center border-2 border-white">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
         </button>
       )}
       <div className="w-8 h-8 rounded-full overflow-hidden border border-primary/20">
@@ -1235,25 +1242,27 @@ const ScreenProfile = ({
           <WelcomeAudioPlayer audioUrl={creator.welcome_audio} />
         )}
 
-        <div className="flex justify-center items-center gap-4 sm:gap-10 mb-10 py-6 px-4 sm:px-8 bg-white rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5 overflow-hidden">
-          <div className="text-center min-w-[60px]">
-            <span className="block text-xl font-bold">{isMaster ? myPosts.length : '0'}</span>
-            <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
+        {isMaster && (
+          <div className="flex justify-center items-center gap-4 sm:gap-10 mb-10 py-6 px-4 sm:px-8 bg-white rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5 overflow-hidden">
+            <div className="text-center min-w-[60px]">
+              <span className="block text-xl font-bold">{myPosts.length}</span>
+              <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
+            </div>
+            <div className="w-px h-8 bg-primary/10 flex-shrink-0"></div>
+            <div className="text-center min-w-[60px]">
+              <span className="block text-xl font-bold">{creator.stats?.followers || '0'}</span>
+              <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Seguidores</span>
+            </div>
+            <div className="w-px h-8 bg-primary/10 flex-shrink-0"></div>
+            <div className="text-center min-w-[60px]">
+              <span className="block text-xl font-bold">{creator.stats?.likes || '0'}</span>
+              <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Curtidas</span>
+            </div>
           </div>
-          <div className="w-px h-8 bg-primary/10 flex-shrink-0"></div>
-          <div className="text-center min-w-[60px]">
-            <span className="block text-xl font-bold">{isMaster ? creator.stats?.followers || '0' : '1'}</span>
-            <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Seguidores</span>
-          </div>
-          <div className="w-px h-8 bg-primary/10 flex-shrink-0"></div>
-          <div className="text-center min-w-[60px]">
-            <span className="block text-xl font-bold">{isMaster ? creator.stats?.likes || '0' : '0'}</span>
-            <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Curtidas</span>
-          </div>
-        </div>
+        )}
         
         <div className="flex flex-col gap-3 mb-10 max-w-md mx-auto">
-          {isMaster && (
+          {isMaster ? (
             <div className="flex flex-col sm:flex-row gap-3">
               <button onClick={onEdit} className="flex-1 py-4 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs">
                 Editar Perfil
@@ -1270,6 +1279,10 @@ const ScreenProfile = ({
                 Compartilhar
               </button>
             </div>
+          ) : (
+            <button onClick={onEdit} className="w-full py-4 bg-primary/5 text-primary font-bold rounded-2xl shadow-sm active:scale-95 transition-all uppercase tracking-widest text-xs">
+              Editar Perfil
+            </button>
           )}
         </div>
         
@@ -1725,6 +1738,18 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
         }
       } else if (data) {
         setMessages(data);
+        
+        // Mark received messages as read
+        const unreadIds = data
+          .filter(m => m.receiver_id === userId && !m.is_read)
+          .map(m => m.id);
+        
+        if (unreadIds.length > 0) {
+          await supabase
+            .from('messages')
+            .update({ is_read: true })
+            .in('id', unreadIds);
+        }
       }
     } catch (err) {
       console.error('Exception in fetchMessages:', err);
@@ -3823,6 +3848,8 @@ export default function App() {
   const showNav = isLoggedIn && !['edit-profile', 'create-post', 'public-profile', 'payment'].includes(screen);
   const showTopNav = (isLoggedIn || screen === 'public-profile' || screen === 'payment') && !['login', 'register'].includes(screen);
 
+  const unreadMessagesCount = messages.reduce((acc, m) => acc + (m.unreadCount || 0), 0);
+
   return (
     <div className="min-h-screen bg-background">
       {showTopNav && (
@@ -3842,6 +3869,7 @@ export default function App() {
           avatar={isLoggedIn ? creator.avatar : publicCreator?.avatar}
           isMaster={isMaster}
           onMessageClick={() => setScreen('messages')}
+          unreadCount={unreadMessagesCount}
         />
       )}
       
@@ -3858,7 +3886,12 @@ export default function App() {
       </AnimatePresence>
 
       {showNav && (
-        <BottomNav active={screen} onChange={setScreen} isMaster={isMaster} unreadCount={unreadNotificationsCount} />
+        <BottomNav 
+          active={screen} 
+          onChange={setScreen} 
+          isMaster={isMaster} 
+          unreadCount={isMaster ? unreadNotificationsCount : unreadMessagesCount} 
+        />
       )}
     </div>
   );
