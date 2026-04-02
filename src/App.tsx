@@ -101,6 +101,97 @@ const TopNav = ({ title = "Novinha do JOB MOC", showBack = false, onBack = () =>
   </header>
 );
 
+const ScreenSubscriptions = ({ onBack }: { onBack: () => void }) => {
+  const [subscriptions, setSubscriptions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  React.useEffect(() => {
+    const fetchSubscriptions = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data, error } = await supabase
+          .from('payments')
+          .select('*, creator:profiles!creator_id(*)')
+          .eq('user_id', user.id)
+          .eq('status', 'approved')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        if (data) setSubscriptions(data);
+      } catch (err) {
+        console.error('Error fetching subscriptions:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSubscriptions();
+  }, []);
+
+  return (
+    <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
+      <section className="mb-8 pt-8">
+        <h1 className="text-4xl font-extrabold tracking-tight mb-1">Assinaturas</h1>
+        <p className="text-on-surface/60 text-sm font-medium">Histórico de conteúdos que você assinou.</p>
+      </section>
+
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+        </div>
+      ) : subscriptions.length > 0 ? (
+        <div className="space-y-4">
+          {subscriptions.map((sub) => (
+            <div key={sub.id} className="bg-white p-5 rounded-2xl border border-primary/5 shadow-sm flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <img src={sub.creator?.avatar} className="w-14 h-14 rounded-full object-cover border-2 border-primary/10" referrerPolicy="no-referrer" />
+                  <div className="absolute -bottom-1 -right-1 bg-primary text-white p-1 rounded-full border-2 border-white">
+                    <ShieldCheck size={12} />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-black text-on-surface text-base uppercase tracking-tight">{sub.creator?.name}</h3>
+                  <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">Plano: {sub.plan_id || 'VIP'}</p>
+                  <p className="text-[9px] font-bold text-primary/60 uppercase tracking-widest mt-1">
+                    Ativo desde {new Date(sub.created_at).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="block font-black text-primary text-sm">R$ {sub.amount?.toFixed(2).replace('.', ',')}</span>
+                <span className="text-[8px] font-black text-green-600 uppercase tracking-widest bg-green-50 px-2 py-1 rounded-md border border-green-100">Confirmado</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-20 px-6 bg-white rounded-3xl border border-primary/5 shadow-sm">
+          <div className="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Crown className="text-primary/20" size={40} />
+          </div>
+          <h3 className="text-lg font-black mb-2 uppercase tracking-tight">Nenhuma Assinatura</h3>
+          <p className="text-xs text-on-surface/40 font-bold uppercase tracking-widest leading-relaxed">
+            Você ainda não assinou nenhum criador. Explore o feed para encontrar conteúdos exclusivos!
+          </p>
+        </div>
+      )}
+
+      <section className="mt-12 bg-primary/5 p-6 rounded-3xl border border-primary/10">
+        <div className="flex items-center gap-3 mb-4">
+          <ShieldCheck className="text-primary" size={20} />
+          <h3 className="font-bold text-sm text-on-surface uppercase tracking-widest">Suporte ao Assinante</h3>
+        </div>
+        <p className="text-xs text-on-surface/60 leading-relaxed font-medium">
+          Suas assinaturas são processadas de forma segura. Se tiver qualquer problema com o acesso ao conteúdo, entre em contato com o suporte.
+        </p>
+      </section>
+    </div>
+  );
+};
+
 const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: boolean }) => {
   const [balance, setBalance] = useState('R$ 45,00');
   const [loading, setLoading] = useState(false);
@@ -258,9 +349,9 @@ const BottomNav = ({ active, onChange, isMaster, unreadCount }: { active: Screen
       <Home size={24} />
       <span className="text-[10px] font-bold">Início</span>
     </button>
-    <button onClick={() => onChange('wallet')} className={`flex flex-col items-center gap-1 transition-all ${active === 'wallet' ? 'text-primary' : 'text-on-surface/40'}`}>
+    <button onClick={() => onChange(isMaster ? 'wallet' : 'subscriptions')} className={`flex flex-col items-center gap-1 transition-all ${(active === 'wallet' || active === 'subscriptions') ? 'text-primary' : 'text-on-surface/40'}`}>
       <CreditCard size={24} />
-      <span className="text-[10px] font-bold">Carteira</span>
+      <span className="text-[10px] font-bold">{isMaster ? 'Carteira' : 'Assinaturas'}</span>
     </button>
     
     {isMaster && (
@@ -3330,6 +3421,7 @@ export default function App() {
         return <ScreenActivity notifications={notifications} onRefresh={fetchData} />;
       case 'messages': return <ScreenMessages messages={messages} />;
       case 'wallet': return <ScreenWallet onBack={() => setScreen('feed')} isMaster={isMaster} />;
+      case 'subscriptions': return <ScreenSubscriptions onBack={() => setScreen('feed')} />;
       case 'edit-profile': return <ScreenEditProfile onBack={() => setScreen('profile')} creator={creator} onProfileUpdated={() => setRefreshKey(prev => prev + 1)} />;
       case 'create-post': return <ScreenCreatePost onBack={() => setScreen('feed')} onPostCreated={() => { setRefreshKey(prev => prev + 1); setScreen('feed'); }} />;
       case 'payment': return <ScreenPayment onBack={() => setScreen('feed')} creator={publicCreator || creator} />;
@@ -3356,6 +3448,7 @@ export default function App() {
     if (screen === 'activity') return 'ATIVIDADE';
     if (screen === 'messages') return 'MENSAGENS';
     if (screen === 'wallet') return 'CARTEIRA';
+    if (screen === 'subscriptions') return 'ASSINATURAS';
     if (screen === 'edit-profile') return 'EDITAR';
     if (screen === 'create-post') return 'POSTAR';
     if (screen === 'payment') return 'ASSINAR';
