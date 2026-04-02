@@ -1396,61 +1396,90 @@ const ScreenPublicProfile = ({ creator, posts, onSubscribe, stories, onLikePost,
   );
 };
 
-const ScreenActivity = ({ notifications }: { notifications: Notification[] }) => (
-  <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
-    <section className="mb-8 pt-8">
-      <h2 className="text-4xl font-extrabold tracking-tight mb-1">Atividade</h2>
-      <p className="text-on-surface/60 text-sm font-medium">Sua jornada criativa em tempo real.</p>
-    </section>
+const formatRelativeTime = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-    <div className="space-y-10">
-      <div>
-        <h3 className="text-[10px] font-bold uppercase tracking-widest text-on-surface/30 mb-4">Hoje</h3>
-        <div className="space-y-3">
-          {notifications.map(notif => (
-            <div key={notif.id} className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-primary/5">
-              <div className="relative">
-                <img src={notif.user.avatar} className="w-12 h-12 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
-                {notif.user.isVerified && (
-                  <span className="absolute -bottom-1 -right-1 bg-primary text-white rounded-full p-0.5 border-2 border-white">
-                    <CheckCircle2 size={10} fill="white" />
-                  </span>
-                )}
+  if (diffInSeconds < 60) return 'Agora mesmo';
+  if (diffInSeconds < 3600) return `Há ${Math.floor(diffInSeconds / 60)} min`;
+  if (diffInSeconds < 86400) return `Há ${Math.floor(diffInSeconds / 3600)} h`;
+  if (diffInSeconds < 604800) return `Há ${Math.floor(diffInSeconds / 86400)} d`;
+  return date.toLocaleDateString('pt-BR');
+};
+
+const ScreenActivity = ({ notifications }: { notifications: Notification[] }) => {
+  const groupedNotifications = notifications.reduce((acc: any, notif) => {
+    const date = new Date(notif.created_at || Date.now()).toLocaleDateString('pt-BR');
+    const today = new Date().toLocaleDateString('pt-BR');
+    const yesterday = new Date(Date.now() - 86400000).toLocaleDateString('pt-BR');
+    
+    let label = date;
+    if (date === today) label = 'Hoje';
+    else if (date === yesterday) label = 'Ontem';
+    
+    if (!acc[label]) acc[label] = [];
+    acc[label].push(notif);
+    return acc;
+  }, {});
+
+  return (
+    <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
+      <section className="mb-8 pt-8">
+        <h2 className="text-4xl font-extrabold tracking-tight mb-1">Atividade</h2>
+        <p className="text-on-surface/60 text-sm font-medium">Sua jornada criativa em tempo real.</p>
+      </section>
+
+      {notifications.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center opacity-40">
+          <div className="w-20 h-20 bg-on-surface/5 rounded-full flex items-center justify-center mb-4">
+            <Bell size={32} />
+          </div>
+          <p className="text-sm font-bold uppercase tracking-widest">Nenhuma atividade ainda</p>
+          <p className="text-xs mt-2">Suas interações e vendas aparecerão aqui.</p>
+        </div>
+      ) : (
+        <div className="space-y-10">
+          {Object.entries(groupedNotifications).map(([label, items]: [string, any]) => (
+            <div key={label}>
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-on-surface/30 mb-4">{label}</h3>
+              <div className="space-y-3">
+                {items.map((notif: Notification) => (
+                  <div key={notif.id} className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-primary/5">
+                    <div className="relative">
+                      <img src={notif.user.avatar} className="w-12 h-12 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
+                      {notif.user.isVerified && (
+                        <span className="absolute -bottom-1 -right-1 bg-primary text-white rounded-full p-0.5 border-2 border-white">
+                          <CheckCircle2 size={10} fill="white" />
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      {notif.badge && (
+                        <span className="bg-primary/10 text-primary text-[8px] font-black px-2 py-0.5 rounded-full tracking-wider mb-1 inline-block uppercase">
+                          {notif.badge}
+                        </span>
+                      )}
+                      <p className="text-xs font-medium leading-relaxed text-on-surface">
+                        <span className="font-bold">{notif.user.name}</span> {notif.content}
+                      </p>
+                      <span className="text-[10px] text-on-surface/40 mt-0.5 block font-bold uppercase tracking-tighter">
+                        {notif.created_at ? formatRelativeTime(notif.created_at) : notif.time}
+                      </span>
+                    </div>
+                    {notif.thumbnail && (
+                      <img src={notif.thumbnail} className="w-12 h-12 rounded-lg object-cover" referrerPolicy="no-referrer" />
+                    )}
+                  </div>
+                ))}
               </div>
-              <div className="flex-1">
-                {notif.badge && (
-                  <span className="bg-primary/10 text-primary text-[8px] font-black px-2 py-0.5 rounded-full tracking-wider mb-1 inline-block uppercase">
-                    {notif.badge}
-                  </span>
-                )}
-                <p className="text-xs font-medium leading-relaxed text-on-surface">
-                  <span className="font-bold">{notif.user.name}</span> {notif.content}
-                </p>
-                <span className="text-[10px] text-on-surface/40 mt-0.5 block font-bold uppercase tracking-tighter">{notif.time}</span>
-              </div>
-              {notif.thumbnail && (
-                <img src={notif.thumbnail} className="w-12 h-12 rounded-lg object-cover" referrerPolicy="no-referrer" />
-              )}
             </div>
           ))}
         </div>
-      </div>
-      
-      <div>
-        <h3 className="text-[10px] font-bold uppercase tracking-widest text-on-surface/30 mb-4">Ontem</h3>
-        <div className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-primary/5 opacity-60">
-          <img src="https://picsum.photos/seed/user/100" className="w-12 h-12 rounded-full object-cover" referrerPolicy="no-referrer" />
-          <div className="flex-1">
-            <p className="text-xs font-medium text-on-surface">
-              <span className="font-bold">Marco Aurélio</span> comentou no seu post: "Incrível!"
-            </p>
-            <span className="text-[10px] text-on-surface/40 mt-0.5 block font-bold uppercase tracking-tighter">Há 24 horas</span>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 const ScreenMessages = ({ messages }: { messages: Message[] }) => (
   <div className="pt-20 pb-24 max-w-2xl mx-auto px-6">
@@ -2946,12 +2975,16 @@ export default function App() {
 
         // Fetch likes for notifications
         try {
-          const { data: likesData } = await supabase
+          const { data: likesData, error: likesErr } = await supabase
             .from('post_likes')
             .select('*, user:profiles(name, avatar, is_verified), posts!inner(creator_id, image)')
             .eq('posts.creator_id', user.id)
             .order('created_at', { ascending: false })
             .limit(20);
+
+          if (likesErr) {
+            console.error('Error in likesData query:', likesErr);
+          }
 
           if (likesData) {
             const likeNotifications: Notification[] = likesData.map((l: any) => ({
@@ -2976,12 +3009,16 @@ export default function App() {
 
         // Fetch comments for notifications
         try {
-          const { data: commentsData } = await supabase
+          const { data: commentsData, error: commentsErr } = await supabase
             .from('post_comments')
             .select('*, user:profiles(name, avatar, is_verified), posts!inner(creator_id, image)')
             .eq('posts.creator_id', user.id)
             .order('created_at', { ascending: false })
             .limit(20);
+
+          if (commentsErr) {
+            console.error('Error in commentsData query:', commentsErr);
+          }
 
           if (commentsData) {
             const commentNotifications: Notification[] = commentsData.map((c: any) => ({
@@ -3011,6 +3048,7 @@ export default function App() {
           return dateB - dateA;
         });
         
+        console.log(`Total notifications to display: ${allNotifications.length}`);
         setNotifications(allNotifications);
 
         // Fetch messages
@@ -3031,7 +3069,7 @@ export default function App() {
     if (isLoggedIn) {
       fetchData();
     }
-  }, [isLoggedIn, refreshKey]);
+  }, [isLoggedIn, refreshKey, screen]);
 
   // Expose setScreen globally for the VIP button in ScreenProfile
   React.useEffect(() => {
