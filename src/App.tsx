@@ -908,7 +908,8 @@ const ScreenProfile = ({
   onDeleteStory: (id: string) => void,
   isMaster: boolean
 }) => {
-  const myPosts = posts.filter(p => p.creator.id === creator.id);
+  const [activeTab, setActiveTab] = React.useState<'all' | 'exclusive'>('all');
+  const myPosts = posts.filter(p => p.creator.id === creator.id).filter(p => activeTab === 'all' ? true : p.isLocked);
   const myStories = stories.filter(s => s.creator_id === creator.id);
   const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
   const [editingPost, setEditingPost] = React.useState<Post | null>(null);
@@ -1023,8 +1024,18 @@ const ScreenProfile = ({
 
       <div className="sticky top-16 bg-white/80 backdrop-blur-md z-40 border-b border-primary/5 mb-6">
         <div className="max-w-4xl mx-auto px-6 flex justify-around">
-          <button className="py-4 border-b-2 border-primary text-primary font-bold text-xs uppercase tracking-widest">Criações</button>
-          <button className="py-4 border-b-2 border-transparent text-on-surface/40 font-bold text-xs uppercase tracking-widest">Exclusivos</button>
+          <button 
+            onClick={() => setActiveTab('all')}
+            className={`py-4 border-b-2 font-bold text-xs uppercase tracking-widest ${activeTab === 'all' ? 'border-primary text-primary' : 'border-transparent text-on-surface/40'}`}
+          >
+            Criações
+          </button>
+          <button 
+            onClick={() => setActiveTab('exclusive')}
+            className={`py-4 border-b-2 font-bold text-xs uppercase tracking-widest ${activeTab === 'exclusive' ? 'border-primary text-primary' : 'border-transparent text-on-surface/40'}`}
+          >
+            Exclusivos
+          </button>
           <button className="py-4 border-b-2 border-transparent text-on-surface/40 font-bold text-xs uppercase tracking-widest flex items-center gap-1">
             Pro <Lock size={12} fill="currentColor" />
           </button>
@@ -1108,7 +1119,8 @@ const ScreenProfile = ({
 };
 
 const ScreenPublicProfile = ({ creator, posts, onSubscribe, stories }: { creator: Creator, posts: Post[], onSubscribe: () => void, stories: any[] }) => {
-  const myPosts = posts.filter(p => p.creator.id === creator.id);
+  const [activeTab, setActiveTab] = React.useState<'all' | 'exclusive'>('all');
+  const myPosts = posts.filter(p => p.creator.id === creator.id).filter(p => activeTab === 'all' ? true : p.isLocked);
   const myStories = stories.filter(s => s.creator_id === creator.id);
   const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
   const [activeStoryIndex, setActiveStoryIndex] = React.useState<number | null>(null);
@@ -1191,8 +1203,18 @@ const ScreenPublicProfile = ({ creator, posts, onSubscribe, stories }: { creator
 
       <div className="sticky top-16 bg-white/80 backdrop-blur-md z-40 border-b border-primary/5 mb-6">
         <div className="max-w-4xl mx-auto px-6 flex justify-around">
-          <button className="py-4 border-b-2 border-primary text-primary font-bold text-xs uppercase tracking-widest">Criações</button>
-          <button className="py-4 border-b-2 border-transparent text-on-surface/40 font-bold text-xs uppercase tracking-widest">Exclusivos</button>
+          <button 
+            onClick={() => setActiveTab('all')}
+            className={`py-4 border-b-2 font-bold text-xs uppercase tracking-widest ${activeTab === 'all' ? 'border-primary text-primary' : 'border-transparent text-on-surface/40'}`}
+          >
+            Criações
+          </button>
+          <button 
+            onClick={() => setActiveTab('exclusive')}
+            className={`py-4 border-b-2 font-bold text-xs uppercase tracking-widest ${activeTab === 'exclusive' ? 'border-primary text-primary' : 'border-transparent text-on-surface/40'}`}
+          >
+            Exclusivos
+          </button>
         </div>
       </div>
 
@@ -2638,8 +2660,39 @@ export default function App() {
         }
 
         // Fetch notifications
+        let allNotifications: Notification[] = [];
         const { data: notificationsData } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
-        if (notificationsData) setNotifications(notificationsData as any);
+        if (notificationsData) {
+          allNotifications = [...notificationsData as any];
+        }
+
+        // Fetch payments for notifications
+        const { data: paymentsData } = await supabase
+          .from('payments')
+          .select('*, user:profiles!user_id(*)')
+          .eq('creator_id', user.id)
+          .eq('status', 'approved')
+          .order('created_at', { ascending: false });
+
+        if (paymentsData) {
+          const paymentNotifications: Notification[] = paymentsData.map((p: any) => ({
+            id: `payment-${p.id}`,
+            type: 'subscription',
+            user: {
+              name: p.user?.name || 'Usuário Anônimo',
+              avatar: p.user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous',
+              isVerified: p.user?.is_verified
+            },
+            content: `assinou seu conteúdo VIP!`,
+            time: new Date(p.created_at).toLocaleDateString('pt-BR'),
+            badge: 'NOVO ASSINANTE'
+          }));
+          
+          allNotifications = [...paymentNotifications, ...allNotifications];
+          // Sort by date if needed, but since we just prepend, it's fine for now
+        }
+        
+        setNotifications(allNotifications);
 
         // Fetch messages
         const { data: messagesData } = await supabase.from('messages').select('*, user:profiles(*)').order('created_at', { ascending: false });
