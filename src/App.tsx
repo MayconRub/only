@@ -252,7 +252,7 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
 
 const MASTER_EMAIL = 'mayconrubemx@gmail.com';
 
-const BottomNav = ({ active, onChange, isMaster }: { active: Screen, onChange: (s: Screen) => void, isMaster: boolean }) => (
+const BottomNav = ({ active, onChange, isMaster, unreadCount }: { active: Screen, onChange: (s: Screen) => void, isMaster: boolean, unreadCount: number }) => (
   <nav className="fixed bottom-0 w-full flex justify-around items-center px-4 py-3 bg-white border-t border-primary/5 z-50">
     <button onClick={() => onChange('feed')} className={`flex flex-col items-center gap-1 transition-all ${active === 'feed' ? 'text-primary' : 'text-on-surface/40'}`}>
       <Home size={24} />
@@ -269,8 +269,15 @@ const BottomNav = ({ active, onChange, isMaster }: { active: Screen, onChange: (
       </button>
     )}
 
-    <button onClick={() => onChange('activity')} className={`flex flex-col items-center gap-1 transition-all ${active === 'activity' ? 'text-primary' : 'text-on-surface/40'}`}>
-      <Bell size={24} />
+    <button onClick={() => onChange('activity')} className={`flex flex-col items-center gap-1 transition-all relative ${active === 'activity' ? 'text-primary' : 'text-on-surface/40'}`}>
+      <div className="relative">
+        <Bell size={24} />
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 bg-primary text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center border-2 border-white">
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
+        )}
+      </div>
       <span className="text-[10px] font-bold">Atividade</span>
     </button>
     <button onClick={() => onChange('profile')} className={`flex flex-col items-center gap-1 transition-all ${active === 'profile' ? 'text-primary' : 'text-on-surface/40'}`}>
@@ -397,38 +404,63 @@ const FullScreenPostModal = ({
 
           {/* Comments Panel */}
           {showComments && (
-            <div className="absolute bottom-0 md:relative md:bottom-auto w-full md:w-1/3 h-[50vh] md:h-full bg-white rounded-t-3xl md:rounded-none flex flex-col z-[105]">
+            <motion.div 
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed bottom-0 left-0 right-0 md:relative md:bottom-auto md:left-auto md:right-auto w-full md:w-1/3 h-[70vh] md:h-full bg-white rounded-t-[2.5rem] md:rounded-none flex flex-col z-[105] shadow-2xl overflow-hidden"
+            >
+              <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-3 mb-1 md:hidden" />
               <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-                <h3 className="font-bold">Comentários</h3>
-                <button onClick={() => setShowComments(false)} className="md:hidden">
+                <h3 className="font-black text-lg uppercase tracking-tight">Comentários</h3>
+                <button onClick={() => setShowComments(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                   <X size={24} />
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {comments.map(c => (
-                  <div key={c.id} className="flex gap-3">
-                    <img src={c.user.avatar} className="w-8 h-8 rounded-full object-cover" referrerPolicy="no-referrer" />
-                    <div>
-                      <p className="text-sm"><span className="font-bold mr-2">{c.user.name}</span>{c.content}</p>
-                      <p className="text-[10px] text-gray-400 mt-1">{new Date(c.created_at).toLocaleDateString()}</p>
-                    </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 overscroll-contain no-scrollbar">
+                {comments.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full opacity-30 py-10">
+                    <MessageCircle size={48} className="mb-2" />
+                    <p className="text-xs font-bold uppercase tracking-widest">Nenhum comentário ainda</p>
                   </div>
-                ))}
+                ) : (
+                  comments.map(c => (
+                    <div key={c.id} className="flex gap-3 group">
+                      <img src={c.user.avatar} className="w-10 h-10 rounded-full object-cover border border-primary/5" referrerPolicy="no-referrer" />
+                      <div className="flex-1">
+                        <div className="bg-gray-50 p-3 rounded-2xl rounded-tl-none">
+                          <p className="text-xs font-black text-primary uppercase tracking-tight mb-0.5">{c.user.name}</p>
+                          <p className="text-sm text-on-surface/80 leading-relaxed">{c.content}</p>
+                        </div>
+                        <p className="text-[9px] font-bold text-on-surface/30 mt-1 ml-1 uppercase tracking-widest">
+                          {new Date(c.created_at).toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
-              <div className="p-4 border-t border-gray-100 flex gap-2">
-                <input 
-                  type="text" 
-                  value={newComment}
-                  onChange={e => setNewComment(e.target.value)}
-                  placeholder="Adicione um comentário..."
-                  className="flex-1 bg-gray-100 rounded-full px-4 py-2 text-sm outline-none"
-                  onKeyDown={e => e.key === 'Enter' && handleSendComment()}
-                />
-                <button onClick={handleSendComment} className="text-primary font-bold px-4">
-                  Enviar
-                </button>
+              <div className="p-4 border-t border-gray-100 bg-white pb-safe">
+                <div className="flex gap-2 bg-gray-100 p-1.5 rounded-2xl border border-gray-200 focus-within:border-primary/30 transition-colors">
+                  <input 
+                    type="text" 
+                    value={newComment}
+                    onChange={e => setNewComment(e.target.value)}
+                    placeholder="Adicione um comentário..."
+                    className="flex-1 bg-transparent px-4 py-2.5 text-base outline-none font-medium"
+                    onKeyDown={e => e.key === 'Enter' && handleSendComment()}
+                  />
+                  <button 
+                    onClick={handleSendComment} 
+                    disabled={!newComment.trim()}
+                    className="bg-primary text-white font-black px-6 py-2 rounded-xl shadow-lg shadow-primary/20 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 text-xs uppercase tracking-widest"
+                  >
+                    Enviar
+                  </button>
+                </div>
               </div>
-            </div>
+            </motion.div>
           )}
 
           {!showComments && (
@@ -2572,6 +2604,7 @@ export default function App() {
   const [posts, setPosts] = React.useState<Post[]>([]);
   const [stories, setStories] = React.useState<any[]>([]);
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = React.useState(0);
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [creator, setCreator] = React.useState<Creator>(ELENA);
   const [publicCreator, setPublicCreator] = React.useState<Creator | null>(null);
@@ -2870,6 +2903,19 @@ export default function App() {
       console.log('Total notifications aggregated:', allNotifications.length);
       setNotifications(allNotifications);
 
+      // Calculate unread count
+      const lastSeen = localStorage.getItem('last_seen_notification_time');
+      if (lastSeen) {
+        const lastSeenTime = new Date(lastSeen).getTime();
+        const unread = allNotifications.filter(n => {
+          const nTime = n.created_at ? new Date(n.created_at).getTime() : 0;
+          return nTime > lastSeenTime;
+        }).length;
+        setUnreadNotificationsCount(unread);
+      } else {
+        setUnreadNotificationsCount(allNotifications.length);
+      }
+
       // Fetch messages
       const { data: messagesData } = await supabase.from('messages').select('*, user:profiles(*)').order('created_at', { ascending: false });
       if (messagesData) {
@@ -2935,6 +2981,15 @@ export default function App() {
       supabase.removeChannel(channel);
     };
   }, [isLoggedIn, fetchData]);
+
+  // Clear unread notifications when viewing activity screen
+  React.useEffect(() => {
+    if (screen === 'activity' && notifications.length > 0) {
+      setUnreadNotificationsCount(0);
+      const mostRecent = notifications[0].created_at || new Date().toISOString();
+      localStorage.setItem('last_seen_notification_time', mostRecent);
+    }
+  }, [screen, notifications]);
 
   const handleDeletePost = async (postId: string) => {
     if (!confirm('Tem certeza que deseja excluir esta postagem?')) return;
@@ -3343,7 +3398,7 @@ export default function App() {
       </AnimatePresence>
 
       {showNav && (
-        <BottomNav active={screen} onChange={setScreen} isMaster={isMaster} />
+        <BottomNav active={screen} onChange={setScreen} isMaster={isMaster} unreadCount={unreadNotificationsCount} />
       )}
     </div>
   );
