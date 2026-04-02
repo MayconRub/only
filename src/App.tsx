@@ -1825,6 +1825,98 @@ const ScreenActivity = ({ notifications, onRefresh }: { notifications: Notificat
   );
 };
 
+const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const audioRef = React.useRef<HTMLAudioElement>(null);
+
+  const togglePlay = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const onLoadedMetadata = () => {
+    if (audioRef.current) {
+      setDuration(audioRef.current.duration);
+    }
+  };
+
+  const onTimeUpdate = () => {
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
+    }
+  };
+
+  const onEnded = () => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+  };
+
+  const formatTime = (time: number) => {
+    const mins = Math.floor(time / 60);
+    const secs = Math.floor(time % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const time = parseFloat(e.target.value);
+    if (audioRef.current) {
+      audioRef.current.currentTime = time;
+      setCurrentTime(time);
+    }
+  };
+
+  return (
+    <div className={`flex items-center gap-3 p-2 rounded-xl min-w-[200px] ${isMe ? 'bg-white/10' : 'bg-primary/5'}`}>
+      <audio 
+        ref={audioRef} 
+        src={src} 
+        onLoadedMetadata={onLoadedMetadata} 
+        onTimeUpdate={onTimeUpdate}
+        onEnded={onEnded}
+      />
+      
+      <button 
+        onClick={togglePlay}
+        className={`w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all ${
+          isMe ? 'bg-white text-primary' : 'bg-primary text-white'
+        }`}
+      >
+        {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} className="ml-0.5" fill="currentColor" />}
+      </button>
+
+      <div className="flex-1 flex flex-col gap-1">
+        <input 
+          type="range"
+          min="0"
+          max={duration || 0}
+          value={currentTime}
+          onChange={handleProgressChange}
+          className={`w-full h-1 rounded-lg appearance-none cursor-pointer accent-current ${
+            isMe ? 'text-white' : 'text-primary'
+          }`}
+          style={{
+            background: `linear-gradient(to right, currentColor ${(currentTime / duration) * 100}%, rgba(0,0,0,0.1) ${(currentTime / duration) * 100}%)`
+          }}
+        />
+        <div className={`flex justify-between text-[10px] font-bold uppercase tracking-widest ${
+          isMe ? 'text-white/60' : 'text-on-surface/40'
+        }`}>
+          <span>{formatTime(currentTime)}</span>
+          <span>{formatTime(duration)}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => void }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -2080,7 +2172,7 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
                         <video src={msg.media_url} controls className="w-full max-h-64" />
                       )}
                       {msg.media_type === 'audio' && (
-                        <audio src={msg.media_url} controls className="w-full" />
+                        <AudioPlayer src={msg.media_url} isMe={isMe} />
                       )}
                     </div>
                   )}
