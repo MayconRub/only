@@ -1291,25 +1291,27 @@ const ScreenProfile = ({
         </button>
       </section>
 
-      <div className="sticky top-16 bg-white/80 backdrop-blur-md z-40 border-b border-primary/5 mb-6">
-        <div className="max-w-4xl mx-auto px-6 flex justify-around">
-          <button 
-            onClick={() => setActiveTab('all')}
-            className={`py-4 border-b-2 font-bold text-xs uppercase tracking-widest ${activeTab === 'all' ? 'border-primary text-primary' : 'border-transparent text-on-surface/40'}`}
-          >
-            Criações
-          </button>
-          <button 
-            onClick={() => setActiveTab('exclusive')}
-            className={`py-4 border-b-2 font-bold text-xs uppercase tracking-widest ${activeTab === 'exclusive' ? 'border-primary text-primary' : 'border-transparent text-on-surface/40'}`}
-          >
-            Exclusivos
-          </button>
-          <button className="py-4 border-b-2 border-transparent text-on-surface/40 font-bold text-xs uppercase tracking-widest flex items-center gap-1">
-            Pro <Lock size={12} fill="currentColor" />
-          </button>
+      {isMaster && (
+        <div className="sticky top-16 bg-white/80 backdrop-blur-md z-40 border-b border-primary/5 mb-6">
+          <div className="max-w-4xl mx-auto px-6 flex justify-around">
+            <button 
+              onClick={() => setActiveTab('all')}
+              className={`py-4 border-b-2 font-bold text-xs uppercase tracking-widest ${activeTab === 'all' ? 'border-primary text-primary' : 'border-transparent text-on-surface/40'}`}
+            >
+              Criações
+            </button>
+            <button 
+              onClick={() => setActiveTab('exclusive')}
+              className={`py-4 border-b-2 font-bold text-xs uppercase tracking-widest ${activeTab === 'exclusive' ? 'border-primary text-primary' : 'border-transparent text-on-surface/40'}`}
+            >
+              Exclusivos
+            </button>
+            <button className="py-4 border-b-2 border-transparent text-on-surface/40 font-bold text-xs uppercase tracking-widest flex items-center gap-1">
+              Pro <Lock size={12} fill="currentColor" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <section className="max-w-5xl mx-auto px-4">
         {isMaster ? (
@@ -1387,12 +1389,69 @@ const ScreenProfile = ({
   );
 };
 
-const ScreenPublicProfile = ({ creator, posts, onSubscribe, stories, onLikePost, onCommentPost }: { creator: Creator, posts: Post[], onSubscribe: () => void, stories: any[], onLikePost?: (id: string, isLiked: boolean) => void, onCommentPost?: (id: string, content: string) => void }) => {
+const ScreenPublicProfile = ({ 
+  creator, 
+  posts, 
+  onSubscribe, 
+  stories, 
+  onLikePost, 
+  onCommentPost,
+  isLoggedIn
+}: { 
+  creator: Creator, 
+  posts: Post[], 
+  onSubscribe: () => void, 
+  stories: any[], 
+  onLikePost?: (id: string, isLiked: boolean) => void, 
+  onCommentPost?: (id: string, content: string) => void,
+  isLoggedIn: boolean
+}) => {
   const [activeTab, setActiveTab] = React.useState<'all' | 'exclusive'>('all');
   const myPosts = posts.filter(p => p.creator.id === creator.id).filter(p => activeTab === 'all' ? true : p.isLocked);
   const myStories = stories.filter(s => s.creator_id === creator.id);
   const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
   const [activeStoryIndex, setActiveStoryIndex] = React.useState<number | null>(null);
+  const [isFollowing, setIsFollowing] = React.useState(false);
+  const [followerCount, setFollowerCount] = React.useState(Number(creator.stats?.followers || 0));
+
+  React.useEffect(() => {
+    const fetchFollowData = async () => {
+      if (!isLoggedIn) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      // Check if following
+      const { data } = await supabase.from('follows').select('id').eq('follower_id', user.id).eq('following_id', creator.id).single();
+      if (data) setIsFollowing(true);
+
+      // Fetch real follower count
+      const { count } = await supabase
+        .from('follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('following_id', creator.id);
+      if (count !== null) setFollowerCount(count);
+    };
+    fetchFollowData();
+  }, [creator.id, isLoggedIn]);
+
+  const handleFollow = async () => {
+    if (!isLoggedIn) {
+      alert('Faça login para seguir!');
+      return;
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    if (isFollowing) {
+      await supabase.from('follows').delete().eq('follower_id', user.id).eq('following_id', creator.id);
+      setIsFollowing(false);
+      setFollowerCount(prev => Math.max(0, prev - 1));
+    } else {
+      await supabase.from('follows').insert({ follower_id: user.id, following_id: creator.id });
+      setIsFollowing(true);
+      setFollowerCount(prev => prev + 1);
+    }
+  };
   
   return (
     <div className="pt-0 pb-24">
@@ -1451,7 +1510,7 @@ const ScreenPublicProfile = ({ creator, posts, onSubscribe, stories, onLikePost,
           </div>
           <div className="w-px h-8 bg-primary/10 flex-shrink-0"></div>
           <div className="text-center min-w-[60px]">
-            <span className="block text-xl font-bold">{creator.stats?.followers || '0'}</span>
+            <span className="block text-xl font-bold">{followerCount}</span>
             <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Seguidores</span>
           </div>
           <div className="w-px h-8 bg-primary/10 flex-shrink-0"></div>
@@ -1461,14 +1520,26 @@ const ScreenPublicProfile = ({ creator, posts, onSubscribe, stories, onLikePost,
           </div>
         </div>
 
-        <div className="max-w-md mx-auto space-y-4 mb-12">
-          <button 
-            onClick={onSubscribe}
-            className="w-full py-5 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-95 transition-all uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-3"
-          >
-            <Lock size={20} fill="white" />
-            Assinar Agora
-          </button>
+        <div className="max-w-md mx-auto space-y-3 mb-12">
+          <div className="flex gap-3">
+            <button 
+              onClick={onSubscribe}
+              className="flex-[2] py-4 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-95 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
+            >
+              <Crown size={18} fill="white" />
+              Assinar VIP
+            </button>
+            <button 
+              onClick={handleFollow}
+              className={`flex-1 py-4 font-bold rounded-2xl transition-all uppercase tracking-widest text-[10px] border ${
+                isFollowing 
+                ? 'bg-on-surface/5 border-on-surface/10 text-on-surface/60' 
+                : 'bg-white border-primary/20 text-primary'
+              }`}
+            >
+              {isFollowing ? 'Seguindo' : 'Seguir'}
+            </button>
+          </div>
           <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">
             Acesso imediato a todo o conteúdo exclusivo
           </p>
@@ -1774,6 +1845,39 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
 
 const ScreenMessages = ({ messages, isMaster }: { messages: Message[], isMaster: boolean }) => {
   const [selectedRecipient, setSelectedRecipient] = useState<Creator | null>(null);
+  const [contacts, setContacts] = useState<Creator[]>([]);
+  const [loading, setLoading] = useState(isMaster);
+
+  React.useEffect(() => {
+    const fetchContacts = async () => {
+      if (!isMaster) return;
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Fetch all followers and subscribers
+        const { data: followers } = await supabase.from('follows').select('follower:profiles!follower_id(*)').eq('following_id', user.id);
+        const { data: subscribers } = await supabase.from('payments').select('user:profiles!user_id(*)').eq('creator_id', user.id).eq('status', 'approved');
+
+        const contactMap = new Map<string, Creator>();
+        followers?.forEach((f: any) => {
+          const follower = Array.isArray(f.follower) ? f.follower[0] : f.follower;
+          if (follower) contactMap.set(follower.id, follower as any);
+        });
+        subscribers?.forEach((s: any) => {
+          const user = Array.isArray(s.user) ? s.user[0] : s.user;
+          if (user) contactMap.set(user.id, user as any);
+        });
+
+        setContacts(Array.from(contactMap.values()));
+      } catch (err) {
+        console.error('Error fetching contacts:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchContacts();
+  }, [isMaster]);
 
   if (selectedRecipient) {
     return <ChatView recipient={selectedRecipient} onBack={() => setSelectedRecipient(null)} />;
@@ -1786,6 +1890,24 @@ const ScreenMessages = ({ messages, isMaster }: { messages: Message[], isMaster:
         <p className="text-on-surface/60 text-sm font-medium">Gerencie suas conexões e conversas exclusivas.</p>
       </section>
 
+      {isMaster && contacts.length > 0 && (
+        <section className="mb-8">
+          <h2 className="text-xs font-black text-primary uppercase tracking-widest mb-4">Seus Contatos (Seguidores/Assinantes)</h2>
+          <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+            {contacts.map(contact => (
+              <button 
+                key={contact.id} 
+                onClick={() => setSelectedRecipient(contact)}
+                className="flex flex-col items-center gap-2 min-w-[70px]"
+              >
+                <img src={contact.avatar} className="w-14 h-14 rounded-full object-cover border-2 border-primary/10 p-0.5" referrerPolicy="no-referrer" />
+                <span className="text-[10px] font-bold truncate w-full text-center">{contact.name.split(' ')[0]}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       <div className="flex gap-2 overflow-x-auto no-scrollbar mb-6">
         <button className="px-5 py-2 rounded-full premium-gradient text-white font-bold text-xs shadow-sm">Todas</button>
         <button className="px-5 py-2 rounded-full bg-white text-on-surface/60 font-bold text-xs border border-primary/5">Não Lidas</button>
@@ -1796,7 +1918,11 @@ const ScreenMessages = ({ messages, isMaster }: { messages: Message[], isMaster:
       </div>
 
       <div className="space-y-3">
-        {messages.length > 0 ? (
+        {loading ? (
+          <div className="flex justify-center py-10">
+            <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+          </div>
+        ) : messages.length > 0 ? (
           messages.map(msg => (
             <div 
               key={msg.id} 
@@ -2857,8 +2983,20 @@ export default function App() {
       // Fetch profile
       const { data: profileData, error: profileFetchError } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       
+      // Fetch follower count
+      const { count: followerCount } = await supabase
+        .from('follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('following_id', user.id);
+
       if (profileData) {
-        setCreator(profileData as any);
+        setCreator({
+          ...profileData,
+          stats: {
+            ...profileData.stats,
+            followers: followerCount?.toString() || '0'
+          }
+        } as any);
         console.log('Profile fetched:', profileData.name);
         // If profile exists but email is missing, update it
         if (!profileData.email && user.email) {
@@ -3504,6 +3642,7 @@ export default function App() {
                 setScreen('register');
               }
             }} 
+            isLoggedIn={isLoggedIn}
           />
         );
       }
@@ -3555,6 +3694,7 @@ export default function App() {
             onSubscribe={() => handleSubscribe(publicCreator)} 
             onLikePost={handleLikePost}
             onCommentPost={handleCommentPost}
+            isLoggedIn={isLoggedIn}
           />
         ) : (
           <ScreenFeed 
