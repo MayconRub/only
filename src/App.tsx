@@ -2574,6 +2574,311 @@ export default function App() {
 
   const isMaster = userEmail === MASTER_EMAIL;
 
+  const fetchData = React.useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Fetch profile
+      const { data: profileData, error: profileFetchError } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      
+      if (profileData) {
+        setCreator(profileData as any);
+        // If profile exists but email is missing, update it
+        if (!profileData.email && user.email) {
+          console.log('Updating profile with missing email:', user.email);
+          await supabase.from('profiles').update({ email: user.email }).eq('id', user.id);
+        }
+      } else if (profileFetchError && profileFetchError.code === 'PGRST116') {
+        // PGRST116 is "The result contains 0 rows" for .single()
+        console.log('Profile not found, creating default profile for user:', user.id);
+        const newProfile = {
+          id: user.id,
+          email: user.email,
+          name: user.user_metadata?.full_name || 'Novo Criador',
+          username: user.email?.split('@')[0] + Math.floor(Math.random() * 1000),
+          avatar: `https://picsum.photos/seed/${user.id}/400`,
+          bio: 'Bem-vindo ao meu perfil!',
+          stats: { posts: '0', followers: '0', likes: '0' }
+        };
+        
+        const { data: createdProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert(newProfile)
+          .select()
+          .single();
+          
+        if (createError) {
+          console.error('Error creating fallback profile:', createError);
+        } else if (createdProfile) {
+          setCreator(createdProfile as any);
+        }
+      }
+
+      // Fetch user's active payments
+      const { data: userPayments } = await supabase
+        .from('payments')
+        .select('creator_id')
+        .eq('user_id', user.id)
+        .eq('status', 'approved');
+
+      const subscribedCreatorIds = new Set(userPayments?.map(p => p.creator_id) || []);
+
+      // Fetch posts
+      // Try to find master profile by email. If it fails, masterId will be undefined and we show all posts.
+      let masterId: string | undefined = undefined;
+      try {
+        const { data: masterProfile } = await supabase.from('profiles').select('id').eq('email', MASTER_EMAIL).single();
+        masterId = masterProfile?.id;
+      } catch (e) {
+        console.log('Master profile not found by email, showing all posts');
+      }
+
+      const { data: postsData, error: postsError } = await supabase
+        .from('posts')
+        .select('*, creator:profiles(*), post_likes!post_id(user_id), post_comments!post_id(id)')
+        .order('created_at', { ascending: false });
+
+      if (postsError) {
+        console.error('Error fetching posts with likes/comments:', postsError);
+        
+        if (postsError.message?.includes('relation "public.post_likes" does not exist') || 
+            postsError.message?.includes('relation "public.post_comments" does not exist') ||
+            postsError.message?.includes('relation "post_likes" does not exist') ||
+            postsError.message?.includes('relation "post_comments" does not exist')) {
+          console.warn('Database tables for likes/comments are missing. Please run the migration script.');
+        }
+
+        // Fallback to fetching posts without likes/comments if tables don't exist
+        const { data: fallbackPosts, error: fallbackError } = await supabase
+          .from('posts')
+          .select('*, creator:profiles(*)')
+          .order('created_at', { ascending: false });
+        
+        if (fallbackError) {
+          console.error('Error fetching fallback posts:', fallbackError);
+        } else if (fallbackPosts) {
+          console.log(`Fetched ${fallbackPosts.length} fallback posts`);
+          const filteredPosts = masterId 
+            ? fallbackPosts.filter((p: any) => p.creator_id === masterId)
+            : fallbackPosts;
+          
+          console.log(`Filtered to ${filteredPosts.length} posts (masterId: ${masterId})`);
+
+          setPosts(filteredPosts.map((p: any) => ({
+            ...p,
+            isLocked: p.is_locked,
+            hasAccess: p.creator_id === user.id ? true : (subscribedCreatorIds.has(p.creator_id) ? true : !p.is_locked),
+            isVideo: p.is_video,
+            likesCount: 0,
+            commentsCount: 0,
+            isLikedByMe: false
+          })) as any);
+        }
+      } else if (postsData) {
+        console.log(`Fetched ${postsData.length} posts`);
+        // Filter posts to only show master's posts if masterId exists
+        const filteredPosts = masterId 
+          ? postsData.filter((p: any) => p.creator_id === masterId)
+          : postsData;
+        
+        console.log(`Filtered to ${filteredPosts.length} posts (masterId: ${masterId})`);
+
+        setPosts(filteredPosts.map((p: any) => ({
+          ...p,
+          isLocked: p.is_locked,
+          hasAccess: p.creator_id === user.id ? true : (subscribedCreatorIds.has(p.creator_id) ? true : !p.is_locked),
+          isVideo: p.is_video,
+          likesCount: p.post_likes?.length || 0,
+          commentsCount: p.post_comments?.length || 0,
+          isLikedByMe: p.post_likes?.some((l: any) => l.user_id === user.id)
+        })) as any);
+      }
+
+      // Fetch stories (only from the last 24 hours)
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: storiesData } = await supabase
+        .from('stories')
+        .select('*')
+        .gte('created_at', twentyFourHoursAgo)
+        .order('created_at', { ascending: false });
+        
+      if (storiesData) {
+        const filteredStories = masterId
+          ? storiesData.filter((s: any) => s.creator_id === masterId)
+          : storiesData;
+        setStories(filteredStories);
+      }
+
+      // Fetch notifications
+      let allNotifications: Notification[] = [];
+      try {
+        // Fetch from notifications table (system/other notifications)
+        const { data: notificationsData, error: notifErr } = await supabase
+          .from('notifications')
+          .select('*, user:profiles!user_id(name, avatar, is_verified)')
+          .eq('user_id', user.id) // Only for the current user
+          .order('created_at', { ascending: false });
+        
+        if (notifErr) {
+          console.log('Notifications table might not exist or query failed:', notifErr.message);
+        } else if (notificationsData) {
+          allNotifications = notificationsData.map((n: any) => ({
+            ...n,
+            user: {
+              name: n.user?.name || 'Sistema',
+              avatar: n.user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=system',
+              isVerified: n.user?.is_verified
+            }
+          }));
+        }
+      } catch (e) {
+        console.log('Error fetching from notifications table:', e);
+      }
+
+      // Fetch payments for notifications (subscriptions)
+      try {
+        const { data: paymentsData, error: payErr } = await supabase
+          .from('payments')
+          .select('*, user:profiles!user_id(name, avatar, is_verified)')
+          .eq('creator_id', user.id)
+          .eq('status', 'approved')
+          .order('created_at', { ascending: false });
+
+        if (payErr) {
+          console.error('Error fetching payments for notifications:', payErr);
+        } else if (paymentsData) {
+          const paymentNotifications: Notification[] = paymentsData.map((p: any) => ({
+            id: `payment-${p.id}`,
+            type: 'subscription',
+            user: {
+              name: p.user?.name || 'Usuário Anônimo',
+              avatar: p.user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous',
+              isVerified: p.user?.is_verified
+            },
+            content: `assinou seu conteúdo VIP!`,
+            time: new Date(p.created_at).toLocaleDateString('pt-BR'),
+            badge: 'NOVO ASSINANTE',
+            created_at: p.created_at
+          }));
+          
+          allNotifications = [...allNotifications, ...paymentNotifications];
+        }
+      } catch (e) {
+        console.error('Error in payments notification block:', e);
+      }
+
+      // Fetch user's posts to get their IDs for filtering likes/comments
+      const { data: myPosts } = await supabase
+        .from('posts')
+        .select('id')
+        .eq('creator_id', user.id);
+      
+      const myPostIds = myPosts?.map(p => p.id) || [];
+      console.log(`User has ${myPostIds.length} posts for notification filtering`);
+
+      // Fetch likes for notifications
+      if (myPostIds.length > 0) {
+        try {
+          const { data: likesData, error: likesErr } = await supabase
+            .from('post_likes')
+            .select('*, user:profiles!user_id(name, avatar, is_verified), posts!post_id(image)')
+            .in('post_id', myPostIds)
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+          if (likesErr) {
+            console.error('Error in likesData query:', likesErr);
+          } else if (likesData) {
+            console.log(`Fetched ${likesData.length} likes for notifications`);
+            const likeNotifications: Notification[] = likesData
+              .filter((l: any) => l.user_id !== user.id) // Don't notify about own likes
+              .map((l: any) => ({
+                id: `like-${l.id}`,
+                type: 'like',
+                user: {
+                  name: l.user?.name || 'Usuário',
+                  avatar: l.user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=user',
+                  isVerified: l.user?.is_verified
+                },
+                content: `curtiu sua publicação`,
+                time: l.created_at ? new Date(l.created_at).toLocaleDateString('pt-BR') : 'Recentemente',
+                thumbnail: l.posts?.image,
+                badge: 'CURTIDA',
+                created_at: l.created_at || new Date().toISOString()
+              }));
+            allNotifications = [...allNotifications, ...likeNotifications];
+          }
+        } catch (e) {
+          console.error('Error fetching like notifications:', e);
+        }
+
+        // Fetch comments for notifications
+        try {
+          const { data: commentsData, error: commentsErr } = await supabase
+            .from('post_comments')
+            .select('*, user:profiles!user_id(name, avatar, is_verified), posts!post_id(image)')
+            .in('post_id', myPostIds)
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+          if (commentsErr) {
+            console.error('Error in commentsData query:', commentsErr);
+          } else if (commentsData) {
+            console.log(`Fetched ${commentsData.length} comments for notifications`);
+            const commentNotifications: Notification[] = commentsData
+              .filter((c: any) => c.user_id !== user.id) // Don't notify about own comments
+              .map((c: any) => ({
+                id: `comment-${c.id}`,
+                type: 'comment',
+                user: {
+                  name: c.user?.name || 'Usuário',
+                  avatar: c.user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=user',
+                  isVerified: c.user?.is_verified
+                },
+                content: `comentou: "${c.content.substring(0, 30)}${c.content.length > 30 ? '...' : ''}"`,
+                time: c.created_at ? new Date(c.created_at).toLocaleDateString('pt-BR') : 'Recentemente',
+                thumbnail: c.posts?.image,
+                badge: 'COMENTÁRIO',
+                created_at: c.created_at || new Date().toISOString()
+              }));
+            allNotifications = [...allNotifications, ...commentNotifications];
+          }
+        } catch (e) {
+          console.error('Error fetching comment notifications:', e);
+        }
+      }
+
+      // Sort all notifications by date
+      allNotifications.sort((a: any, b: any) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return dateB - dateA;
+      });
+      
+      setNotifications(allNotifications);
+
+      // Fetch messages
+      const { data: messagesData } = await supabase.from('messages').select('*, user:profiles(*)').order('created_at', { ascending: false });
+      if (messagesData) {
+        setMessages(messagesData.map((m: any) => ({
+          ...m,
+          unreadCount: m.unread_count,
+          isLocked: m.is_locked,
+          isOnline: m.is_online
+        })) as any);
+      }
+    } catch (error) {
+      console.error('Error fetching data from Supabase:', error);
+    }
+  }, [refreshKey, screen]);
+
+  React.useEffect(() => {
+    if (isLoggedIn) {
+      fetchData();
+    }
+  }, [isLoggedIn, fetchData]);
+
   const handleDeletePost = async (postId: string) => {
     if (!confirm('Tem certeza que deseja excluir esta postagem?')) return;
     try {
@@ -2807,311 +3112,6 @@ export default function App() {
       fetchPublicProfile();
     }
   }, []);
-
-  React.useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        // Fetch profile
-        const { data: profileData, error: profileFetchError } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-        
-        if (profileData) {
-          setCreator(profileData as any);
-          // If profile exists but email is missing, update it
-          if (!profileData.email && user.email) {
-            console.log('Updating profile with missing email:', user.email);
-            await supabase.from('profiles').update({ email: user.email }).eq('id', user.id);
-          }
-        } else if (profileFetchError && profileFetchError.code === 'PGRST116') {
-          // PGRST116 is "The result contains 0 rows" for .single()
-          console.log('Profile not found, creating default profile for user:', user.id);
-          const newProfile = {
-            id: user.id,
-            email: user.email,
-            name: user.user_metadata?.full_name || 'Novo Criador',
-            username: user.email?.split('@')[0] + Math.floor(Math.random() * 1000),
-            avatar: `https://picsum.photos/seed/${user.id}/400`,
-            bio: 'Bem-vindo ao meu perfil!',
-            stats: { posts: '0', followers: '0', likes: '0' }
-          };
-          
-          const { data: createdProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert(newProfile)
-            .select()
-            .single();
-            
-          if (createError) {
-            console.error('Error creating fallback profile:', createError);
-          } else if (createdProfile) {
-            setCreator(createdProfile as any);
-          }
-        }
-
-        // Fetch user's active payments
-        const { data: userPayments } = await supabase
-          .from('payments')
-          .select('creator_id')
-          .eq('user_id', user.id)
-          .eq('status', 'approved');
-
-        const subscribedCreatorIds = new Set(userPayments?.map(p => p.creator_id) || []);
-
-        // Fetch posts
-        // Try to find master profile by email. If it fails, masterId will be undefined and we show all posts.
-        let masterId: string | undefined = undefined;
-        try {
-          const { data: masterProfile } = await supabase.from('profiles').select('id').eq('email', MASTER_EMAIL).single();
-          masterId = masterProfile?.id;
-        } catch (e) {
-          console.log('Master profile not found by email, showing all posts');
-        }
-
-        const { data: postsData, error: postsError } = await supabase
-          .from('posts')
-          .select('*, creator:profiles(*), post_likes!post_id(user_id), post_comments!post_id(id)')
-          .order('created_at', { ascending: false });
-
-        if (postsError) {
-          console.error('Error fetching posts with likes/comments:', postsError);
-          
-          if (postsError.message?.includes('relation "public.post_likes" does not exist') || 
-              postsError.message?.includes('relation "public.post_comments" does not exist') ||
-              postsError.message?.includes('relation "post_likes" does not exist') ||
-              postsError.message?.includes('relation "post_comments" does not exist')) {
-            console.warn('Database tables for likes/comments are missing. Please run the migration script.');
-          }
-
-          // Fallback to fetching posts without likes/comments if tables don't exist
-          const { data: fallbackPosts, error: fallbackError } = await supabase
-            .from('posts')
-            .select('*, creator:profiles(*)')
-            .order('created_at', { ascending: false });
-          
-          if (fallbackError) {
-            console.error('Error fetching fallback posts:', fallbackError);
-          } else if (fallbackPosts) {
-            console.log(`Fetched ${fallbackPosts.length} fallback posts`);
-            const filteredPosts = masterId 
-              ? fallbackPosts.filter((p: any) => p.creator_id === masterId)
-              : fallbackPosts;
-            
-            console.log(`Filtered to ${filteredPosts.length} posts (masterId: ${masterId})`);
-
-            setPosts(filteredPosts.map((p: any) => ({
-              ...p,
-              isLocked: p.is_locked,
-              hasAccess: p.creator_id === user.id ? true : (subscribedCreatorIds.has(p.creator_id) ? true : !p.is_locked),
-              isVideo: p.is_video,
-              likesCount: 0,
-              commentsCount: 0,
-              isLikedByMe: false
-            })) as any);
-          }
-        } else if (postsData) {
-          console.log(`Fetched ${postsData.length} posts`);
-          // Filter posts to only show master's posts if masterId exists
-          const filteredPosts = masterId 
-            ? postsData.filter((p: any) => p.creator_id === masterId)
-            : postsData;
-          
-          console.log(`Filtered to ${filteredPosts.length} posts (masterId: ${masterId})`);
-
-          setPosts(filteredPosts.map((p: any) => ({
-            ...p,
-            isLocked: p.is_locked,
-            hasAccess: p.creator_id === user.id ? true : (subscribedCreatorIds.has(p.creator_id) ? true : !p.is_locked),
-            isVideo: p.is_video,
-            likesCount: p.post_likes?.length || 0,
-            commentsCount: p.post_comments?.length || 0,
-            isLikedByMe: p.post_likes?.some((l: any) => l.user_id === user.id)
-          })) as any);
-        }
-
-        // Fetch stories (only from the last 24 hours)
-        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        const { data: storiesData } = await supabase
-          .from('stories')
-          .select('*')
-          .gte('created_at', twentyFourHoursAgo)
-          .order('created_at', { ascending: false });
-          
-        if (storiesData) {
-          const filteredStories = masterId
-            ? storiesData.filter((s: any) => s.creator_id === masterId)
-            : storiesData;
-          setStories(filteredStories);
-        }
-
-        // Fetch notifications
-        let allNotifications: Notification[] = [];
-        try {
-          // Fetch from notifications table (system/other notifications)
-          const { data: notificationsData, error: notifErr } = await supabase
-            .from('notifications')
-            .select('*, user:profiles!user_id(name, avatar, is_verified)')
-            .eq('user_id', user.id) // Only for the current user
-            .order('created_at', { ascending: false });
-          
-          if (notifErr) {
-            console.log('Notifications table might not exist or query failed:', notifErr.message);
-          } else if (notificationsData) {
-            allNotifications = notificationsData.map((n: any) => ({
-              ...n,
-              user: {
-                name: n.user?.name || 'Sistema',
-                avatar: n.user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=system',
-                isVerified: n.user?.is_verified
-              }
-            }));
-          }
-        } catch (e) {
-          console.log('Error fetching from notifications table:', e);
-        }
-
-        // Fetch payments for notifications (subscriptions)
-        try {
-          const { data: paymentsData, error: payErr } = await supabase
-            .from('payments')
-            .select('*, user:profiles!user_id(name, avatar, is_verified)')
-            .eq('creator_id', user.id)
-            .eq('status', 'approved')
-            .order('created_at', { ascending: false });
-
-          if (payErr) {
-            console.error('Error fetching payments for notifications:', payErr);
-          } else if (paymentsData) {
-            const paymentNotifications: Notification[] = paymentsData.map((p: any) => ({
-              id: `payment-${p.id}`,
-              type: 'subscription',
-              user: {
-                name: p.user?.name || 'Usuário Anônimo',
-                avatar: p.user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous',
-                isVerified: p.user?.is_verified
-              },
-              content: `assinou seu conteúdo VIP!`,
-              time: new Date(p.created_at).toLocaleDateString('pt-BR'),
-              badge: 'NOVO ASSINANTE',
-              created_at: p.created_at
-            }));
-            
-            allNotifications = [...allNotifications, ...paymentNotifications];
-          }
-        } catch (e) {
-          console.error('Error in payments notification block:', e);
-        }
-
-        // Fetch user's posts to get their IDs for filtering likes/comments
-        const { data: myPosts } = await supabase
-          .from('posts')
-          .select('id')
-          .eq('creator_id', user.id);
-        
-        const myPostIds = myPosts?.map(p => p.id) || [];
-        console.log(`User has ${myPostIds.length} posts for notification filtering`);
-
-        // Fetch likes for notifications
-        if (myPostIds.length > 0) {
-          try {
-            const { data: likesData, error: likesErr } = await supabase
-              .from('post_likes')
-              .select('*, user:profiles!user_id(name, avatar, is_verified), posts!post_id(image)')
-              .in('post_id', myPostIds)
-              .order('created_at', { ascending: false })
-              .limit(50);
-
-            if (likesErr) {
-              console.error('Error in likesData query:', likesErr);
-            } else if (likesData) {
-              console.log(`Fetched ${likesData.length} likes for notifications`);
-              const likeNotifications: Notification[] = likesData
-                .filter((l: any) => l.user_id !== user.id) // Don't notify about own likes
-                .map((l: any) => ({
-                  id: `like-${l.id}`,
-                  type: 'like',
-                  user: {
-                    name: l.user?.name || 'Usuário',
-                    avatar: l.user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=user',
-                    isVerified: l.user?.is_verified
-                  },
-                  content: `curtiu sua publicação`,
-                  time: l.created_at ? new Date(l.created_at).toLocaleDateString('pt-BR') : 'Recentemente',
-                  thumbnail: l.posts?.image,
-                  badge: 'CURTIDA',
-                  created_at: l.created_at || new Date().toISOString()
-                }));
-              allNotifications = [...allNotifications, ...likeNotifications];
-            }
-          } catch (e) {
-            console.error('Error fetching like notifications:', e);
-          }
-
-          // Fetch comments for notifications
-          try {
-            const { data: commentsData, error: commentsErr } = await supabase
-              .from('post_comments')
-              .select('*, user:profiles!user_id(name, avatar, is_verified), posts!post_id(image)')
-              .in('post_id', myPostIds)
-              .order('created_at', { ascending: false })
-              .limit(50);
-
-            if (commentsErr) {
-              console.error('Error in commentsData query:', commentsErr);
-            } else if (commentsData) {
-              console.log(`Fetched ${commentsData.length} comments for notifications`);
-              const commentNotifications: Notification[] = commentsData
-                .filter((c: any) => c.user_id !== user.id) // Don't notify about own comments
-                .map((c: any) => ({
-                  id: `comment-${c.id}`,
-                  type: 'comment',
-                  user: {
-                    name: c.user?.name || 'Usuário',
-                    avatar: c.user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=user',
-                    isVerified: c.user?.is_verified
-                  },
-                  content: `comentou: "${c.content.substring(0, 30)}${c.content.length > 30 ? '...' : ''}"`,
-                  time: c.created_at ? new Date(c.created_at).toLocaleDateString('pt-BR') : 'Recentemente',
-                  thumbnail: c.posts?.image,
-                  badge: 'COMENTÁRIO',
-                  created_at: c.created_at || new Date().toISOString()
-                }));
-              allNotifications = [...allNotifications, ...commentNotifications];
-            }
-          } catch (e) {
-            console.error('Error fetching comment notifications:', e);
-          }
-        }
-
-        // Sort all notifications by date
-        allNotifications.sort((a: any, b: any) => {
-          const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-          const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-          return dateB - dateA;
-        });
-        
-        setNotifications(allNotifications);
-
-        // Fetch messages
-        const { data: messagesData } = await supabase.from('messages').select('*, user:profiles(*)').order('created_at', { ascending: false });
-        if (messagesData) {
-          setMessages(messagesData.map((m: any) => ({
-            ...m,
-            unreadCount: m.unread_count,
-            isLocked: m.is_locked,
-            isOnline: m.is_online
-          })) as any);
-        }
-      } catch (error) {
-        console.error('Error fetching data from Supabase:', error);
-      }
-    };
-
-    if (isLoggedIn) {
-      fetchData();
-    }
-  }, [isLoggedIn, refreshKey, screen]);
 
   // Expose setScreen globally for the VIP button in ScreenProfile
   React.useEffect(() => {
