@@ -15,6 +15,13 @@ export interface Creator {
   };
 }
 
+export interface Comment {
+  id: string;
+  user: Creator;
+  content: string;
+  created_at: string;
+}
+
 export interface Post {
   id: string;
   creator: Creator;
@@ -26,6 +33,9 @@ export interface Post {
   hasAccess?: boolean;
   isVideo?: boolean;
   price?: string;
+  likesCount?: number;
+  commentsCount?: number;
+  isLikedByMe?: boolean;
 }
 
 export interface Notification {

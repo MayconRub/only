@@ -281,20 +281,63 @@ const BottomNav = ({ active, onChange, isMaster }: { active: Screen, onChange: (
 
 // --- Components ---
 
+import { Comment } from './types';
+
 const FullScreenPostModal = ({ 
   post, 
   onClose, 
   onDelete, 
   onEdit, 
-  currentUserId 
+  currentUserId,
+  onLike,
+  onComment
 }: { 
   post: Post | null, 
   onClose: () => void, 
   onDelete?: (id: string) => void, 
   onEdit?: (post: Post) => void,
-  currentUserId?: string 
+  currentUserId?: string,
+  onLike?: (id: string, isLiked: boolean) => void,
+  onComment?: (id: string, content: string) => void
 }) => {
   const isOwner = post?.creator.id === currentUserId;
+  const [comments, setComments] = React.useState<Comment[]>([]);
+  const [newComment, setNewComment] = React.useState('');
+  const [showComments, setShowComments] = React.useState(false);
+
+  React.useEffect(() => {
+    if (post && showComments) {
+      const fetchComments = async () => {
+        const { data } = await supabase
+          .from('post_comments')
+          .select('*, user:profiles(*)')
+          .eq('post_id', post.id)
+          .order('created_at', { ascending: true });
+        if (data) setComments(data as any);
+      };
+      fetchComments();
+    }
+  }, [post?.id, showComments]);
+
+  const handleSendComment = async () => {
+    if (!newComment.trim() || !post || !onComment) return;
+    onComment(post.id, newComment);
+    
+    // Optimistic update
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      if (profile) {
+        setComments(prev => [...prev, {
+          id: Math.random().toString(),
+          user: profile as any,
+          content: newComment,
+          created_at: new Date().toISOString()
+        }]);
+      }
+    }
+    setNewComment('');
+  };
 
   return (
     <AnimatePresence>
@@ -303,7 +346,7 @@ const FullScreenPostModal = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center"
+          className="fixed inset-0 z-[100] bg-black flex flex-col md:flex-row items-center justify-center"
         >
           <div className="absolute top-6 right-6 flex items-center gap-4 z-[110]">
             {isOwner && onDelete && onEdit && (
@@ -333,7 +376,7 @@ const FullScreenPostModal = ({
             </button>
           </div>
           
-          <div className="w-full h-full flex items-center justify-center p-4">
+          <div className={`w-full h-full flex items-center justify-center p-4 transition-all ${showComments ? 'md:w-2/3' : 'w-full'}`}>
             {post.isVideo ? (
               <video 
                 src={`${post.image}#t=0.001`} 
@@ -351,16 +394,71 @@ const FullScreenPostModal = ({
             )}
           </div>
 
-          <div className="absolute bottom-0 w-full p-8 bg-gradient-to-t from-black/80 to-transparent text-white">
-            <div className="flex items-center gap-3 mb-4">
-              <img src={post.creator.avatar} className="w-10 h-10 rounded-full object-cover border border-white/20" referrerPolicy="no-referrer" />
-              <div>
-                <p className="font-bold text-sm">{post.creator.name}</p>
-                <p className="text-[10px] text-white/60 uppercase tracking-widest">{post.time}</p>
+          {/* Comments Panel */}
+          {showComments && (
+            <div className="absolute bottom-0 md:relative md:bottom-auto w-full md:w-1/3 h-[50vh] md:h-full bg-white rounded-t-3xl md:rounded-none flex flex-col z-[105]">
+              <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+                <h3 className="font-bold">Comentários</h3>
+                <button onClick={() => setShowComments(false)} className="md:hidden">
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {comments.map(c => (
+                  <div key={c.id} className="flex gap-3">
+                    <img src={c.user.avatar} className="w-8 h-8 rounded-full object-cover" referrerPolicy="no-referrer" />
+                    <div>
+                      <p className="text-sm"><span className="font-bold mr-2">{c.user.name}</span>{c.content}</p>
+                      <p className="text-[10px] text-gray-400 mt-1">{new Date(c.created_at).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-4 border-t border-gray-100 flex gap-2">
+                <input 
+                  type="text" 
+                  value={newComment}
+                  onChange={e => setNewComment(e.target.value)}
+                  placeholder="Adicione um comentário..."
+                  className="flex-1 bg-gray-100 rounded-full px-4 py-2 text-sm outline-none"
+                  onKeyDown={e => e.key === 'Enter' && handleSendComment()}
+                />
+                <button onClick={handleSendComment} className="text-primary font-bold px-4">
+                  Enviar
+                </button>
               </div>
             </div>
-            <p className="text-sm text-white/80 leading-relaxed">{post.caption}</p>
-          </div>
+          )}
+
+          {!showComments && (
+            <div className="absolute bottom-0 w-full p-8 bg-gradient-to-t from-black/80 to-transparent text-white">
+              <div className="flex items-center gap-3 mb-4">
+                <img src={post.creator.avatar} className="w-10 h-10 rounded-full object-cover border border-white/20" referrerPolicy="no-referrer" />
+                <div>
+                  <p className="font-bold text-sm">{post.creator.name}</p>
+                  <p className="text-[10px] text-white/60 uppercase tracking-widest">{post.time}</p>
+                </div>
+              </div>
+              <p className="text-sm text-white/80 leading-relaxed mb-4">{post.caption}</p>
+              
+              <div className="flex items-center gap-6">
+                <button 
+                  onClick={() => onLike && onLike(post.id, !!post.isLikedByMe)}
+                  className="flex items-center gap-2 text-white hover:text-primary transition-colors"
+                >
+                  <Heart size={24} fill={post.isLikedByMe ? "currentColor" : "none"} className={post.isLikedByMe ? "text-primary" : ""} />
+                  <span className="text-sm font-bold">{post.likesCount || 0}</span>
+                </button>
+                <button 
+                  onClick={() => setShowComments(true)}
+                  className="flex items-center gap-2 text-white hover:text-primary transition-colors"
+                >
+                  <MessageCircle size={24} />
+                  <span className="text-sm font-bold">{post.commentsCount || 0}</span>
+                </button>
+              </div>
+            </div>
+          )}
         </motion.div>
       )}
     </AnimatePresence>
@@ -598,7 +696,9 @@ const ScreenFeed = ({
   onUpdatePost,
   onDeleteStory,
   onSubscribe,
-  isMaster
+  isMaster,
+  onLikePost,
+  onCommentPost
 }: { 
   posts: Post[], 
   stories: any[], 
@@ -608,7 +708,9 @@ const ScreenFeed = ({
   onUpdatePost: (id: string, caption: string, isLocked: boolean) => void,
   onDeleteStory: (id: string) => void,
   onSubscribe: () => void,
-  isMaster: boolean
+  isMaster: boolean,
+  onLikePost?: (id: string, isLiked: boolean) => void,
+  onCommentPost?: (id: string, content: string) => void
 }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
@@ -625,6 +727,8 @@ const ScreenFeed = ({
         onDelete={onDeletePost}
         onEdit={setEditingPost}
         currentUserId={creator.id}
+        onLike={onLikePost}
+        onComment={onCommentPost}
       />
       {editingPost && <EditPostModal post={editingPost} onSave={onUpdatePost} onClose={() => setEditingPost(null)} />}
       {activeStoryIndex !== null && (
@@ -681,11 +785,12 @@ const ScreenFeed = ({
 
     {/* Posts */}
     <div className="space-y-4 py-4">
-      {posts.map(post => {
-        const isOwner = post.creator.id === creator.id;
-        
-        return (
-          <article key={post.id} className="bg-white shadow-sm">
+      {posts.length > 0 ? (
+        posts.map(post => {
+          const isOwner = post.creator.id === creator.id;
+          
+          return (
+            <article key={post.id} className="bg-white shadow-sm">
             <div className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">
                 <img src={post.creator.avatar} className="w-10 h-10 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
@@ -803,14 +908,20 @@ const ScreenFeed = ({
           <div className="p-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-6">
-                <Heart className="text-on-surface cursor-pointer" fill={post.id === '1' ? '#E11D48' : 'none'} stroke={post.id === '1' ? '#E11D48' : 'currentColor'} />
-                <MessageCircle className="text-on-surface cursor-pointer" />
+                <button onClick={() => onLikePost && onLikePost(post.id, !!post.isLikedByMe)} className="flex items-center gap-2">
+                  <Heart className={post.isLikedByMe ? "text-primary" : "text-on-surface"} fill={post.isLikedByMe ? "currentColor" : "none"} />
+                  <span className="text-sm font-bold">{post.likesCount || 0}</span>
+                </button>
+                <button onClick={() => post.hasAccess && setSelectedPost(post)} className="flex items-center gap-2">
+                  <MessageCircle className="text-on-surface" />
+                  <span className="text-sm font-bold">{post.commentsCount || 0}</span>
+                </button>
                 <Send className="text-on-surface cursor-pointer" />
               </div>
               <Bookmark className="text-on-surface cursor-pointer" />
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-bold">{post.likes} curtidas</p>
+              <p className="text-sm font-bold">{post.likesCount || 0} curtidas</p>
               <p className="text-sm text-on-surface/80 leading-relaxed">
                 <span className="font-bold">{post.creator.name}</span> {post.caption}
               </p>
@@ -818,8 +929,19 @@ const ScreenFeed = ({
           </div>
         </article>
       );
-    })}
-  </div>
+    })
+  ) : (
+    <div className="text-center py-20 px-6">
+      <div className="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center mx-auto mb-6">
+        <Camera className="text-primary/20" size={40} />
+      </div>
+      <h3 className="text-lg font-black mb-2">Nenhuma postagem</h3>
+      <p className="text-xs text-on-surface/40 font-bold uppercase tracking-widest leading-relaxed">
+        Ainda não há conteúdo disponível no feed.
+      </p>
+    </div>
+  )}
+</div>
 </div>
 );
 };
@@ -895,7 +1017,9 @@ const ScreenProfile = ({
   onSubscribe,
   stories,
   onDeleteStory,
-  isMaster
+  isMaster,
+  onLikePost,
+  onCommentPost
 }: { 
   onEdit: () => void, 
   creator: Creator, 
@@ -906,7 +1030,9 @@ const ScreenProfile = ({
   onSubscribe: () => void,
   stories: any[],
   onDeleteStory: (id: string) => void,
-  isMaster: boolean
+  isMaster: boolean,
+  onLikePost?: (id: string, isLiked: boolean) => void,
+  onCommentPost?: (id: string, content: string) => void
 }) => {
   const [activeTab, setActiveTab] = React.useState<'all' | 'exclusive'>('all');
   const myPosts = posts.filter(p => p.creator.id === creator.id).filter(p => activeTab === 'all' ? true : p.isLocked);
@@ -924,6 +1050,8 @@ const ScreenProfile = ({
         onDelete={onDeletePost}
         onEdit={setEditingPost}
         currentUserId={creator.id}
+        onLike={onLikePost}
+        onComment={onCommentPost}
       />
       {editingPost && <EditPostModal post={editingPost} onSave={onUpdatePost} onClose={() => setEditingPost(null)} />}
       {activeStoryIndex !== null && (
@@ -1118,7 +1246,7 @@ const ScreenProfile = ({
   );
 };
 
-const ScreenPublicProfile = ({ creator, posts, onSubscribe, stories }: { creator: Creator, posts: Post[], onSubscribe: () => void, stories: any[] }) => {
+const ScreenPublicProfile = ({ creator, posts, onSubscribe, stories, onLikePost, onCommentPost }: { creator: Creator, posts: Post[], onSubscribe: () => void, stories: any[], onLikePost?: (id: string, isLiked: boolean) => void, onCommentPost?: (id: string, content: string) => void }) => {
   const [activeTab, setActiveTab] = React.useState<'all' | 'exclusive'>('all');
   const myPosts = posts.filter(p => p.creator.id === creator.id).filter(p => activeTab === 'all' ? true : p.isLocked);
   const myStories = stories.filter(s => s.creator_id === creator.id);
@@ -1128,7 +1256,12 @@ const ScreenPublicProfile = ({ creator, posts, onSubscribe, stories }: { creator
   return (
     <div className="pt-0 pb-24">
       {/* Full Screen Modal */}
-      <FullScreenPostModal post={selectedPost} onClose={() => setSelectedPost(null)} />
+      <FullScreenPostModal 
+        post={selectedPost} 
+        onClose={() => setSelectedPost(null)} 
+        onLike={onLikePost}
+        onComment={onCommentPost}
+      />
       {activeStoryIndex !== null && (
         <StoryViewer 
           stories={myStories} 
@@ -2436,6 +2569,41 @@ export default function App() {
     }
   };
 
+  const handleLikePost = async (postId: string, isLiked: boolean) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      if (isLiked) {
+        await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', user.id);
+        setPosts(prev => prev.map(p => p.id === postId ? { ...p, isLikedByMe: false, likesCount: (p.likesCount || 1) - 1 } : p));
+        setPublicPosts(prev => prev.map(p => p.id === postId ? { ...p, isLikedByMe: false, likesCount: (p.likesCount || 1) - 1 } : p));
+      } else {
+        await supabase.from('post_likes').insert({ post_id: postId, user_id: user.id });
+        setPosts(prev => prev.map(p => p.id === postId ? { ...p, isLikedByMe: true, likesCount: (p.likesCount || 0) + 1 } : p));
+        setPublicPosts(prev => prev.map(p => p.id === postId ? { ...p, isLikedByMe: true, likesCount: (p.likesCount || 0) + 1 } : p));
+      }
+    } catch (err) {
+      console.error('Error liking post:', err);
+    }
+  };
+
+  const handleCommentPost = async (postId: string, content: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase.from('post_comments').insert({ post_id: postId, user_id: user.id, content });
+      if (error) throw error;
+      
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, commentsCount: (p.commentsCount || 0) + 1 } : p));
+      setPublicPosts(prev => prev.map(p => p.id === postId ? { ...p, commentsCount: (p.commentsCount || 0) + 1 } : p));
+    } catch (err) {
+      console.error('Error commenting on post:', err);
+      alert('Erro ao enviar comentário.');
+    }
+  };
+
   const handleDeleteStory = async (storyId: string) => {
     if (!confirm('Tem certeza que deseja excluir este story?')) return;
     try {
@@ -2548,7 +2716,7 @@ export default function App() {
         const { data: profile } = await supabase.from('profiles').select('*').eq('username', username).single();
         if (profile) {
           setPublicCreator(profile as any);
-          const { data: posts } = await supabase.from('posts').select('*, creator:profiles(*)').eq('creator_id', profile.id).order('created_at', { ascending: false });
+          const { data: posts } = await supabase.from('posts').select('*, creator:profiles(*), post_likes(user_id), post_comments(id)').eq('creator_id', profile.id).order('created_at', { ascending: false });
           
           let subscribedCreatorIds = new Set();
           const { data: { session } } = await supabase.auth.getSession();
@@ -2566,7 +2734,10 @@ export default function App() {
               ...p,
               isLocked: p.is_locked,
               hasAccess: session?.user?.id === p.creator_id ? true : (subscribedCreatorIds.has(p.creator_id) ? true : !p.is_locked),
-              isVideo: p.is_video
+              isVideo: p.is_video,
+              likesCount: p.post_likes?.length || 0,
+              commentsCount: p.post_comments?.length || 0,
+              isLikedByMe: p.post_likes?.some((l: any) => l.user_id === session?.user?.id)
             })) as any);
           }
           setScreen('public-profile');
@@ -2587,11 +2758,17 @@ export default function App() {
         
         if (profileData) {
           setCreator(profileData as any);
+          // If profile exists but email is missing, update it
+          if (!profileData.email && user.email) {
+            console.log('Updating profile with missing email:', user.email);
+            await supabase.from('profiles').update({ email: user.email }).eq('id', user.id);
+          }
         } else if (profileFetchError && profileFetchError.code === 'PGRST116') {
           // PGRST116 is "The result contains 0 rows" for .single()
           console.log('Profile not found, creating default profile for user:', user.id);
           const newProfile = {
             id: user.id,
+            email: user.email,
             name: user.user_metadata?.full_name || 'Novo Criador',
             username: user.email?.split('@')[0] + Math.floor(Math.random() * 1000),
             avatar: `https://picsum.photos/seed/${user.id}/400`,
@@ -2612,15 +2789,6 @@ export default function App() {
           }
         }
 
-        // Fetch posts
-        const { data: masterProfile } = await supabase.from('profiles').select('id').eq('email', MASTER_EMAIL).single();
-        const masterId = masterProfile?.id;
-
-        const { data: postsData } = await supabase
-          .from('posts')
-          .select('*, creator:profiles(*)')
-          .order('created_at', { ascending: false });
-
         // Fetch user's active payments
         const { data: userPayments } = await supabase
           .from('payments')
@@ -2629,18 +2797,67 @@ export default function App() {
           .eq('status', 'approved');
 
         const subscribedCreatorIds = new Set(userPayments?.map(p => p.creator_id) || []);
-        
-        if (postsData) {
+
+        // Fetch posts
+        // Try to find master profile by email. If it fails, masterId will be undefined and we show all posts.
+        let masterId: string | undefined = undefined;
+        try {
+          const { data: masterProfile } = await supabase.from('profiles').select('id').eq('email', MASTER_EMAIL).single();
+          masterId = masterProfile?.id;
+        } catch (e) {
+          console.log('Master profile not found by email, showing all posts');
+        }
+
+        const { data: postsData, error: postsError } = await supabase
+          .from('posts')
+          .select('*, creator:profiles(*), post_likes(user_id), post_comments(id)')
+          .order('created_at', { ascending: false });
+
+        if (postsError) {
+          console.error('Error fetching posts with likes/comments:', postsError);
+          // Fallback to fetching posts without likes/comments if tables don't exist
+          const { data: fallbackPosts, error: fallbackError } = await supabase
+            .from('posts')
+            .select('*, creator:profiles(*)')
+            .order('created_at', { ascending: false });
+          
+          if (fallbackError) {
+            console.error('Error fetching fallback posts:', fallbackError);
+          } else if (fallbackPosts) {
+            console.log(`Fetched ${fallbackPosts.length} fallback posts`);
+            const filteredPosts = masterId 
+              ? fallbackPosts.filter((p: any) => p.creator_id === masterId)
+              : fallbackPosts;
+            
+            console.log(`Filtered to ${filteredPosts.length} posts (masterId: ${masterId})`);
+
+            setPosts(filteredPosts.map((p: any) => ({
+              ...p,
+              isLocked: p.is_locked,
+              hasAccess: p.creator_id === user.id ? true : (subscribedCreatorIds.has(p.creator_id) ? true : !p.is_locked),
+              isVideo: p.is_video,
+              likesCount: 0,
+              commentsCount: 0,
+              isLikedByMe: false
+            })) as any);
+          }
+        } else if (postsData) {
+          console.log(`Fetched ${postsData.length} posts`);
           // Filter posts to only show master's posts if masterId exists
           const filteredPosts = masterId 
             ? postsData.filter((p: any) => p.creator_id === masterId)
             : postsData;
+          
+          console.log(`Filtered to ${filteredPosts.length} posts (masterId: ${masterId})`);
 
           setPosts(filteredPosts.map((p: any) => ({
             ...p,
             isLocked: p.is_locked,
             hasAccess: p.creator_id === user.id ? true : (subscribedCreatorIds.has(p.creator_id) ? true : !p.is_locked),
-            isVideo: p.is_video
+            isVideo: p.is_video,
+            likesCount: p.post_likes?.length || 0,
+            commentsCount: p.post_comments?.length || 0,
+            isLikedByMe: p.post_likes?.some((l: any) => l.user_id === user.id)
           })) as any);
         }
 
@@ -2763,6 +2980,8 @@ export default function App() {
           onDeleteStory={handleDeleteStory}
           onSubscribe={() => setScreen('payment')}
           isMaster={isMaster}
+          onLikePost={handleLikePost}
+          onCommentPost={handleCommentPost}
         />
       );
       case 'profile': return (
@@ -2777,6 +2996,8 @@ export default function App() {
           stories={stories}
           onDeleteStory={handleDeleteStory}
           isMaster={isMaster}
+          onLikePost={handleLikePost}
+          onCommentPost={handleCommentPost}
         />
       );
       case 'public-profile': 
@@ -2792,6 +3013,8 @@ export default function App() {
                 setScreen('register');
               }
             }} 
+            onLikePost={handleLikePost}
+            onCommentPost={handleCommentPost}
           />
         ) : (
           <ScreenFeed 
@@ -2804,6 +3027,8 @@ export default function App() {
             onDeleteStory={handleDeleteStory}
             onSubscribe={() => setScreen('payment')}
             isMaster={isMaster}
+            onLikePost={handleLikePost}
+            onCommentPost={handleCommentPost}
           />
         );
       case 'activity': return <ScreenActivity notifications={notifications} />;
@@ -2823,6 +3048,8 @@ export default function App() {
           onDeleteStory={handleDeleteStory}
           onSubscribe={() => setScreen('payment')}
           isMaster={isMaster}
+          onLikePost={handleLikePost}
+          onCommentPost={handleCommentPost}
         />
       );
     }
