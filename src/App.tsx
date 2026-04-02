@@ -1252,7 +1252,8 @@ const ScreenProfile = ({
   onDeleteStory,
   isMaster,
   onLikePost,
-  onCommentPost
+  onCommentPost,
+  onMessage
 }: { 
   onEdit: () => void, 
   creator: Creator, 
@@ -1265,7 +1266,8 @@ const ScreenProfile = ({
   onDeleteStory: (id: string) => void,
   isMaster: boolean,
   onLikePost?: (id: string, isLiked: boolean) => void,
-  onCommentPost?: (id: string, content: string) => void
+  onCommentPost?: (id: string, content: string) => void,
+  onMessage?: (creator: Creator) => void
 }) => {
   const [activeTab, setActiveTab] = React.useState<'all' | 'exclusive'>('all');
   const myPosts = posts.filter(p => p.creator.id === creator.id).filter(p => activeTab === 'all' ? true : p.isLocked);
@@ -1499,6 +1501,7 @@ const ScreenPublicProfile = ({
   stories, 
   onLikePost, 
   onCommentPost,
+  onMessage,
   isLoggedIn
 }: { 
   creator: Creator, 
@@ -1507,6 +1510,7 @@ const ScreenPublicProfile = ({
   stories: any[], 
   onLikePost?: (id: string, isLiked: boolean) => void, 
   onCommentPost?: (id: string, content: string) => void,
+  onMessage?: (creator: Creator) => void,
   isLoggedIn: boolean
 }) => {
   const [activeTab, setActiveTab] = React.useState<'all' | 'exclusive'>('all');
@@ -1639,24 +1643,36 @@ const ScreenPublicProfile = ({
         </div>
 
         <div className="max-w-md mx-auto space-y-3 mb-12">
-          <div className="flex gap-3">
-            <button 
-              onClick={onSubscribe}
-              className="flex-[2] py-4 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-95 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
-            >
-              <Crown size={18} fill="white" />
-              Assinar VIP
-            </button>
-            <button 
-              onClick={handleFollow}
-              className={`flex-1 py-4 font-bold rounded-2xl transition-all uppercase tracking-widest text-[10px] border ${
-                isFollowing 
-                ? 'bg-on-surface/5 border-on-surface/10 text-on-surface/60' 
-                : 'bg-white border-primary/20 text-primary'
-              }`}
-            >
-              {isFollowing ? 'Seguindo' : 'Seguir'}
-            </button>
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-3">
+              <button 
+                onClick={onSubscribe}
+                className="flex-[2] py-4 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-95 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
+              >
+                <Crown size={18} fill="white" />
+                Assinar VIP
+              </button>
+              <button 
+                onClick={handleFollow}
+                className={`flex-1 py-4 font-bold rounded-2xl transition-all uppercase tracking-widest text-[10px] border ${
+                  isFollowing 
+                  ? 'bg-on-surface/5 border-on-surface/10 text-on-surface/60' 
+                  : 'bg-white border-primary/20 text-primary'
+                }`}
+              >
+                {isFollowing ? 'Seguindo' : 'Seguir'}
+              </button>
+            </div>
+            
+            {onMessage && (
+              <button 
+                onClick={() => onMessage(creator)}
+                className="w-full py-4 bg-white border border-primary/20 text-primary font-black rounded-2xl shadow-sm active:scale-95 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
+              >
+                <MessageCircle size={18} />
+                Enviar Mensagem
+              </button>
+            )}
           </div>
           <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">
             Acesso imediato a todo o conteúdo exclusivo
@@ -1839,16 +1855,27 @@ const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
+  const [isReady, setIsReady] = useState(false);
   const audioRef = React.useRef<HTMLAudioElement>(null);
 
-  const togglePlay = () => {
+  React.useEffect(() => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setIsReady(false);
+  }, [src]);
+
+  const togglePlay = async () => {
     if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current.play();
+      try {
+        if (isPlaying) {
+          audioRef.current.pause();
+        } else {
+          await audioRef.current.play();
+        }
+        setIsPlaying(!isPlaying);
+      } catch (err) {
+        console.error('Audio playback failed:', err);
       }
-      setIsPlaying(!isPlaying);
     }
   };
 
@@ -1856,6 +1883,10 @@ const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
     if (audioRef.current) {
       setDuration(audioRef.current.duration);
     }
+  };
+
+  const onCanPlay = () => {
+    setIsReady(true);
   };
 
   const onTimeUpdate = () => {
@@ -1891,14 +1922,17 @@ const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
         onLoadedMetadata={onLoadedMetadata} 
         onTimeUpdate={onTimeUpdate}
         onEnded={onEnded}
-        preload="metadata"
+        onCanPlay={onCanPlay}
+        preload="auto"
+        playsInline
       />
       
       <button 
         onClick={togglePlay}
+        disabled={!isReady}
         className={`w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all active:scale-90 shadow-sm ${
           isMe ? 'bg-white text-primary' : 'bg-primary text-white'
-        }`}
+        } ${!isReady ? 'opacity-50' : ''}`}
       >
         {isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} className="ml-0.5" fill="currentColor" />}
       </button>
@@ -3502,7 +3536,7 @@ export default function App() {
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = React.useState(0);
   const [messages, setMessages] = React.useState<Message[]>([]);
-  const [creator, setCreator] = React.useState<Creator>(ELENA);
+  const [creator, setCreator] = React.useState<Creator | null>(null);
   const [publicCreator, setPublicCreator] = React.useState<Creator | null>(null);
   const [publicPosts, setPublicPosts] = React.useState<Post[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -3881,8 +3915,10 @@ export default function App() {
 
         setMessages(Array.from(conversationsMap.values()));
       }
+      setLoading(false);
     } catch (error) {
       console.error('Error fetching data from Supabase:', error);
+      setLoading(false);
     }
   }, [refreshKey, screen]);
 
@@ -4135,7 +4171,8 @@ export default function App() {
           return prev;
         });
       }
-      setLoading(false);
+      // Don't set loading false here, wait for fetchData if logged in
+      if (!session) setLoading(false);
     });
 
     // Listen for changes on auth state
@@ -4243,6 +4280,7 @@ export default function App() {
                 setScreen('register');
               }
             }} 
+            onMessage={() => setScreen('register')}
             isLoggedIn={isLoggedIn}
           />
         );
@@ -4254,7 +4292,7 @@ export default function App() {
     }
 
     switch (screen) {
-      case 'feed': return (
+      case 'feed': return creator ? (
         <ScreenFeed 
           posts={posts} 
           stories={stories.filter(s => s.creator_id === creator.id)} 
@@ -4269,8 +4307,8 @@ export default function App() {
           onCommentPost={handleCommentPost}
           onViewProfile={handleViewProfile}
         />
-      );
-      case 'profile': return (
+      ) : null;
+      case 'profile': return creator ? (
         <ScreenProfile 
           onEdit={() => setScreen('edit-profile')} 
           creator={creator} 
@@ -4284,8 +4322,12 @@ export default function App() {
           isMaster={isMaster}
           onLikePost={handleLikePost}
           onCommentPost={handleCommentPost}
+          onMessage={(c) => {
+            setSelectedRecipient(c);
+            setScreen('chat');
+          }}
         />
-      );
+      ) : null;
       case 'public-profile': 
         return publicCreator ? (
           <ScreenPublicProfile 
@@ -4295,6 +4337,10 @@ export default function App() {
             onSubscribe={(post) => handleSubscribe(publicCreator, post)} 
             onLikePost={handleLikePost}
             onCommentPost={handleCommentPost}
+            onMessage={(c) => {
+              setSelectedRecipient(c);
+              setScreen('chat');
+            }}
             isLoggedIn={isLoggedIn}
           />
         ) : (
