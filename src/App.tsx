@@ -1516,6 +1516,7 @@ const ScreenPublicProfile = ({
   const [activeStoryIndex, setActiveStoryIndex] = React.useState<number | null>(null);
   const [isFollowing, setIsFollowing] = React.useState(false);
   const [followerCount, setFollowerCount] = React.useState(Number(creator.stats?.followers || 0));
+  const [likesCount, setLikesCount] = React.useState(Number(creator.stats?.likes || 0));
 
   React.useEffect(() => {
     const fetchFollowData = async () => {
@@ -1528,11 +1529,20 @@ const ScreenPublicProfile = ({
       if (data) setIsFollowing(true);
 
       // Fetch real follower count
-      const { count } = await supabase
+      const { count: followers } = await supabase
         .from('follows')
         .select('*', { count: 'exact', head: true })
         .eq('following_id', creator.id);
-      if (count !== null) setFollowerCount(count);
+      if (followers !== null) setFollowerCount(followers);
+
+      // Fetch real likes count
+      const { data: creatorPosts } = await supabase
+        .from('posts')
+        .select('id, post_likes(count)')
+        .eq('creator_id', creator.id);
+      
+      const totalLikes = creatorPosts?.reduce((acc, post: any) => acc + (post.post_likes?.[0]?.count || 0), 0) || 0;
+      setLikesCount(totalLikes);
     };
     fetchFollowData();
   }, [creator.id, isLoggedIn]);
@@ -1623,7 +1633,7 @@ const ScreenPublicProfile = ({
           </div>
           <div className="w-px h-8 bg-primary/10 flex-shrink-0"></div>
           <div className="text-center min-w-[60px]">
-            <span className="block text-xl font-bold">{creator.stats?.likes || '0'}</span>
+            <span className="block text-xl font-bold">{likesCount}</span>
             <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Curtidas</span>
           </div>
         </div>
@@ -1874,40 +1884,56 @@ const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
   };
 
   return (
-    <div className={`flex items-center gap-3 p-2 rounded-xl min-w-[200px] ${isMe ? 'bg-white/10' : 'bg-primary/5'}`}>
+    <div className={`flex items-center gap-2 p-1.5 sm:p-2 rounded-2xl w-full max-w-[260px] sm:max-w-[320px] ${isMe ? 'bg-white/20' : 'bg-primary/10'} backdrop-blur-sm shadow-sm`}>
       <audio 
         ref={audioRef} 
         src={src} 
         onLoadedMetadata={onLoadedMetadata} 
         onTimeUpdate={onTimeUpdate}
         onEnded={onEnded}
+        preload="metadata"
       />
       
       <button 
         onClick={togglePlay}
-        className={`w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all ${
+        className={`w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all active:scale-90 shadow-sm ${
           isMe ? 'bg-white text-primary' : 'bg-primary text-white'
         }`}
       >
-        {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} className="ml-0.5" fill="currentColor" />}
+        {isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} className="ml-0.5" fill="currentColor" />}
       </button>
 
-      <div className="flex-1 flex flex-col gap-1">
+      <div className="flex-1 flex flex-col gap-1 sm:gap-1.5 pr-1 overflow-hidden relative">
+        <div className="flex items-center gap-[2px] sm:gap-1 h-4 sm:h-5">
+          {/* Waveform-like bars */}
+          {[...Array(20)].map((_, i) => {
+            const barHeight = 30 + (Math.sin(i * 0.5) * 20) + (Math.random() * 30);
+            const isPlayed = (currentTime / (duration || 1)) * 20 > i;
+            return (
+              <div 
+                key={i} 
+                className={`flex-1 rounded-full transition-all duration-200 ${
+                  isMe ? 'bg-white' : 'bg-primary'
+                }`}
+                style={{ 
+                  height: `${barHeight}%`,
+                  opacity: isPlayed ? 1 : 0.2
+                }}
+              />
+            );
+          })}
+        </div>
         <input 
           type="range"
           min="0"
           max={duration || 0}
+          step="0.01"
           value={currentTime}
           onChange={handleProgressChange}
-          className={`w-full h-1 rounded-lg appearance-none cursor-pointer accent-current ${
-            isMe ? 'text-white' : 'text-primary'
-          }`}
-          style={{
-            background: `linear-gradient(to right, currentColor ${(currentTime / duration) * 100}%, rgba(0,0,0,0.1) ${(currentTime / duration) * 100}%)`
-          }}
+          className="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer"
         />
-        <div className={`flex justify-between text-[10px] font-bold uppercase tracking-widest ${
-          isMe ? 'text-white/60' : 'text-on-surface/40'
+        <div className={`flex justify-between text-[8px] sm:text-[9px] font-black uppercase tracking-tighter ${
+          isMe ? 'text-white/80' : 'text-on-surface/60'
         }`}>
           <span>{formatTime(currentTime)}</span>
           <span>{formatTime(duration)}</span>
@@ -2230,19 +2256,19 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
                   </button>
                 </div>
 
-                <div className="flex-1 flex gap-2 bg-gray-100 p-1 rounded-2xl border border-gray-200 focus-within:border-primary/30 transition-colors items-center">
+                <div className="flex-1 flex gap-2 bg-gray-100 p-1 rounded-2xl border border-gray-200 focus-within:border-primary/30 transition-colors items-center overflow-hidden">
                   <input 
                     type="text" 
                     value={newMessage}
                     onChange={e => setNewMessage(e.target.value)}
                     placeholder="Sua mensagem..."
-                    className="flex-1 bg-transparent px-3 py-2 text-sm outline-none font-medium"
+                    className="flex-1 bg-transparent px-3 py-2 text-sm outline-none font-medium min-w-0"
                     onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
                   />
                   <button 
                     onClick={() => handleSendMessage()}
                     disabled={(!newMessage.trim() && !uploading) || uploading}
-                    className="bg-primary text-white p-2.5 rounded-xl shadow-lg shadow-primary/20 active:scale-95 transition-all disabled:opacity-50 flex-shrink-0"
+                    className="bg-primary text-white w-10 h-10 flex items-center justify-center rounded-xl shadow-lg shadow-primary/20 active:scale-95 transition-all disabled:opacity-50 flex-shrink-0"
                   >
                     <Send size={18} />
                   </button>
@@ -3507,12 +3533,23 @@ export default function App() {
         .select('*', { count: 'exact', head: true })
         .eq('following_id', user.id);
 
+      // Fetch total likes for user's posts
+      const { data: userPostsLikes } = await supabase
+        .from('posts')
+        .select('id, post_likes(count)')
+        .eq('creator_id', user.id);
+      
+      const totalLikes = userPostsLikes?.reduce((acc, post: any) => acc + (post.post_likes?.[0]?.count || 0), 0) || 0;
+      const totalPosts = userPostsLikes?.length || 0;
+
       if (profileData) {
         setCreator({
           ...profileData,
           stats: {
             ...profileData.stats,
-            followers: followerCount?.toString() || '0'
+            followers: followerCount?.toString() || '0',
+            likes: totalLikes.toString(),
+            posts: totalPosts.toString()
           }
         } as any);
         console.log('Profile fetched:', profileData.name);
