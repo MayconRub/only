@@ -2575,16 +2575,23 @@ export default function App() {
       if (!user) return;
 
       if (isLiked) {
-        await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', user.id);
+        const { error } = await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', user.id);
+        if (error) throw error;
         setPosts(prev => prev.map(p => p.id === postId ? { ...p, isLikedByMe: false, likesCount: (p.likesCount || 1) - 1 } : p));
         setPublicPosts(prev => prev.map(p => p.id === postId ? { ...p, isLikedByMe: false, likesCount: (p.likesCount || 1) - 1 } : p));
       } else {
-        await supabase.from('post_likes').insert({ post_id: postId, user_id: user.id });
+        const { error } = await supabase.from('post_likes').insert({ post_id: postId, user_id: user.id });
+        if (error) throw error;
         setPosts(prev => prev.map(p => p.id === postId ? { ...p, isLikedByMe: true, likesCount: (p.likesCount || 0) + 1 } : p));
         setPublicPosts(prev => prev.map(p => p.id === postId ? { ...p, isLikedByMe: true, likesCount: (p.likesCount || 0) + 1 } : p));
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error liking post:', err);
+      if (err.code === 'PGRST116' || err.message?.includes('relation "public.post_likes" does not exist')) {
+        alert('Erro: As tabelas de curtidas não foram criadas no banco de dados. Por favor, execute o script SQL no painel do Supabase.');
+      } else {
+        alert('Erro ao processar curtida: ' + (err.message || 'Erro desconhecido'));
+      }
     }
   };
 
@@ -2598,9 +2605,13 @@ export default function App() {
       
       setPosts(prev => prev.map(p => p.id === postId ? { ...p, commentsCount: (p.commentsCount || 0) + 1 } : p));
       setPublicPosts(prev => prev.map(p => p.id === postId ? { ...p, commentsCount: (p.commentsCount || 0) + 1 } : p));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error commenting on post:', err);
-      alert('Erro ao enviar comentário.');
+      if (err.code === 'PGRST116' || err.message?.includes('relation "public.post_comments" does not exist')) {
+        alert('Erro: As tabelas de comentários não foram criadas no banco de dados. Por favor, execute o script SQL no painel do Supabase.');
+      } else {
+        alert('Erro ao enviar comentário: ' + (err.message || 'Erro desconhecido'));
+      }
     }
   };
 
@@ -2716,8 +2727,6 @@ export default function App() {
         const { data: profile } = await supabase.from('profiles').select('*').eq('username', username).single();
         if (profile) {
           setPublicCreator(profile as any);
-          const { data: posts } = await supabase.from('posts').select('*, creator:profiles(*), post_likes(user_id), post_comments(id)').eq('creator_id', profile.id).order('created_at', { ascending: false });
-          
           let subscribedCreatorIds = new Set();
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
@@ -2729,7 +2738,23 @@ export default function App() {
              subscribedCreatorIds = new Set(userPayments?.map(p => p.creator_id) || []);
           }
 
-          if (posts) {
+          const { data: posts, error: postsError } = await supabase.from('posts').select('*, creator:profiles(*), post_likes(user_id), post_comments(id)').eq('creator_id', profile.id).order('created_at', { ascending: false });
+          
+          if (postsError) {
+            console.error('Error fetching public posts with likes/comments:', postsError);
+            const { data: fallbackPosts } = await supabase.from('posts').select('*, creator:profiles(*)').eq('creator_id', profile.id).order('created_at', { ascending: false });
+            if (fallbackPosts) {
+              setPublicPosts(fallbackPosts.map((p: any) => ({
+                ...p,
+                isLocked: p.is_locked,
+                hasAccess: session?.user?.id === p.creator_id ? true : (subscribedCreatorIds.has(p.creator_id) ? true : !p.is_locked),
+                isVideo: p.is_video,
+                likesCount: 0,
+                commentsCount: 0,
+                isLikedByMe: false
+              })) as any);
+            }
+          } else if (posts) {
             setPublicPosts(posts.map((p: any) => ({
               ...p,
               isLocked: p.is_locked,
@@ -2815,6 +2840,12 @@ export default function App() {
 
         if (postsError) {
           console.error('Error fetching posts with likes/comments:', postsError);
+          
+          if (postsError.message?.includes('relation "public.post_likes" does not exist') || 
+              postsError.message?.includes('relation "public.post_comments" does not exist')) {
+            console.warn('Database tables for likes/comments are missing. Please run the migration script.');
+          }
+
           // Fallback to fetching posts without likes/comments if tables don't exist
           const { data: fallbackPosts, error: fallbackError } = await supabase
             .from('posts')
