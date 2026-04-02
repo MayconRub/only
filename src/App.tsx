@@ -45,6 +45,10 @@ import Cropper from 'react-easy-crop';
 import { Screen, Post, Notification, Message, Creator } from './types';
 import { supabase } from './lib/supabase';
 
+// --- Constants ---
+
+const LOGO_URL = `${(import.meta as any).env.VITE_SUPABASE_URL}/storage/v1/object/public/avatars/logo.png`;
+
 // --- Mock Data ---
 
 const ELENA: Creator = {
@@ -100,8 +104,23 @@ const TopNav = ({
         </button>
       )}
       <div>
-        <div className="text-2xl font-black text-primary tracking-tight leading-none">
-          {title}
+        <div className="flex items-center">
+          <img 
+            src={LOGO_URL} 
+            alt="Logo" 
+            className="h-8 w-auto object-contain" 
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+              const parent = (e.target as HTMLElement).parentElement;
+              if (parent) {
+                const text = document.createElement('div');
+                text.className = "text-2xl font-black text-primary tracking-tight leading-none";
+                text.innerText = title;
+                parent.appendChild(text);
+              }
+            }}
+          />
         </div>
       </div>
     </div>
@@ -2466,7 +2485,22 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
     <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12 bg-background">
       <div className="w-full max-w-md space-y-12">
         <div className="flex flex-col items-center space-y-6">
-          <div className="text-4xl font-black text-primary tracking-tighter">Novinha +18</div>
+          <img 
+            src={LOGO_URL} 
+            alt="Logo" 
+            className="h-20 w-auto object-contain mb-2" 
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+              const parent = (e.target as HTMLElement).parentElement;
+              if (parent) {
+                const text = document.createElement('div');
+                text.className = "text-4xl font-black text-primary tracking-tighter";
+                text.innerText = "Novinha +18";
+                parent.appendChild(text);
+              }
+            }}
+          />
           <div className="text-center space-y-2">
             <p className="text-on-surface/60 text-base font-bold max-w-[280px] mx-auto">Acesse sua galeria digital e gerencie seu legado.</p>
           </div>
@@ -2623,7 +2657,22 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
     <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12 bg-background">
       <div className="w-full max-w-md space-y-10">
         <div className="flex flex-col items-center space-y-6">
-          <div className="text-4xl font-black text-primary tracking-tighter">Novinha do JOB MOC</div>
+          <img 
+            src={LOGO_URL} 
+            alt="Logo" 
+            className="h-20 w-auto object-contain mb-2" 
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+              const parent = (e.target as HTMLElement).parentElement;
+              if (parent) {
+                const text = document.createElement('div');
+                text.className = "text-4xl font-black text-primary tracking-tighter";
+                text.innerText = "Novinha do JOB MOC";
+                parent.appendChild(text);
+              }
+            }}
+          />
           <div className="text-center space-y-2">
             <h1 className="text-5xl font-black tracking-tight leading-none text-on-surface">Criar Conta.</h1>
             <p className="text-on-surface/60 text-base font-bold max-w-[280px] mx-auto">Junte-se à elite dos criadores digitais.</p>
