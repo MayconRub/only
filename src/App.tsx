@@ -37,7 +37,8 @@ import {
   ShieldCheck,
   Crown,
   QrCode,
-  Copy
+  Copy,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Cropper from 'react-easy-crop';
@@ -1408,7 +1409,7 @@ const formatRelativeTime = (dateString: string) => {
   return date.toLocaleDateString('pt-BR');
 };
 
-const ScreenActivity = ({ notifications }: { notifications: Notification[] }) => {
+const ScreenActivity = ({ notifications, onRefresh }: { notifications: Notification[], onRefresh: () => void }) => {
   const groupedNotifications = notifications.reduce((acc: any, notif) => {
     const date = new Date(notif.created_at || Date.now()).toLocaleDateString('pt-BR');
     const today = new Date().toLocaleDateString('pt-BR');
@@ -1425,9 +1426,18 @@ const ScreenActivity = ({ notifications }: { notifications: Notification[] }) =>
 
   return (
     <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
-      <section className="mb-8 pt-8">
-        <h2 className="text-4xl font-extrabold tracking-tight mb-1">Atividade</h2>
-        <p className="text-on-surface/60 text-sm font-medium">Sua jornada criativa em tempo real.</p>
+      <section className="mb-8 pt-8 flex items-center justify-between">
+        <div>
+          <h2 className="text-4xl font-extrabold tracking-tight mb-1">Atividade</h2>
+          <p className="text-on-surface/60 text-sm font-medium">Sua jornada criativa em tempo real.</p>
+        </div>
+        <button 
+          onClick={onRefresh}
+          className="p-3 bg-primary/10 rounded-full text-primary hover:bg-primary/20 transition-colors active:scale-95"
+          title="Atualizar"
+        >
+          <RefreshCw size={20} />
+        </button>
       </section>
 
       {notifications.length === 0 ? (
@@ -2575,22 +2585,27 @@ export default function App() {
   const isMaster = userEmail === MASTER_EMAIL;
 
   const fetchData = React.useCallback(async () => {
+    console.log('fetchData called');
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.log('No user found in fetchData');
+        return;
+      }
+      console.log('Fetching data for user:', user.email, 'ID:', user.id);
 
       // Fetch profile
       const { data: profileData, error: profileFetchError } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       
       if (profileData) {
         setCreator(profileData as any);
+        console.log('Profile fetched:', profileData.name);
         // If profile exists but email is missing, update it
         if (!profileData.email && user.email) {
           console.log('Updating profile with missing email:', user.email);
           await supabase.from('profiles').update({ email: user.email }).eq('id', user.id);
         }
       } else if (profileFetchError && profileFetchError.code === 'PGRST116') {
-        // PGRST116 is "The result contains 0 rows" for .single()
         console.log('Profile not found, creating default profile for user:', user.id);
         const newProfile = {
           id: user.id,
@@ -2630,6 +2645,7 @@ export default function App() {
       try {
         const { data: masterProfile } = await supabase.from('profiles').select('id').eq('email', MASTER_EMAIL).single();
         masterId = masterProfile?.id;
+        console.log('Master ID found:', masterId);
       } catch (e) {
         console.log('Master profile not found by email, showing all posts');
       }
@@ -2663,8 +2679,6 @@ export default function App() {
             ? fallbackPosts.filter((p: any) => p.creator_id === masterId)
             : fallbackPosts;
           
-          console.log(`Filtered to ${filteredPosts.length} posts (masterId: ${masterId})`);
-
           setPosts(filteredPosts.map((p: any) => ({
             ...p,
             isLocked: p.is_locked,
@@ -2682,8 +2696,6 @@ export default function App() {
           ? postsData.filter((p: any) => p.creator_id === masterId)
           : postsData;
         
-        console.log(`Filtered to ${filteredPosts.length} posts (masterId: ${masterId})`);
-
         setPosts(filteredPosts.map((p: any) => ({
           ...p,
           isLocked: p.is_locked,
@@ -2716,12 +2728,12 @@ export default function App() {
         // Fetch from notifications table (system/other notifications)
         const { data: notificationsData, error: notifErr } = await supabase
           .from('notifications')
-          .select('*, user:profiles!user_id(name, avatar, is_verified)')
+          .select('*, user:profiles!user_id(name, avatar)')
           .eq('user_id', user.id) // Only for the current user
           .order('created_at', { ascending: false });
         
         if (notifErr) {
-          console.log('Notifications table might not exist or query failed:', notifErr.message);
+          console.log('Notifications table query failed:', notifErr.message);
         } else if (notificationsData) {
           allNotifications = notificationsData.map((n: any) => ({
             ...n,
@@ -2740,7 +2752,7 @@ export default function App() {
       try {
         const { data: paymentsData, error: payErr } = await supabase
           .from('payments')
-          .select('*, user:profiles!user_id(name, avatar, is_verified)')
+          .select('*, user:profiles!user_id(name, avatar)')
           .eq('creator_id', user.id)
           .eq('status', 'approved')
           .order('created_at', { ascending: false });
@@ -2748,6 +2760,7 @@ export default function App() {
         if (payErr) {
           console.error('Error fetching payments for notifications:', payErr);
         } else if (paymentsData) {
+          console.log(`Fetched ${paymentsData.length} payments for notifications`);
           const paymentNotifications: Notification[] = paymentsData.map((p: any) => ({
             id: `payment-${p.id}`,
             type: 'subscription',
@@ -2775,14 +2788,14 @@ export default function App() {
         .eq('creator_id', user.id);
       
       const myPostIds = myPosts?.map(p => p.id) || [];
-      console.log(`User has ${myPostIds.length} posts for notification filtering`);
+      console.log(`User has ${myPostIds.length} posts for notification filtering. IDs:`, myPostIds);
 
       // Fetch likes for notifications
       if (myPostIds.length > 0) {
         try {
           const { data: likesData, error: likesErr } = await supabase
             .from('post_likes')
-            .select('*, user:profiles!user_id(name, avatar, is_verified), posts!post_id(image)')
+            .select('*, user:profiles!user_id(name, avatar), posts!post_id(image)')
             .in('post_id', myPostIds)
             .order('created_at', { ascending: false })
             .limit(50);
@@ -2798,8 +2811,7 @@ export default function App() {
                 type: 'like',
                 user: {
                   name: l.user?.name || 'Usuário',
-                  avatar: l.user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=user',
-                  isVerified: l.user?.is_verified
+                  avatar: l.user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=user'
                 },
                 content: `curtiu sua publicação`,
                 time: l.created_at ? new Date(l.created_at).toLocaleDateString('pt-BR') : 'Recentemente',
@@ -2817,7 +2829,7 @@ export default function App() {
         try {
           const { data: commentsData, error: commentsErr } = await supabase
             .from('post_comments')
-            .select('*, user:profiles!user_id(name, avatar, is_verified), posts!post_id(image)')
+            .select('*, user:profiles!user_id(name, avatar), posts!post_id(image)')
             .in('post_id', myPostIds)
             .order('created_at', { ascending: false })
             .limit(50);
@@ -2833,8 +2845,7 @@ export default function App() {
                 type: 'comment',
                 user: {
                   name: c.user?.name || 'Usuário',
-                  avatar: c.user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=user',
-                  isVerified: c.user?.is_verified
+                  avatar: c.user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=user'
                 },
                 content: `comentou: "${c.content.substring(0, 30)}${c.content.length > 30 ? '...' : ''}"`,
                 time: c.created_at ? new Date(c.created_at).toLocaleDateString('pt-BR') : 'Recentemente',
@@ -2856,6 +2867,7 @@ export default function App() {
         return dateB - dateA;
       });
       
+      console.log('Total notifications aggregated:', allNotifications.length);
       setNotifications(allNotifications);
 
       // Fetch messages
@@ -2877,6 +2889,51 @@ export default function App() {
     if (isLoggedIn) {
       fetchData();
     }
+  }, [isLoggedIn, fetchData]);
+
+  // Real-time updates for notifications
+  React.useEffect(() => {
+    if (!isLoggedIn) return;
+
+    const channel = supabase
+      .channel('activity-updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'post_likes' },
+        () => {
+          console.log('Real-time: Like detected, refreshing data');
+          fetchData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'post_comments' },
+        () => {
+          console.log('Real-time: Comment detected, refreshing data');
+          fetchData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'payments' },
+        () => {
+          console.log('Real-time: Payment detected, refreshing data');
+          fetchData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications' },
+        () => {
+          console.log('Real-time: Notification detected, refreshing data');
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [isLoggedIn, fetchData]);
 
   const handleDeletePost = async (postId: string) => {
@@ -3213,7 +3270,9 @@ export default function App() {
             onCommentPost={handleCommentPost}
           />
         );
-      case 'activity': return <ScreenActivity notifications={notifications} />;
+      case 'activity': 
+        console.log('Rendering Activity screen with', notifications.length, 'notifications');
+        return <ScreenActivity notifications={notifications} onRefresh={fetchData} />;
       case 'messages': return <ScreenMessages messages={messages} />;
       case 'wallet': return <ScreenWallet onBack={() => setScreen('feed')} isMaster={isMaster} />;
       case 'edit-profile': return <ScreenEditProfile onBack={() => setScreen('profile')} creator={creator} onProfileUpdated={() => setRefreshKey(prev => prev + 1)} />;
