@@ -1253,33 +1253,23 @@ const ScreenProfile = ({
         </div>
         
         <div className="flex flex-col gap-3 mb-10 max-w-md mx-auto">
-          <div className="flex flex-col sm:flex-row gap-3">
-            {isMaster && (
+          {isMaster && (
+            <div className="flex flex-col sm:flex-row gap-3">
               <button onClick={onEdit} className="flex-1 py-4 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs">
                 Editar Perfil
               </button>
-            )}
-            <button 
-              onClick={() => {
-                const url = `${window.location.origin}/?u=${creator.username}`;
-                navigator.clipboard.writeText(url);
-                alert('Link do perfil copiado!');
-              }}
-              className="flex-1 py-4 bg-primary/5 text-primary font-bold rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase tracking-widest text-xs"
-            >
-              <Share2 size={18} />
-              Compartilhar
-            </button>
-          </div>
-          
-          {!isMaster && (
-            <button 
-              onClick={onSubscribe}
-              className="w-full py-5 bg-black text-white font-black rounded-2xl shadow-xl active:scale-95 transition-all uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-3"
-            >
-              <Crown size={20} className="text-yellow-400" fill="currentColor" />
-              Seja Membro VIP
-            </button>
+              <button 
+                onClick={() => {
+                  const url = `${window.location.origin}/?u=${creator.username}`;
+                  navigator.clipboard.writeText(url);
+                  alert('Link do perfil copiado!');
+                }}
+                className="flex-1 py-4 bg-primary/5 text-primary font-bold rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase tracking-widest text-xs"
+              >
+                <Share2 size={18} />
+                Compartilhar
+              </button>
+            </div>
           )}
         </div>
         
@@ -1710,15 +1700,38 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
   const fetchMessages = React.useCallback(async (userId: string) => {
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*, sender:profiles!sender_id(*)')
-      .or(`and(sender_id.eq.${userId},receiver_id.eq.${recipient.id}),and(sender_id.eq.${recipient.id},receiver_id.eq.${userId})`)
-      .order('created_at', { ascending: true });
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*, sender:profiles!sender_id(*), receiver:profiles!receiver_id(*)')
+        .or(`and(sender_id.eq.${userId},receiver_id.eq.${recipient.id}),and(sender_id.eq.${recipient.id},receiver_id.eq.${userId})`)
+        .order('created_at', { ascending: true });
 
-    if (data) setMessages(data);
-    setLoading(false);
-    setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      if (error) {
+        console.error('Error fetching messages in ChatView:', error);
+        // Fallback if complex OR filter fails
+        const { data: fallbackData } = await supabase
+          .from('messages')
+          .select('*, sender:profiles!sender_id(*), receiver:profiles!receiver_id(*)')
+          .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+          .order('created_at', { ascending: true });
+        
+        if (fallbackData) {
+          const filtered = fallbackData.filter(m => 
+            (m.sender_id === userId && m.receiver_id === recipient.id) || 
+            (m.sender_id === recipient.id && m.receiver_id === userId)
+          );
+          setMessages(filtered);
+        }
+      } else if (data) {
+        setMessages(data);
+      }
+    } catch (err) {
+      console.error('Exception in fetchMessages:', err);
+    } finally {
+      setLoading(false);
+      setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    }
   }, [recipient.id]);
 
   React.useEffect(() => {
@@ -1766,6 +1779,18 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
       console.error('Error sending message:', error);
       alert('Erro ao enviar mensagem.');
     } else {
+      // Create notification for the receiver
+      try {
+        await supabase.from('notifications').insert({
+          user_id: recipient.id,
+          type: 'message',
+          content: `enviou uma nova mensagem para você`,
+          created_at: new Date().toISOString()
+        });
+      } catch (err) {
+        console.error('Error creating message notification:', err);
+      }
+
       fetchMessages(currentUser.id);
     }
   };
@@ -1846,30 +1871,36 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
 const ScreenMessages = ({ messages, isMaster }: { messages: Message[], isMaster: boolean }) => {
   const [selectedRecipient, setSelectedRecipient] = useState<Creator | null>(null);
   const [contacts, setContacts] = useState<Creator[]>([]);
-  const [loading, setLoading] = useState(isMaster);
+  const [loading, setLoading] = useState(true);
 
   React.useEffect(() => {
     const fetchContacts = async () => {
-      if (!isMaster) return;
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Fetch all followers and subscribers
-        const { data: followers } = await supabase.from('follows').select('follower:profiles!follower_id(*)').eq('following_id', user.id);
-        const { data: subscribers } = await supabase.from('payments').select('user:profiles!user_id(*)').eq('creator_id', user.id).eq('status', 'approved');
+        if (isMaster) {
+          // Fetch all followers and subscribers for Master
+          const { data: followers } = await supabase.from('follows').select('follower:profiles!follower_id(*)').eq('following_id', user.id);
+          const { data: subscribers } = await supabase.from('payments').select('user:profiles!user_id(*)').eq('creator_id', user.id).eq('status', 'approved');
 
-        const contactMap = new Map<string, Creator>();
-        followers?.forEach((f: any) => {
-          const follower = Array.isArray(f.follower) ? f.follower[0] : f.follower;
-          if (follower) contactMap.set(follower.id, follower as any);
-        });
-        subscribers?.forEach((s: any) => {
-          const user = Array.isArray(s.user) ? s.user[0] : s.user;
-          if (user) contactMap.set(user.id, user as any);
-        });
-
-        setContacts(Array.from(contactMap.values()));
+          const contactMap = new Map<string, Creator>();
+          followers?.forEach((f: any) => {
+            const follower = Array.isArray(f.follower) ? f.follower[0] : f.follower;
+            if (follower) contactMap.set(follower.id, follower as any);
+          });
+          subscribers?.forEach((s: any) => {
+            const user = Array.isArray(s.user) ? s.user[0] : s.user;
+            if (user) contactMap.set(user.id, user as any);
+          });
+          setContacts(Array.from(contactMap.values()));
+        } else {
+          // For subscribers, always show the Master as a contact
+          const { data: masterProfile } = await supabase.from('profiles').select('*').eq('email', MASTER_EMAIL).single();
+          if (masterProfile) {
+            setContacts([masterProfile as any]);
+          }
+        }
       } catch (err) {
         console.error('Error fetching contacts:', err);
       } finally {
@@ -1890,9 +1921,11 @@ const ScreenMessages = ({ messages, isMaster }: { messages: Message[], isMaster:
         <p className="text-on-surface/60 text-sm font-medium">Gerencie suas conexões e conversas exclusivas.</p>
       </section>
 
-      {isMaster && contacts.length > 0 && (
+      {contacts.length > 0 && (
         <section className="mb-8">
-          <h2 className="text-xs font-black text-primary uppercase tracking-widest mb-4">Seus Contatos (Seguidores/Assinantes)</h2>
+          <h2 className="text-xs font-black text-primary uppercase tracking-widest mb-4">
+            {isMaster ? 'Seus Contatos (Seguidores/Assinantes)' : 'Fale com o Criador'}
+          </h2>
           <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
             {contacts.map(contact => (
               <button 
@@ -1911,10 +1944,6 @@ const ScreenMessages = ({ messages, isMaster }: { messages: Message[], isMaster:
       <div className="flex gap-2 overflow-x-auto no-scrollbar mb-6">
         <button className="px-5 py-2 rounded-full premium-gradient text-white font-bold text-xs shadow-sm">Todas</button>
         <button className="px-5 py-2 rounded-full bg-white text-on-surface/60 font-bold text-xs border border-primary/5">Não Lidas</button>
-        <button className="px-5 py-2 rounded-full bg-white text-on-surface/60 font-bold text-xs border border-primary/5 flex items-center gap-1.5">
-          <Star size={14} className="text-primary" fill="currentColor" />
-          Premium
-        </button>
       </div>
 
       <div className="space-y-3">
@@ -3282,14 +3311,41 @@ export default function App() {
       }
 
       // Fetch messages
-      const { data: messagesData } = await supabase.from('messages').select('*, user:profiles(*)').order('created_at', { ascending: false });
-      if (messagesData) {
-        setMessages(messagesData.map((m: any) => ({
-          ...m,
-          unreadCount: m.unread_count,
-          isLocked: m.is_locked,
-          isOnline: m.is_online
-        })) as any);
+      const { data: messagesData, error: messagesError } = await supabase
+        .from('messages')
+        .select('*, sender:profiles!sender_id(*), receiver:profiles!receiver_id(*)')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: false });
+
+      if (messagesError) {
+        console.error('Error fetching messages:', messagesError);
+      } else if (messagesData) {
+        // Group messages by conversation (the other person)
+        const conversationsMap = new Map<string, any>();
+        
+        messagesData.forEach((m: any) => {
+          const otherPerson = m.sender_id === user.id ? m.receiver : m.sender;
+          if (!otherPerson) return;
+          
+          if (!conversationsMap.has(otherPerson.id)) {
+            conversationsMap.set(otherPerson.id, {
+              id: m.id,
+              user: otherPerson,
+              lastMessage: m.content,
+              time: formatRelativeTime(m.created_at),
+              unreadCount: m.sender_id !== user.id && !m.is_read ? 1 : 0,
+              created_at: m.created_at,
+              isOnline: false // Could be implemented with presence
+            });
+          } else {
+            const conv = conversationsMap.get(otherPerson.id);
+            if (m.sender_id !== user.id && !m.is_read) {
+              conv.unreadCount += 1;
+            }
+          }
+        });
+
+        setMessages(Array.from(conversationsMap.values()));
       }
     } catch (error) {
       console.error('Error fetching data from Supabase:', error);
@@ -3337,6 +3393,14 @@ export default function App() {
         { event: '*', schema: 'public', table: 'notifications' },
         () => {
           console.log('Real-time: Notification detected, refreshing data');
+          fetchData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'messages' },
+        () => {
+          console.log('Real-time: Message detected, refreshing data');
           fetchData();
         }
       )
