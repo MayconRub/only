@@ -75,16 +75,26 @@ const MESSAGES: Message[] = [];
 
 // --- Components ---
 
-const TopNav = ({ title = "Novinha do JOB MOC", showBack = false, onBack = () => {}, avatar }: { title?: string, showBack?: boolean, onBack?: () => void, avatar?: string }) => (
+const TopNav = ({ 
+  title = "Novinha do JOB MOC", 
+  showBack = false, 
+  onBack = () => {}, 
+  avatar,
+  isMaster = false,
+  onMessageClick
+}: { 
+  title?: string, 
+  showBack?: boolean, 
+  onBack?: () => void, 
+  avatar?: string,
+  isMaster?: boolean,
+  onMessageClick?: () => void
+}) => (
   <header className="fixed top-0 w-full flex justify-between items-center px-6 py-4 glass-header z-50">
     <div className="flex items-center gap-4">
-      {showBack ? (
+      {showBack && (
         <button onClick={onBack} className="text-on-surface hover:opacity-80 transition-opacity">
           <ArrowLeft size={24} />
-        </button>
-      ) : (
-        <button className="text-on-surface hover:opacity-80 transition-opacity">
-          <Menu size={24} />
         </button>
       )}
       <div>
@@ -94,6 +104,11 @@ const TopNav = ({ title = "Novinha do JOB MOC", showBack = false, onBack = () =>
       </div>
     </div>
     <div className="flex items-center gap-4">
+      {isMaster && onMessageClick && (
+        <button onClick={onMessageClick} className="text-on-surface/60 hover:text-primary transition-colors">
+          <MessageCircle size={24} />
+        </button>
+      )}
       <div className="w-8 h-8 rounded-full overflow-hidden border border-primary/20">
         <img src={avatar || ELENA.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
       </div>
@@ -362,14 +377,14 @@ const BottomNav = ({ active, onChange, isMaster, unreadCount }: { active: Screen
 
     <button onClick={() => onChange('activity')} className={`flex flex-col items-center gap-1 transition-all relative ${active === 'activity' ? 'text-primary' : 'text-on-surface/40'}`}>
       <div className="relative">
-        <Bell size={24} />
+        {isMaster ? <Bell size={24} /> : <MessageCircle size={24} />}
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 bg-primary text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center border-2 border-white">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </div>
-      <span className="text-[10px] font-bold">Atividade</span>
+      <span className="text-[10px] font-bold">{isMaster ? 'Atividade' : 'Chat'}</span>
     </button>
     <button onClick={() => onChange('profile')} className={`flex flex-col items-center gap-1 transition-all ${active === 'profile' ? 'text-primary' : 'text-on-surface/40'}`}>
       <User size={24} />
@@ -822,7 +837,8 @@ const ScreenFeed = ({
   onSubscribe,
   isMaster,
   onLikePost,
-  onCommentPost
+  onCommentPost,
+  onViewProfile
 }: { 
   posts: Post[], 
   stories: any[], 
@@ -831,10 +847,11 @@ const ScreenFeed = ({
   onDeletePost: (id: string) => void,
   onUpdatePost: (id: string, caption: string, isLocked: boolean) => void,
   onDeleteStory: (id: string) => void,
-  onSubscribe: () => void,
+  onSubscribe: (creator: Creator) => void,
   isMaster: boolean,
   onLikePost?: (id: string, isLiked: boolean) => void,
-  onCommentPost?: (id: string, content: string) => void
+  onCommentPost?: (id: string, content: string) => void,
+  onViewProfile?: (creatorId: string) => void
 }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
@@ -916,11 +933,11 @@ const ScreenFeed = ({
           return (
             <article key={post.id} className="bg-white shadow-sm">
             <div className="flex items-center justify-between p-4">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 cursor-pointer" onClick={() => onViewProfile && onViewProfile(post.creator.id)}>
                 <img src={post.creator.avatar} className="w-10 h-10 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
                 <div>
                   <div className="flex items-center gap-1">
-                    <p className="font-bold text-sm">{post.creator.name}</p>
+                    <p className="font-bold text-sm hover:text-primary transition-colors">{post.creator.name}</p>
                     <CheckCircle2 size={12} className="text-primary fill-primary/10" />
                   </div>
                   <p className="text-[10px] text-on-surface/40 font-bold uppercase tracking-wider">{post.time}</p>
@@ -1007,7 +1024,7 @@ const ScreenFeed = ({
                     Desbloqueie este post exclusivo do criador.
                   </p>
                   <button 
-                    onClick={onSubscribe}
+                    onClick={() => onSubscribe(post.creator)}
                     className="w-full py-4 px-8 premium-gradient text-white font-black rounded-2xl shadow-xl active:scale-95 transition-all text-[10px] uppercase tracking-[0.2em]"
                   >
                     ASSINAR POR {post.price || 'R$ 19,90'}
@@ -1047,7 +1064,7 @@ const ScreenFeed = ({
             <div className="space-y-1">
               <p className="text-sm font-bold">{post.likesCount || 0} curtidas</p>
               <p className="text-sm text-on-surface/80 leading-relaxed">
-                <span className="font-bold">{post.creator.name}</span> {post.caption}
+                <span className="font-bold cursor-pointer hover:text-primary transition-colors" onClick={() => onViewProfile && onViewProfile(post.creator.id)}>{post.creator.name}</span> {post.caption}
               </p>
             </div>
           </div>
@@ -1614,91 +1631,210 @@ const ScreenActivity = ({ notifications, onRefresh }: { notifications: Notificat
   );
 };
 
-const ScreenMessages = ({ messages }: { messages: Message[] }) => (
-  <div className="pt-20 pb-24 max-w-2xl mx-auto px-6">
-    <section className="mb-8 pt-8">
-      <h1 className="text-4xl font-extrabold tracking-tight mb-1">Mensagens</h1>
-      <p className="text-on-surface/60 text-sm font-medium">Gerencie suas conexões e conversas exclusivas.</p>
-    </section>
+const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => void }) => {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
 
-    <div className="flex gap-2 overflow-x-auto no-scrollbar mb-6">
-      <button className="px-5 py-2 rounded-full premium-gradient text-white font-bold text-xs shadow-sm">Todas</button>
-      <button className="px-5 py-2 rounded-full bg-white text-on-surface/60 font-bold text-xs border border-primary/5">Não Lidas</button>
-      <button className="px-5 py-2 rounded-full bg-white text-on-surface/60 font-bold text-xs border border-primary/5 flex items-center gap-1.5">
-        <Star size={14} className="text-primary" fill="currentColor" />
-        Premium
-      </button>
-    </div>
+  const fetchMessages = React.useCallback(async (userId: string) => {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*, sender:profiles!sender_id(*)')
+      .or(`and(sender_id.eq.${userId},receiver_id.eq.${recipient.id}),and(sender_id.eq.${recipient.id},receiver_id.eq.${userId})`)
+      .order('created_at', { ascending: true });
 
-    <div className="space-y-3">
-      {messages.map(msg => (
-        <div key={msg.id} className="group relative flex items-center gap-4 p-4 rounded-2xl bg-white transition-all hover:shadow-md cursor-pointer border border-primary/5">
-          <div className="relative flex-shrink-0">
-            <img src={msg.user.avatar} className={`w-14 h-14 rounded-full object-cover border border-primary/10 p-0.5 ${msg.isLocked ? 'grayscale opacity-50' : ''}`} referrerPolicy="no-referrer" />
-            {msg.isOnline && <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></div>}
-          </div>
-          <div className="flex-grow min-w-0">
-            <div className="flex justify-between items-baseline mb-0.5">
-              <h3 className={`font-bold text-base truncate ${msg.isLocked ? 'text-on-surface/60' : 'text-on-surface'}`}>{msg.user.name}</h3>
-              <span className="text-[10px] font-bold text-on-surface/40 uppercase tracking-tighter">{msg.time}</span>
+    if (data) setMessages(data);
+    setLoading(false);
+    setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+  }, [recipient.id]);
+
+  React.useEffect(() => {
+    const setup = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUser(user);
+        fetchMessages(user.id);
+
+        const channel = supabase
+          .channel(`chat-${user.id}-${recipient.id}`)
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'messages' },
+            (payload) => {
+              const msg = payload.new;
+              if ((msg.sender_id === user.id && msg.receiver_id === recipient.id) || 
+                  (msg.sender_id === recipient.id && msg.receiver_id === user.id)) {
+                fetchMessages(user.id);
+              }
+            }
+          )
+          .subscribe();
+
+        return () => {
+          supabase.removeChannel(channel);
+        };
+      }
+    };
+    setup();
+  }, [recipient.id, fetchMessages]);
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !currentUser) return;
+    const content = newMessage;
+    setNewMessage('');
+
+    const { error } = await supabase.from('messages').insert({
+      sender_id: currentUser.id,
+      receiver_id: recipient.id,
+      content: content
+    });
+
+    if (error) {
+      console.error('Error sending message:', error);
+      alert('Erro ao enviar mensagem.');
+    } else {
+      fetchMessages(currentUser.id);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-background flex flex-col">
+      <div className="p-4 bg-white border-b border-primary/5 flex items-center gap-4 sticky top-0 z-10">
+        {onBack && (
+          <button onClick={onBack} className="p-2 -ml-2 text-on-surface/60">
+            <ArrowLeft size={24} />
+          </button>
+        )}
+        <div className="flex items-center gap-3">
+          <img src={recipient.avatar} className="w-10 h-10 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
+          <div>
+            <h3 className="font-black text-sm uppercase tracking-tight">{recipient.name}</h3>
+            <div className="flex items-center gap-1">
+              <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+              <span className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">Online agora</span>
             </div>
-            <p className={`text-xs truncate ${msg.isLocked ? 'text-primary font-bold' : 'text-on-surface/60 font-medium'}`}>
-              {msg.isLocked ? (
-                <span className="flex items-center gap-1"><Lock size={12} /> {msg.lastMessage}</span>
-              ) : msg.lastMessage}
-            </p>
           </div>
-          {msg.unreadCount && (
-            <div className="bg-primary text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">
-              {msg.unreadCount}
-            </div>
-          )}
         </div>
-      ))}
-    </div>
-
-    <section className="mt-12">
-      <div className="flex justify-between items-end mb-6">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight">Descobrir Novos</h2>
-          <p className="text-xs text-on-surface/60 font-medium">Recomendações baseadas no seu perfil</p>
-        </div>
-        <button className="text-primary font-bold text-xs flex items-center gap-0.5">Ver todos <ChevronRight size={14} /></button>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="relative h-48 rounded-2xl overflow-hidden group">
-          <img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=400" className="absolute inset-0 w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
-          <div className="absolute bottom-0 left-0 p-4 w-full">
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <span className="w-1.5 h-1.5 bg-primary rounded-full"></span>
-              <span className="text-[8px] font-black text-white uppercase tracking-widest">Fashion</span>
-            </div>
-            <p className="text-white font-bold text-sm">Alana Costa</p>
+
+      <div className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar">
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
           </div>
-        </div>
-        <div className="grid grid-rows-2 gap-3">
-          <div className="relative rounded-2xl overflow-hidden bg-white flex items-center p-3 gap-3 border border-primary/5">
-            <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200" className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
-            <div>
-              <p className="font-bold text-xs">Lucas M.</p>
-              <p className="text-[8px] font-black text-primary uppercase tracking-widest">Música</p>
-            </div>
+        ) : messages.length > 0 ? (
+          messages.map((msg) => {
+            const isMe = msg.sender_id === currentUser?.id;
+            return (
+              <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] p-4 rounded-2xl shadow-sm ${
+                  isMe ? 'bg-primary text-white rounded-tr-none' : 'bg-white text-on-surface rounded-tl-none border border-primary/5'
+                }`}>
+                  <p className="text-sm font-medium leading-relaxed">{msg.content}</p>
+                  <p className={`text-[9px] mt-1 font-bold uppercase tracking-widest ${isMe ? 'text-white/60' : 'text-on-surface/30'}`}>
+                    {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="text-center py-20 opacity-30">
+            <MessageCircle size={48} className="mx-auto mb-4" />
+            <p className="text-xs font-black uppercase tracking-widest">Inicie uma conversa exclusiva</p>
           </div>
-          <div className="relative rounded-2xl overflow-hidden bg-primary/5 flex items-center p-3 gap-3 border border-primary/10">
-            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm">
-              <PlusCircle size={18} className="text-primary" />
-            </div>
-            <div>
-              <p className="font-bold text-xs text-primary">Explorar</p>
-              <p className="text-[8px] font-black text-primary/70 uppercase tracking-widest">Tendências</p>
-            </div>
-          </div>
+        )}
+        <div ref={scrollRef} />
+      </div>
+
+      <div className="p-4 bg-white border-t border-primary/5 pb-safe">
+        <div className="flex gap-2 bg-gray-100 p-1.5 rounded-2xl border border-gray-200 focus-within:border-primary/30 transition-colors">
+          <input 
+            type="text" 
+            value={newMessage}
+            onChange={e => setNewMessage(e.target.value)}
+            placeholder="Sua mensagem exclusiva..."
+            className="flex-1 bg-transparent px-4 py-3 text-sm outline-none font-medium"
+            onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+          />
+          <button 
+            onClick={handleSendMessage}
+            disabled={!newMessage.trim()}
+            className="bg-primary text-white p-3 rounded-xl shadow-lg shadow-primary/20 active:scale-95 transition-all disabled:opacity-50"
+          >
+            <Send size={20} />
+          </button>
         </div>
       </div>
-    </section>
-  </div>
-);
+    </div>
+  );
+};
+
+const ScreenMessages = ({ messages, isMaster }: { messages: Message[], isMaster: boolean }) => {
+  const [selectedRecipient, setSelectedRecipient] = useState<Creator | null>(null);
+
+  if (selectedRecipient) {
+    return <ChatView recipient={selectedRecipient} onBack={() => setSelectedRecipient(null)} />;
+  }
+
+  return (
+    <div className="pt-20 pb-24 max-w-2xl mx-auto px-6">
+      <section className="mb-8 pt-8">
+        <h1 className="text-4xl font-extrabold tracking-tight mb-1">Mensagens</h1>
+        <p className="text-on-surface/60 text-sm font-medium">Gerencie suas conexões e conversas exclusivas.</p>
+      </section>
+
+      <div className="flex gap-2 overflow-x-auto no-scrollbar mb-6">
+        <button className="px-5 py-2 rounded-full premium-gradient text-white font-bold text-xs shadow-sm">Todas</button>
+        <button className="px-5 py-2 rounded-full bg-white text-on-surface/60 font-bold text-xs border border-primary/5">Não Lidas</button>
+        <button className="px-5 py-2 rounded-full bg-white text-on-surface/60 font-bold text-xs border border-primary/5 flex items-center gap-1.5">
+          <Star size={14} className="text-primary" fill="currentColor" />
+          Premium
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {messages.length > 0 ? (
+          messages.map(msg => (
+            <div 
+              key={msg.id} 
+              onClick={() => setSelectedRecipient(msg.user)}
+              className="group relative flex items-center gap-4 p-4 rounded-2xl bg-white transition-all hover:shadow-md cursor-pointer border border-primary/5"
+            >
+              <div className="relative flex-shrink-0">
+                <img src={msg.user.avatar} className={`w-14 h-14 rounded-full object-cover border border-primary/10 p-0.5 ${msg.isLocked ? 'grayscale opacity-50' : ''}`} referrerPolicy="no-referrer" />
+                {msg.isOnline && <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></div>}
+              </div>
+              <div className="flex-grow min-w-0">
+                <div className="flex justify-between items-baseline mb-0.5">
+                  <h3 className={`font-bold text-base truncate ${msg.isLocked ? 'text-on-surface/60' : 'text-on-surface'}`}>{msg.user.name}</h3>
+                  <span className="text-[10px] font-bold text-on-surface/40 uppercase tracking-tighter">{msg.time}</span>
+                </div>
+                <p className={`text-xs truncate ${msg.isLocked ? 'text-primary font-bold' : 'text-on-surface/60 font-medium'}`}>
+                  {msg.isLocked ? (
+                    <span className="flex items-center gap-1"><Lock size={12} /> {msg.lastMessage}</span>
+                  ) : msg.lastMessage}
+                </p>
+              </div>
+              {msg.unreadCount && (
+                <div className="bg-primary text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">
+                  {msg.unreadCount}
+                </div>
+              )}
+            </div>
+          ))
+        ) : (
+          <div className="text-center py-20 opacity-30">
+            <MessageCircle size={48} className="mx-auto mb-4" />
+            <p className="text-xs font-black uppercase tracking-widest">Nenhuma mensagem ainda</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () => void, creator: Creator, onProfileUpdated: () => void }) => {
   const [name, setName] = useState(creator.name);
@@ -3082,6 +3218,30 @@ export default function App() {
     }
   }, [screen, notifications]);
 
+  const handleViewProfile = async (creatorId: string) => {
+    try {
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', creatorId).single();
+      if (profile) {
+        setPublicCreator(profile as any);
+        // Fetch posts for this creator
+        const { data: posts } = await supabase.from('posts').select('*, creator:profiles(*)').eq('creator_id', creatorId).order('created_at', { ascending: false });
+        if (posts) setPublicPosts(posts as any);
+        setScreen('public-profile');
+      }
+    } catch (err) {
+      console.error('Error viewing profile:', err);
+    }
+  };
+
+  const handleSubscribe = (targetCreator: Creator) => {
+    setPublicCreator(targetCreator);
+    if (isLoggedIn) {
+      setScreen('payment');
+    } else {
+      setScreen('register');
+    }
+  };
+
   const handleDeletePost = async (postId: string) => {
     if (!confirm('Tem certeza que deseja excluir esta postagem?')) return;
     try {
@@ -3363,10 +3523,11 @@ export default function App() {
           onDeletePost={handleDeletePost}
           onUpdatePost={handleUpdatePost}
           onDeleteStory={handleDeleteStory}
-          onSubscribe={() => setScreen('payment')}
+          onSubscribe={handleSubscribe}
           isMaster={isMaster}
           onLikePost={handleLikePost}
           onCommentPost={handleCommentPost}
+          onViewProfile={handleViewProfile}
         />
       );
       case 'profile': return (
@@ -3377,7 +3538,7 @@ export default function App() {
           posts={posts}
           onDeletePost={handleDeletePost}
           onUpdatePost={handleUpdatePost}
-          onSubscribe={() => setScreen('payment')}
+          onSubscribe={() => handleSubscribe(creator)}
           stories={stories}
           onDeleteStory={handleDeleteStory}
           isMaster={isMaster}
@@ -3391,13 +3552,7 @@ export default function App() {
             creator={publicCreator} 
             posts={publicPosts} 
             stories={stories}
-            onSubscribe={() => {
-              if (isLoggedIn) {
-                setScreen('payment');
-              } else {
-                setScreen('register');
-              }
-            }} 
+            onSubscribe={() => handleSubscribe(publicCreator)} 
             onLikePost={handleLikePost}
             onCommentPost={handleCommentPost}
           />
@@ -3410,16 +3565,21 @@ export default function App() {
             onDeletePost={handleDeletePost}
             onUpdatePost={handleUpdatePost}
             onDeleteStory={handleDeleteStory}
-            onSubscribe={() => setScreen('payment')}
+            onSubscribe={handleSubscribe}
             isMaster={isMaster}
             onLikePost={handleLikePost}
             onCommentPost={handleCommentPost}
+            onViewProfile={handleViewProfile}
           />
         );
       case 'activity': 
         console.log('Rendering Activity screen with', notifications.length, 'notifications');
-        return <ScreenActivity notifications={notifications} onRefresh={fetchData} />;
-      case 'messages': return <ScreenMessages messages={messages} />;
+        if (isMaster) {
+          return <ScreenActivity notifications={notifications} onRefresh={fetchData} />;
+        } else {
+          return <ScreenMessages messages={messages} isMaster={isMaster} />;
+        }
+      case 'messages': return <ScreenMessages messages={messages} isMaster={isMaster} />;
       case 'wallet': return <ScreenWallet onBack={() => setScreen('feed')} isMaster={isMaster} />;
       case 'subscriptions': return <ScreenSubscriptions onBack={() => setScreen('feed')} />;
       case 'edit-profile': return <ScreenEditProfile onBack={() => setScreen('profile')} creator={creator} onProfileUpdated={() => setRefreshKey(prev => prev + 1)} />;
@@ -3434,10 +3594,11 @@ export default function App() {
           onDeletePost={handleDeletePost}
           onUpdatePost={handleUpdatePost}
           onDeleteStory={handleDeleteStory}
-          onSubscribe={() => setScreen('payment')}
+          onSubscribe={handleSubscribe}
           isMaster={isMaster}
           onLikePost={handleLikePost}
           onCommentPost={handleCommentPost}
+          onViewProfile={handleViewProfile}
         />
       );
     }
@@ -3445,7 +3606,7 @@ export default function App() {
 
   const getTitle = () => {
     if (screen === 'profile') return 'PERFIL';
-    if (screen === 'activity') return 'ATIVIDADE';
+    if (screen === 'activity') return isMaster ? 'ATIVIDADE' : 'CHAT';
     if (screen === 'messages') return 'MENSAGENS';
     if (screen === 'wallet') return 'CARTEIRA';
     if (screen === 'subscriptions') return 'ASSINATURAS';
@@ -3475,6 +3636,8 @@ export default function App() {
             }
           }} 
           avatar={isLoggedIn ? creator.avatar : publicCreator?.avatar}
+          isMaster={isMaster}
+          onMessageClick={() => setScreen('messages')}
         />
       )}
       
