@@ -2909,9 +2909,13 @@ export default function App() {
 
         // Fetch notifications
         let allNotifications: Notification[] = [];
-        const { data: notificationsData } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
-        if (notificationsData) {
-          allNotifications = [...notificationsData as any];
+        try {
+          const { data: notificationsData } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
+          if (notificationsData) {
+            allNotifications = [...notificationsData as any];
+          }
+        } catch (e) {
+          console.log('Notifications table might not exist yet');
         }
 
         // Fetch payments for notifications
@@ -2933,12 +2937,79 @@ export default function App() {
             },
             content: `assinou seu conteúdo VIP!`,
             time: new Date(p.created_at).toLocaleDateString('pt-BR'),
-            badge: 'NOVO ASSINANTE'
+            badge: 'NOVO ASSINANTE',
+            created_at: p.created_at
           }));
           
-          allNotifications = [...paymentNotifications, ...allNotifications];
-          // Sort by date if needed, but since we just prepend, it's fine for now
+          allNotifications = [...allNotifications, ...paymentNotifications];
         }
+
+        // Fetch likes for notifications
+        try {
+          const { data: likesData } = await supabase
+            .from('post_likes')
+            .select('*, user:profiles(name, avatar, is_verified), posts!inner(creator_id, image)')
+            .eq('posts.creator_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+          if (likesData) {
+            const likeNotifications: Notification[] = likesData.map((l: any) => ({
+              id: `like-${l.id}`,
+              type: 'like',
+              user: {
+                name: l.user?.name || 'Usuário',
+                avatar: l.user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=user',
+                isVerified: l.user?.is_verified
+              },
+              content: `curtiu sua publicação`,
+              time: new Date(l.created_at).toLocaleDateString('pt-BR'),
+              thumbnail: l.posts?.image,
+              badge: 'CURTIDA',
+              created_at: l.created_at
+            }));
+            allNotifications = [...allNotifications, ...likeNotifications];
+          }
+        } catch (e) {
+          console.error('Error fetching like notifications:', e);
+        }
+
+        // Fetch comments for notifications
+        try {
+          const { data: commentsData } = await supabase
+            .from('post_comments')
+            .select('*, user:profiles(name, avatar, is_verified), posts!inner(creator_id, image)')
+            .eq('posts.creator_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+          if (commentsData) {
+            const commentNotifications: Notification[] = commentsData.map((c: any) => ({
+              id: `comment-${c.id}`,
+              type: 'comment',
+              user: {
+                name: c.user?.name || 'Usuário',
+                avatar: c.user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=user',
+                isVerified: c.user?.is_verified
+              },
+              content: `comentou: "${c.content.substring(0, 30)}${c.content.length > 30 ? '...' : ''}"`,
+              time: new Date(c.created_at).toLocaleDateString('pt-BR'),
+              thumbnail: c.posts?.image,
+              badge: 'COMENTÁRIO',
+              created_at: c.created_at
+            }));
+            allNotifications = [...allNotifications, ...commentNotifications];
+          }
+        } catch (e) {
+          console.error('Error fetching comment notifications:', e);
+        }
+
+        // Sort all notifications by date
+        allNotifications.sort((a: any, b: any) => {
+          const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return dateB - dateA;
+        });
         
         setNotifications(allNotifications);
 

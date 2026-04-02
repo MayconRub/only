@@ -50,6 +50,7 @@ export interface Notification {
   time: string;
   thumbnail?: string;
   badge?: string;
+  created_at?: string;
 }
 
 export interface Message {
