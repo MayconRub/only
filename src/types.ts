@@ -7,6 +7,7 @@ export interface Creator {
   avatar: string;
   cover_image?: string;
   bio?: string;
+  services_bio?: string;
   welcome_audio?: string;
   stats?: {
     posts: string;
@@ -61,4 +62,15 @@ export interface Message {
   unreadCount?: number;
   isLocked?: boolean;
   isOnline?: boolean;
+}
+
+export interface ChatMessage {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  content: string;
+  created_at: string;
+  is_read: boolean;
+  media_url?: string;
+  media_type?: 'image' | 'video' | 'audio';
 }

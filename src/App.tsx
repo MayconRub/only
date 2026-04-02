@@ -38,11 +38,14 @@ import {
   Crown,
   QrCode,
   Copy,
-  RefreshCw
+  RefreshCw,
+  Mic,
+  Image as ImageIcon,
+  Video as VideoIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Cropper from 'react-easy-crop';
-import { Screen, Post, Notification, Message, Creator } from './types';
+import { Screen, Post, Notification, Message, Creator, ChatMessage } from './types';
 import { supabase } from './lib/supabase';
 
 // --- Constants ---
@@ -234,22 +237,68 @@ const ScreenSubscriptions = ({ onBack }: { onBack: () => void }) => {
 };
 
 const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: boolean }) => {
-  const [balance, setBalance] = useState('R$ 45,00');
-  const [loading, setLoading] = useState(false);
+  const [balance, setBalance] = useState('R$ 0,00');
+  const [loading, setLoading] = useState(true);
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
 
-  // Mock data for demonstration since we don't have the tables yet
   React.useEffect(() => {
-    if (isMaster) {
-      setSubscribers([
-        { id: '1', name: 'João Silva', username: 'joaosilva', plan: 'Mensal', date: '2026-03-29', avatar: 'https://i.pravatar.cc/150?u=1' },
-        { id: '2', name: 'Maria Oliveira', username: 'maria_o', plan: 'Anual', date: '2026-03-28', avatar: 'https://i.pravatar.cc/150?u=2' },
-      ]);
-      setPurchases([
-        { id: '1', name: 'Pedro Santos', username: 'pedros', item: 'Post Exclusivo', price: 'R$ 15,00', date: '2026-03-30', avatar: 'https://i.pravatar.cc/150?u=3' },
-      ]);
-    }
+    const fetchData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        if (isMaster) {
+          const { data: payments, error } = await supabase
+            .from('payments')
+            .select('*, profiles:user_id(name, username, avatar)')
+            .eq('creator_id', user.id)
+            .eq('status', 'approved')
+            .order('created_at', { ascending: false });
+
+          if (error) throw error;
+
+          if (payments) {
+            const total = payments.reduce((acc, p) => acc + (p.amount || 0), 0);
+            setBalance(`R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
+            
+            const subs = payments
+              .filter(p => p.description?.toLowerCase().includes('assinatura'))
+              .map(p => ({
+                id: p.id,
+                name: p.profiles?.name || 'Usuário',
+                username: p.profiles?.username || 'usuario',
+                plan: p.description?.split(' - ')[0]?.replace(/assinatura/i, '').trim() || 'Plano',
+                date: new Date(p.created_at).toLocaleDateString('pt-BR'),
+                avatar: p.profiles?.avatar || `https://i.pravatar.cc/150?u=${p.user_id}`
+              }));
+            setSubscribers(subs);
+
+            const sales = payments
+              .filter(p => !p.description?.toLowerCase().includes('assinatura'))
+              .map(p => ({
+                id: p.id,
+                name: p.profiles?.name || 'Usuário',
+                username: p.profiles?.username || 'usuario',
+                item: p.description || 'Conteúdo',
+                price: `R$ ${p.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+                date: new Date(p.created_at).toLocaleDateString('pt-BR'),
+                avatar: p.profiles?.avatar || `https://i.pravatar.cc/150?u=${p.user_id}`
+              }));
+            setPurchases(sales);
+          }
+        } else {
+          // Para assinantes, poderíamos mostrar histórico de gastos ou créditos
+          setBalance('R$ 0,00');
+        }
+      } catch (err) {
+        console.error('Erro ao carregar dados da carteira:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, [isMaster]);
 
   const creditOptions = [
@@ -278,14 +327,20 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
         <div className="absolute top-0 right-0 p-4 opacity-5">
           <CreditCard size={120} />
         </div>
-        <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-2">Saldo Disponível</p>
-        <h2 className="text-5xl font-black text-on-surface tracking-tighter">{balance}</h2>
-        <div className="mt-6 flex justify-center gap-2">
-          <div className="px-4 py-1.5 bg-primary/10 rounded-full flex items-center gap-2">
-            <Crown size={14} className="text-primary" />
-            <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Membro VIP</span>
+        <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-2">
+          {isMaster ? 'Faturamento' : 'Saldo Disponível'}
+        </p>
+        <h2 className="text-5xl font-black text-on-surface tracking-tighter">
+          {loading ? '...' : balance}
+        </h2>
+        {!isMaster && (
+          <div className="mt-6 flex justify-center gap-2">
+            <div className="px-4 py-1.5 bg-primary/10 rounded-full flex items-center gap-2">
+              <Crown size={14} className="text-primary" />
+              <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Membro VIP</span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {isMaster ? (
@@ -297,7 +352,7 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
                 {subscribers.map((sub, index) => (
                   <div key={sub.id} className={`p-4 flex items-center justify-between ${index !== subscribers.length - 1 ? 'border-b border-primary/5' : ''}`}>
                     <div className="flex items-center gap-3">
-                      <img src={sub.avatar} alt={sub.name} className="w-10 h-10 rounded-full object-cover" />
+                      <img src={sub.avatar} alt={sub.name} className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
                       <div>
                         <p className="font-bold text-sm text-on-surface">{sub.name}</p>
                         <p className="text-[10px] text-on-surface/60 font-medium">@{sub.username} • {sub.plan}</p>
@@ -308,7 +363,7 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-on-surface/60 px-1">Nenhum assinante ainda.</p>
+              <p className="text-sm text-on-surface/60 px-1">{loading ? 'Carregando...' : 'Nenhum assinante ainda.'}</p>
             )}
           </section>
 
@@ -319,7 +374,7 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
                 {purchases.map((purchase, index) => (
                   <div key={purchase.id} className={`p-4 flex items-center justify-between ${index !== purchases.length - 1 ? 'border-b border-primary/5' : ''}`}>
                     <div className="flex items-center gap-3">
-                      <img src={purchase.avatar} alt={purchase.name} className="w-10 h-10 rounded-full object-cover" />
+                      <img src={purchase.avatar} alt={purchase.name} className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
                       <div>
                         <p className="font-bold text-sm text-on-surface">{purchase.name}</p>
                         <p className="text-[10px] text-on-surface/60 font-medium">Comprou: {purchase.item}</p>
@@ -330,54 +385,56 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-on-surface/60 px-1">Nenhuma venda ainda.</p>
+              <p className="text-sm text-on-surface/60 px-1">{loading ? 'Carregando...' : 'Nenhuma venda ainda.'}</p>
             )}
           </section>
         </div>
       ) : (
-        <section className="space-y-6">
-          <div className="flex items-center justify-between px-1">
-            <h3 className="font-bold text-lg text-on-surface">Adicionar Créditos</h3>
-            <span className="text-[10px] font-black text-primary uppercase tracking-widest">Melhor Valor</span>
-          </div>
+        <>
+          <section className="space-y-6">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="font-bold text-lg text-on-surface">Adicionar Créditos</h3>
+              <span className="text-[10px] font-black text-primary uppercase tracking-widest">Melhor Valor</span>
+            </div>
 
-          <div className="grid grid-cols-1 gap-4">
-            {creditOptions.map((option) => (
-              <button
-                key={option.id}
-                onClick={() => handleAddCredits(option.amount)}
-                disabled={loading}
-                className="bg-white p-5 rounded-2xl border border-primary/5 shadow-sm flex items-center justify-between hover:border-primary/30 transition-all active:scale-[0.98]"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-primary/5 rounded-full flex items-center justify-center">
-                    <PlusCircle size={24} className="text-primary" />
+            <div className="grid grid-cols-1 gap-4">
+              {creditOptions.map((option) => (
+                <button
+                  key={option.id}
+                  onClick={() => handleAddCredits(option.amount)}
+                  disabled={loading}
+                  className="bg-white p-5 rounded-2xl border border-primary/5 shadow-sm flex items-center justify-between hover:border-primary/30 transition-all active:scale-[0.98]"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-primary/5 rounded-full flex items-center justify-center">
+                      <PlusCircle size={24} className="text-primary" />
+                    </div>
+                    <div className="text-left">
+                      <h4 className="font-black text-on-surface text-lg leading-none">{option.credits} Créditos</h4>
+                      {option.badge && (
+                        <span className="text-[8px] font-black text-primary uppercase tracking-widest">{option.badge}</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-left">
-                    <h4 className="font-black text-on-surface text-lg leading-none">{option.credits} Créditos</h4>
-                    {option.badge && (
-                      <span className="text-[8px] font-black text-primary uppercase tracking-widest">{option.badge}</span>
-                    )}
+                  <div className="text-right">
+                    <span className="block font-black text-primary text-xl">{option.amount}</span>
                   </div>
-                </div>
-                <div className="text-right">
-                  <span className="block font-black text-primary text-xl">{option.amount}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </section>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="mt-12 bg-primary/5 p-6 rounded-3xl border border-primary/10">
+            <div className="flex items-center gap-3 mb-4">
+              <ShieldCheck className="text-primary" size={20} />
+              <h3 className="font-bold text-sm text-on-surface uppercase tracking-widest">Segurança Garantida</h3>
+            </div>
+            <p className="text-xs text-on-surface/60 leading-relaxed font-medium">
+              Todas as transações são processadas de forma segura via Pix. Seus dados financeiros nunca são armazenados em nossos servidores.
+            </p>
+          </section>
+        </>
       )}
-
-      <section className="mt-12 bg-primary/5 p-6 rounded-3xl border border-primary/10">
-        <div className="flex items-center gap-3 mb-4">
-          <ShieldCheck className="text-primary" size={20} />
-          <h3 className="font-bold text-sm text-on-surface uppercase tracking-widest">Segurança Garantida</h3>
-        </div>
-        <p className="text-xs text-on-surface/60 leading-relaxed font-medium">
-          Todas as transações são processadas de forma segura via Pix. Seus dados financeiros nunca são armazenados em nossos servidores.
-        </p>
-      </section>
     </div>
   );
 };
@@ -873,7 +930,7 @@ const ScreenFeed = ({
   onDeletePost: (id: string) => void,
   onUpdatePost: (id: string, caption: string, isLocked: boolean) => void,
   onDeleteStory: (id: string) => void,
-  onSubscribe: (creator: Creator) => void,
+  onSubscribe: (creator: Creator, post?: Post) => void,
   isMaster: boolean,
   onLikePost?: (id: string, isLiked: boolean) => void,
   onCommentPost?: (id: string, content: string) => void,
@@ -1049,12 +1106,20 @@ const ScreenFeed = ({
                   <p className="text-xs text-white/80 mb-8 font-bold uppercase tracking-widest leading-relaxed">
                     Desbloqueie este post exclusivo do criador.
                   </p>
-                  <button 
-                    onClick={() => onSubscribe(post.creator)}
-                    className="w-full py-4 px-8 premium-gradient text-white font-black rounded-2xl shadow-xl active:scale-95 transition-all text-[10px] uppercase tracking-[0.2em]"
-                  >
-                    ASSINAR POR {post.price || 'R$ 19,90'}
-                  </button>
+                  <div className="w-full space-y-3">
+                    <button 
+                      onClick={() => onSubscribe(post.creator)}
+                      className="w-full py-4 px-8 premium-gradient text-white font-black rounded-2xl shadow-xl active:scale-95 transition-all text-[10px] uppercase tracking-[0.2em]"
+                    >
+                      ASSINAR MENSAL
+                    </button>
+                    <button 
+                      onClick={() => onSubscribe(post.creator, post)}
+                      className="w-full py-4 px-8 bg-white/10 hover:bg-white/20 text-white font-black rounded-2xl border border-white/20 active:scale-95 transition-all text-[10px] uppercase tracking-[0.2em]"
+                    >
+                      COMPRAR POST POR {post.price || 'R$ 15,00'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -1194,7 +1259,7 @@ const ScreenProfile = ({
   posts: Post[],
   onDeletePost: (id: string) => void,
   onUpdatePost: (id: string, caption: string, isLocked: boolean) => void,
-  onSubscribe: () => void,
+  onSubscribe: (post?: Post) => void,
   stories: any[],
   onDeleteStory: (id: string) => void,
   isMaster: boolean,
@@ -1255,7 +1320,12 @@ const ScreenProfile = ({
           </div>
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator.name}</h1>
-        <p className="text-base text-primary font-bold mb-8">{creator.bio}</p>
+        <p className="text-base text-primary font-bold mb-2">{creator.bio}</p>
+        {creator.services_bio && (
+          <p className="text-xs text-on-surface/60 font-medium mb-8 max-w-md mx-auto leading-relaxed">
+            {creator.services_bio}
+          </p>
+        )}
 
         {creator.welcome_audio && (
           <WelcomeAudioPlayer audioUrl={creator.welcome_audio} />
@@ -1364,9 +1434,18 @@ const ScreenProfile = ({
                     />
                   )}
                   {!post.hasAccess && (
-                    <div className="absolute inset-0 bg-primary/10 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center text-white">
-                      <Lock size={20} fill="white" className="drop-shadow-lg" />
-                      <span className="text-[8px] font-black uppercase tracking-widest mt-1 drop-shadow-md">VIP</span>
+                    <div className="absolute inset-0 bg-primary/10 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center text-white p-2 text-center">
+                      <Lock size={20} fill="white" className="drop-shadow-lg mb-1" />
+                      <span className="text-[8px] font-black uppercase tracking-widest drop-shadow-md mb-2">VIP</span>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSubscribe(post);
+                        }}
+                        className="px-3 py-1.5 bg-primary text-white text-[7px] font-black uppercase tracking-widest rounded-lg shadow-lg active:scale-95 transition-all"
+                      >
+                        Comprar Post
+                      </button>
                     </div>
                   )}
                   {post.isLocked && post.hasAccess && (
@@ -1380,8 +1459,9 @@ const ScreenProfile = ({
                     </div>
                   )}
                   <div className="absolute top-3 right-3 z-10">
-                    <div className="bg-black/20 backdrop-blur-md p-1.5 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Heart size={14} fill="white" />
+                    <div className="bg-black/40 backdrop-blur-md px-2 py-1 rounded-full text-white flex items-center gap-1 shadow-lg">
+                      <Heart size={12} fill="white" />
+                      <span className="text-[10px] font-black">{post.likesCount || 0}</span>
                     </div>
                   </div>
                 </div>
@@ -1422,7 +1502,7 @@ const ScreenPublicProfile = ({
 }: { 
   creator: Creator, 
   posts: Post[], 
-  onSubscribe: () => void, 
+  onSubscribe: (post?: Post) => void, 
   stories: any[], 
   onLikePost?: (id: string, isLiked: boolean) => void, 
   onCommentPost?: (id: string, content: string) => void,
@@ -1519,7 +1599,12 @@ const ScreenPublicProfile = ({
           </div>
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator.name}</h1>
-        <p className="text-base text-primary font-bold mb-8">{creator.bio}</p>
+        <p className="text-base text-primary font-bold mb-2">{creator.bio}</p>
+        {creator.services_bio && (
+          <p className="text-xs text-on-surface/60 font-medium mb-8 max-w-md mx-auto leading-relaxed">
+            {creator.services_bio}
+          </p>
+        )}
 
         {creator.welcome_audio && (
           <WelcomeAudioPlayer audioUrl={creator.welcome_audio} />
@@ -1592,7 +1677,7 @@ const ScreenPublicProfile = ({
               key={post.id} 
               className="relative aspect-square overflow-hidden rounded-2xl bg-on-surface/5 shadow-sm group cursor-pointer"
               onClick={() => {
-                if (!post.hasAccess) onSubscribe();
+                if (!post.hasAccess) onSubscribe(post);
                 else setSelectedPost(post);
               }}
             >
@@ -1612,9 +1697,18 @@ const ScreenPublicProfile = ({
                 />
               )}
               {!post.hasAccess && (
-                <div className="absolute inset-0 bg-primary/10 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center text-white">
-                  <Lock size={20} fill="white" className="drop-shadow-lg" />
-                  <span className="text-[8px] font-black uppercase tracking-widest mt-1 drop-shadow-md">VIP</span>
+                <div className="absolute inset-0 bg-primary/10 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center text-white p-2 text-center">
+                  <Lock size={20} fill="white" className="drop-shadow-lg mb-1" />
+                  <span className="text-[8px] font-black uppercase tracking-widest drop-shadow-md mb-2">VIP</span>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSubscribe(post);
+                    }}
+                    className="px-3 py-1.5 bg-primary text-white text-[7px] font-black uppercase tracking-widest rounded-lg shadow-lg active:scale-95 transition-all"
+                  >
+                    Comprar Post
+                  </button>
                 </div>
               )}
               {post.isLocked && post.hasAccess && (
@@ -1622,6 +1716,12 @@ const ScreenPublicProfile = ({
                   <Lock className="text-white" size={14} />
                 </div>
               )}
+              <div className="absolute top-3 right-3 z-10">
+                <div className="bg-black/40 backdrop-blur-md px-2 py-1 rounded-full text-white flex items-center gap-1 shadow-lg">
+                  <Heart size={12} fill="white" />
+                  <span className="text-[10px] font-black">{post.likesCount || 0}</span>
+                </div>
+              </div>
             </div>
           ))}
         </div>
@@ -1725,36 +1825,25 @@ const ScreenActivity = ({ notifications, onRefresh }: { notifications: Notificat
 };
 
 const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => void }) => {
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [uploading, setUploading] = useState(false);
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [mediaType, setMediaType] = useState<'image' | 'video' | 'audio' | null>(null);
 
   const fetchMessages = React.useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('messages')
-        .select('*, sender:profiles!sender_id(*), receiver:profiles!receiver_id(*)')
+        .select('*')
         .or(`and(sender_id.eq.${userId},receiver_id.eq.${recipient.id}),and(sender_id.eq.${recipient.id},receiver_id.eq.${userId})`)
         .order('created_at', { ascending: true });
 
       if (error) {
         console.error('Error fetching messages in ChatView:', error);
-        // Fallback if complex OR filter fails
-        const { data: fallbackData } = await supabase
-          .from('messages')
-          .select('*, sender:profiles!sender_id(*), receiver:profiles!receiver_id(*)')
-          .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-          .order('created_at', { ascending: true });
-        
-        if (fallbackData) {
-          const filtered = fallbackData.filter(m => 
-            (m.sender_id === userId && m.receiver_id === recipient.id) || 
-            (m.sender_id === recipient.id && m.receiver_id === userId)
-          );
-          setMessages(filtered);
-        }
       } else if (data) {
         setMessages(data);
         
@@ -1808,15 +1897,17 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
     setup();
   }, [recipient.id, fetchMessages]);
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || !currentUser) return;
+  const handleSendMessage = async (mediaUrl?: string, type?: 'image' | 'video' | 'audio') => {
+    if (!newMessage.trim() && !mediaUrl || !currentUser) return;
     const content = newMessage;
     setNewMessage('');
 
     const { error } = await supabase.from('messages').insert({
       sender_id: currentUser.id,
       receiver_id: recipient.id,
-      content: content
+      content: content,
+      media_url: mediaUrl,
+      media_type: type
     });
 
     if (error) {
@@ -1836,6 +1927,37 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
       }
 
       fetchMessages(currentUser.id);
+    }
+  };
+
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentUser) return;
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `chat/${currentUser.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('posts') // Reusing 'posts' bucket or you can create 'chat' bucket
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('posts').getPublicUrl(filePath);
+      
+      let type: 'image' | 'video' | 'audio' = 'image';
+      if (file.type.startsWith('video/')) type = 'video';
+      else if (file.type.startsWith('audio/')) type = 'audio';
+
+      await handleSendMessage(data.publicUrl, type);
+    } catch (err: any) {
+      alert(`Erro no upload: ${err.message}`);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -1869,11 +1991,24 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
             const isMe = msg.sender_id === currentUser?.id;
             return (
               <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] p-4 rounded-2xl shadow-sm ${
+                <div className={`max-w-[85%] p-3 rounded-2xl shadow-sm ${
                   isMe ? 'bg-primary text-white rounded-tr-none' : 'bg-white text-on-surface rounded-tl-none border border-primary/5'
                 }`}>
-                  <p className="text-sm font-medium leading-relaxed">{msg.content}</p>
-                  <p className={`text-[9px] mt-1 font-bold uppercase tracking-widest ${isMe ? 'text-white/60' : 'text-on-surface/30'}`}>
+                  {msg.media_url && (
+                    <div className="mb-2 rounded-xl overflow-hidden bg-black/5">
+                      {msg.media_type === 'image' && (
+                        <img src={msg.media_url} className="w-full max-h-64 object-cover" referrerPolicy="no-referrer" />
+                      )}
+                      {msg.media_type === 'video' && (
+                        <video src={msg.media_url} controls className="w-full max-h-64" />
+                      )}
+                      {msg.media_type === 'audio' && (
+                        <audio src={msg.media_url} controls className="w-full" />
+                      )}
+                    </div>
+                  )}
+                  {msg.content && <p className="text-sm font-medium leading-relaxed px-1">{msg.content}</p>}
+                  <p className={`text-[9px] mt-1 font-bold uppercase tracking-widest px-1 ${isMe ? 'text-white/60' : 'text-on-surface/30'}`}>
                     {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
@@ -1890,22 +2025,58 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
       </div>
 
       <div className="p-4 bg-white border-t border-primary/5 pb-safe">
-        <div className="flex gap-2 bg-gray-100 p-1.5 rounded-2xl border border-gray-200 focus-within:border-primary/30 transition-colors">
-          <input 
-            type="text" 
-            value={newMessage}
-            onChange={e => setNewMessage(e.target.value)}
-            placeholder="Sua mensagem exclusiva..."
-            className="flex-1 bg-transparent px-4 py-3 text-sm outline-none font-medium"
-            onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
-          />
-          <button 
-            onClick={handleSendMessage}
-            disabled={!newMessage.trim()}
-            className="bg-primary text-white p-3 rounded-xl shadow-lg shadow-primary/20 active:scale-95 transition-all disabled:opacity-50"
-          >
-            <Send size={20} />
-          </button>
+        <div className="flex flex-col gap-3">
+          {uploading && (
+            <div className="flex items-center gap-2 text-[10px] font-bold text-primary uppercase tracking-widest animate-pulse px-2">
+              <RefreshCw size={12} className="animate-spin" />
+              Enviando mídia...
+            </div>
+          )}
+          
+          <div className="flex gap-2 items-center">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept="image/*,video/*,audio/*"
+              onChange={handleMediaUpload}
+            />
+            
+            <div className="flex gap-1">
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="p-3 text-on-surface/60 hover:text-primary transition-colors bg-gray-100 rounded-xl"
+                title="Enviar Foto ou Vídeo"
+              >
+                <Camera size={20} />
+              </button>
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="p-3 text-on-surface/60 hover:text-primary transition-colors bg-gray-100 rounded-xl"
+                title="Enviar Áudio"
+              >
+                <Mic size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 flex gap-2 bg-gray-100 p-1.5 rounded-2xl border border-gray-200 focus-within:border-primary/30 transition-colors">
+              <input 
+                type="text" 
+                value={newMessage}
+                onChange={e => setNewMessage(e.target.value)}
+                placeholder="Sua mensagem..."
+                className="flex-1 bg-transparent px-4 py-3 text-sm outline-none font-medium"
+                onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+              />
+              <button 
+                onClick={() => handleSendMessage()}
+                disabled={(!newMessage.trim() && !uploading) || uploading}
+                className="bg-primary text-white p-3 rounded-xl shadow-lg shadow-primary/20 active:scale-95 transition-all disabled:opacity-50"
+              >
+                <Send size={20} />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2039,6 +2210,7 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
   const [name, setName] = useState(creator.name);
   const [username, setUsername] = useState(creator.username);
   const [bio, setBio] = useState(creator.bio);
+  const [servicesBio, setServicesBio] = useState(creator.services_bio || '');
   const [welcomeAudio, setWelcomeAudio] = useState(creator.welcome_audio || '');
   const [avatar, setAvatar] = useState(creator.avatar);
   const [coverImage, setCoverImage] = useState(creator.cover_image || '');
@@ -2111,6 +2283,7 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
         name,
         username,
         bio,
+        services_bio: servicesBio,
         welcome_audio: welcomeAudio,
         avatar,
         cover_image: coverImage
@@ -2196,6 +2369,15 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
               className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm text-sm leading-relaxed min-h-[100px] resize-none font-medium text-on-surface/80" 
               value={bio}
               onChange={(e) => setBio(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Preços e Serviços</label>
+            <textarea 
+              className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm text-xs leading-relaxed min-h-[80px] resize-none font-medium text-on-surface/60" 
+              placeholder="Ex: Video Chamada R$ 50,00 | Conteúdo VIP R$ 30,00"
+              value={servicesBio}
+              onChange={(e) => setServicesBio(e.target.value)}
             />
           </div>
           <div className="space-y-1.5">
@@ -2768,7 +2950,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
   );
 };
 
-const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creator | null }) => {
+const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator: Creator | null, post?: Post | null }) => {
   const [selectedPlan, setSelectedPlan] = useState('monthly');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -2781,6 +2963,8 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
     { id: 'quarterly', name: 'Trimestral', price: 'R$ 79,90', description: 'Economize 15% - 90 dias', badge: 'Popular' },
     { id: 'yearly', name: 'Anual', price: 'R$ 249,90', description: 'Economize 30% - 365 dias', badge: 'Melhor Valor' },
   ];
+
+  const postPrice = post?.price || 'R$ 15,00';
 
   React.useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setCurrentUser(data.user));
@@ -2798,19 +2982,31 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
     if (!currentUser || !creator) return;
     setLoading(true);
     try {
-      const selectedPlanData = plans.find(p => p.id === selectedPlan);
-      const amount = parseFloat(selectedPlanData?.price.replace('R$ ', '').replace(',', '.') || '0');
+      let amount = 0;
+      let description = "";
+      let planId = selectedPlan;
+
+      if (post) {
+        amount = parseFloat(postPrice.replace('R$ ', '').replace(',', '.') || '0');
+        description = `Compra de Post - ${creator.name}`;
+        planId = `post_${post.id}`;
+      } else {
+        const selectedPlanData = plans.find(p => p.id === selectedPlan);
+        amount = parseFloat(selectedPlanData?.price.replace('R$ ', '').replace(',', '.') || '0');
+        description = `Assinatura ${selectedPlanData?.name} - ${creator.name}`;
+      }
 
       const response = await fetch('/api/payments/pix', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount,
-          description: `Assinatura ${selectedPlanData?.name} - ${creator.name}`,
+          description,
           payerEmail: currentUser.email,
           userId: currentUser.id,
           creatorId: creator.id,
-          planId: selectedPlan
+          planId,
+          postId: post?.id
         })
       });
 
@@ -2889,13 +3085,21 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
       <div className="p-6 max-w-2xl mx-auto w-full space-y-8 pb-24">
         <section className="text-center py-4">
           <div className="relative inline-block mb-4">
-            <img src={creator?.avatar} className="w-24 h-24 rounded-full border-4 border-white shadow-xl object-cover" referrerPolicy="no-referrer" />
+            {post ? (
+              <img src={post.image} className="w-32 h-32 rounded-2xl border-4 border-white shadow-xl object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              <img src={creator?.avatar} className="w-24 h-24 rounded-full border-4 border-white shadow-xl object-cover" referrerPolicy="no-referrer" />
+            )}
             <div className="absolute -bottom-1 -right-1 bg-primary text-white p-1.5 rounded-full border-2 border-white">
               <Lock size={14} fill="white" />
             </div>
           </div>
-          <h1 className="text-2xl font-black mb-1 uppercase tracking-tight">Assinar {creator?.name}</h1>
-          <p className="text-xs font-bold text-on-surface/40 uppercase tracking-widest">Escolha seu plano de acesso</p>
+          <h1 className="text-2xl font-black mb-1 uppercase tracking-tight">
+            {post ? 'Desbloquear Conteúdo' : `Assinar ${creator?.name}`}
+          </h1>
+          <p className="text-xs font-bold text-on-surface/40 uppercase tracking-widest">
+            {post ? `Acesso vitalício a este ${post.isVideo ? 'vídeo' : 'post'}` : 'Escolha seu plano de acesso'}
+          </p>
         </section>
 
         <div className="flex items-center justify-center gap-4 py-2">
@@ -2909,40 +3113,52 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
           </div>
         </div>
 
-        <div className="space-y-4">
-          {plans.map((plan) => (
-            <div 
-              key={plan.id}
-              onClick={() => {
-                setSelectedPlan(plan.id);
-                setPixData(null); // Reset pix data when changing plans
-              }}
-              className={`relative p-5 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between ${
-                selectedPlan === plan.id ? 'border-primary bg-primary/5 shadow-lg shadow-primary/5' : 'border-primary/5 bg-white'
-              }`}
-            >
-              {plan.badge && (
-                <span className="absolute -top-2.5 right-6 bg-primary text-white text-[8px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
-                  {plan.badge}
-                </span>
-              )}
-              <div className="flex items-center gap-4">
-                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                  selectedPlan === plan.id ? 'border-primary' : 'border-primary/20'
-                }`}>
-                  {selectedPlan === plan.id && <div className="w-3 h-3 bg-primary rounded-full" />}
+        {!post ? (
+          <div className="space-y-4">
+            {plans.map((plan) => (
+              <div 
+                key={plan.id}
+                onClick={() => {
+                  setSelectedPlan(plan.id);
+                  setPixData(null); // Reset pix data when changing plans
+                }}
+                className={`relative p-5 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between ${
+                  selectedPlan === plan.id ? 'border-primary bg-primary/5 shadow-lg shadow-primary/5' : 'border-primary/5 bg-white'
+                }`}
+              >
+                {plan.badge && (
+                  <span className="absolute -top-2.5 right-6 bg-primary text-white text-[8px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
+                    {plan.badge}
+                  </span>
+                )}
+                <div className="flex items-center gap-4">
+                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                    selectedPlan === plan.id ? 'border-primary' : 'border-primary/20'
+                  }`}>
+                    {selectedPlan === plan.id && <div className="w-3 h-3 bg-primary rounded-full" />}
+                  </div>
+                  <div>
+                    <h3 className="font-black text-sm uppercase tracking-tight">{plan.name}</h3>
+                    <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">{plan.description}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-black text-sm uppercase tracking-tight">{plan.name}</h3>
-                  <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">{plan.description}</p>
+                <div className="text-right">
+                  <span className="block font-black text-primary text-lg">{plan.price}</span>
                 </div>
               </div>
-              <div className="text-right">
-                <span className="block font-black text-primary text-lg">{plan.price}</span>
-              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-6 rounded-3xl bg-white border-2 border-primary shadow-lg shadow-primary/5 flex items-center justify-between">
+            <div>
+              <h3 className="font-black text-lg uppercase tracking-tight">Acesso Único</h3>
+              <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">Este post será desbloqueado para sempre</p>
             </div>
-          ))}
-        </div>
+            <div className="text-right">
+              <span className="block font-black text-primary text-2xl">{postPrice}</span>
+            </div>
+          </div>
+        )}
 
         <div className="bg-white p-8 rounded-3xl border border-primary/5 shadow-sm space-y-8 text-center mt-6">
           <div className="flex flex-col items-center">
@@ -3070,6 +3286,7 @@ export default function App() {
   const [dbStatus, setDbStatus] = React.useState<'checking' | 'connected' | 'error'>('checking');
   const [editingPost, setEditingPost] = React.useState<Post | null>(null);
   const [userEmail, setUserEmail] = React.useState<string | null>(null);
+  const [selectedPostForPayment, setSelectedPostForPayment] = React.useState<Post | null>(null);
 
   const isMaster = userEmail === MASTER_EMAIL;
 
@@ -3134,11 +3351,12 @@ export default function App() {
       // Fetch user's active payments
       const { data: userPayments } = await supabase
         .from('payments')
-        .select('creator_id')
+        .select('creator_id, post_id')
         .eq('user_id', user.id)
         .eq('status', 'approved');
 
-      const subscribedCreatorIds = new Set(userPayments?.map(p => p.creator_id) || []);
+      const subscribedCreatorIds = new Set(userPayments?.filter(p => !p.post_id).map(p => p.creator_id) || []);
+      const purchasedPostIds = new Set(userPayments?.filter(p => p.post_id).map(p => p.post_id) || []);
 
       // Fetch posts
       // Try to find master profile by email. If it fails, masterId will be undefined and we show all posts.
@@ -3200,7 +3418,7 @@ export default function App() {
         setPosts(filteredPosts.map((p: any) => ({
           ...p,
           isLocked: p.is_locked,
-          hasAccess: p.creator_id === user.id ? true : (subscribedCreatorIds.has(p.creator_id) ? true : !p.is_locked),
+          hasAccess: p.creator_id === user.id ? true : (subscribedCreatorIds.has(p.creator_id) || purchasedPostIds.has(p.id) ? true : !p.is_locked),
           isVideo: p.is_video,
           likesCount: p.post_likes?.length || 0,
           commentsCount: p.post_comments?.length || 0,
@@ -3402,10 +3620,17 @@ export default function App() {
           if (!otherPerson) return;
           
           if (!conversationsMap.has(otherPerson.id)) {
+            let lastMsgText = m.content;
+            if (!lastMsgText && m.media_url) {
+              if (m.media_type === 'image') lastMsgText = '📷 Foto';
+              else if (m.media_type === 'video') lastMsgText = '🎥 Vídeo';
+              else if (m.media_type === 'audio') lastMsgText = '🎤 Áudio';
+            }
+
             conversationsMap.set(otherPerson.id, {
               id: m.id,
               user: otherPerson,
-              lastMessage: m.content,
+              lastMessage: lastMsgText,
               time: formatRelativeTime(m.created_at),
               unreadCount: m.sender_id !== user.id && !m.is_read ? 1 : 0,
               created_at: m.created_at,
@@ -3509,8 +3734,9 @@ export default function App() {
     }
   };
 
-  const handleSubscribe = (targetCreator: Creator) => {
+  const handleSubscribe = (targetCreator: Creator, post?: Post) => {
     setPublicCreator(targetCreator);
+    setSelectedPostForPayment(post || null);
     if (isLoggedIn) {
       setScreen('payment');
     } else {
@@ -3708,14 +3934,16 @@ export default function App() {
         if (profile) {
           setPublicCreator(profile as any);
           let subscribedCreatorIds = new Set();
+          let purchasedPostIds = new Set();
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
              const { data: userPayments } = await supabase
               .from('payments')
-              .select('creator_id')
+              .select('creator_id, post_id')
               .eq('user_id', session.user.id)
               .eq('status', 'approved');
-             subscribedCreatorIds = new Set(userPayments?.map(p => p.creator_id) || []);
+             subscribedCreatorIds = new Set(userPayments?.filter(p => !p.post_id).map(p => p.creator_id) || []);
+             purchasedPostIds = new Set(userPayments?.filter(p => p.post_id).map(p => p.post_id) || []);
           }
 
           const { data: posts, error: postsError } = await supabase.from('posts').select('*, creator:profiles(*), post_likes(user_id), post_comments(id)').eq('creator_id', profile.id).order('created_at', { ascending: false });
@@ -3727,7 +3955,7 @@ export default function App() {
               setPublicPosts(fallbackPosts.map((p: any) => ({
                 ...p,
                 isLocked: p.is_locked,
-                hasAccess: session?.user?.id === p.creator_id ? true : (subscribedCreatorIds.has(p.creator_id) ? true : !p.is_locked),
+                hasAccess: session?.user?.id === p.creator_id ? true : (subscribedCreatorIds.has(p.creator_id) || purchasedPostIds.has(p.id) ? true : !p.is_locked),
                 isVideo: p.is_video,
                 likesCount: 0,
                 commentsCount: 0,
@@ -3738,7 +3966,7 @@ export default function App() {
             setPublicPosts(posts.map((p: any) => ({
               ...p,
               isLocked: p.is_locked,
-              hasAccess: session?.user?.id === p.creator_id ? true : (subscribedCreatorIds.has(p.creator_id) ? true : !p.is_locked),
+              hasAccess: session?.user?.id === p.creator_id ? true : (subscribedCreatorIds.has(p.creator_id) || purchasedPostIds.has(p.id) ? true : !p.is_locked),
               isVideo: p.is_video,
               likesCount: p.post_likes?.length || 0,
               commentsCount: p.post_comments?.length || 0,
@@ -3815,7 +4043,7 @@ export default function App() {
           posts={posts}
           onDeletePost={handleDeletePost}
           onUpdatePost={handleUpdatePost}
-          onSubscribe={() => handleSubscribe(creator)}
+          onSubscribe={(post) => handleSubscribe(creator, post)}
           stories={stories}
           onDeleteStory={handleDeleteStory}
           isMaster={isMaster}
@@ -3829,7 +4057,7 @@ export default function App() {
             creator={publicCreator} 
             posts={publicPosts} 
             stories={stories}
-            onSubscribe={() => handleSubscribe(publicCreator)} 
+            onSubscribe={(post) => handleSubscribe(publicCreator, post)} 
             onLikePost={handleLikePost}
             onCommentPost={handleCommentPost}
             isLoggedIn={isLoggedIn}
@@ -3862,7 +4090,7 @@ export default function App() {
       case 'subscriptions': return <ScreenSubscriptions onBack={() => setScreen('feed')} />;
       case 'edit-profile': return <ScreenEditProfile onBack={() => setScreen('profile')} creator={creator} onProfileUpdated={() => setRefreshKey(prev => prev + 1)} />;
       case 'create-post': return <ScreenCreatePost onBack={() => setScreen('feed')} onPostCreated={() => { setRefreshKey(prev => prev + 1); setScreen('feed'); }} />;
-      case 'payment': return <ScreenPayment onBack={() => setScreen('feed')} creator={publicCreator || creator} />;
+      case 'payment': return <ScreenPayment onBack={() => setScreen('feed')} creator={publicCreator || creator} post={selectedPostForPayment} />;
       default: return (
         <ScreenFeed 
           posts={posts} 
