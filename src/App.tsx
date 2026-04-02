@@ -40,6 +40,7 @@ import {
   Copy,
   RefreshCw,
   Mic,
+  Trash2,
   Image as ImageIcon,
   Video as VideoIcon
 } from 'lucide-react';
@@ -1830,6 +1831,11 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const audioChunksRef = React.useRef<Blob[]>([]);
+  const timerRef = React.useRef<any>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [mediaType, setMediaType] = useState<'image' | 'video' | 'audio' | null>(null);
@@ -1930,18 +1936,33 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
     }
   };
 
-  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !currentUser) return;
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement> | Blob) => {
+    let file: File | Blob;
+    let fileName: string;
+    let fileType: string;
+
+    if (e instanceof Blob) {
+      file = e;
+      fileName = `${Math.random()}.webm`;
+      fileType = e.type;
+    } else {
+      const selectedFile = e.target.files?.[0];
+      if (!selectedFile) return;
+      file = selectedFile;
+      fileName = selectedFile.name;
+      fileType = selectedFile.type;
+    }
+
+    if (!currentUser) return;
 
     setUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `chat/${currentUser.id}/${fileName}`;
+      const fileExt = fileName.split('.').pop();
+      const finalFileName = `${Math.random()}.${fileExt}`;
+      const filePath = `chat/${currentUser.id}/${finalFileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('posts') // Reusing 'posts' bucket or you can create 'chat' bucket
+        .from('posts')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
@@ -1949,16 +1970,72 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
       const { data } = supabase.storage.from('posts').getPublicUrl(filePath);
       
       let type: 'image' | 'video' | 'audio' = 'image';
-      if (file.type.startsWith('video/')) type = 'video';
-      else if (file.type.startsWith('audio/')) type = 'audio';
+      if (fileType.startsWith('video/')) type = 'video';
+      else if (fileType.startsWith('audio/')) type = 'audio';
 
       await handleSendMessage(data.publicUrl, type);
     } catch (err: any) {
       alert(`Erro no upload: ${err.message}`);
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (!(e instanceof Blob) && fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        if (audioChunksRef.current.length > 0) {
+          await handleMediaUpload(audioBlob);
+        }
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+      timerRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error('Error accessing microphone:', err);
+      alert('Não foi possível acessar o microfone.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      clearInterval(timerRef.current);
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      audioChunksRef.current = [];
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      clearInterval(timerRef.current);
+    }
+  };
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -2033,7 +2110,7 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
             </div>
           )}
           
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center min-h-[56px]">
             <input 
               type="file" 
               ref={fileInputRef} 
@@ -2042,40 +2119,69 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
               onChange={handleMediaUpload}
             />
             
-            <div className="flex gap-1">
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="p-3 text-on-surface/60 hover:text-primary transition-colors bg-gray-100 rounded-xl"
-                title="Enviar Foto ou Vídeo"
-              >
-                <Camera size={20} />
-              </button>
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="p-3 text-on-surface/60 hover:text-primary transition-colors bg-gray-100 rounded-xl"
-                title="Enviar Áudio"
-              >
-                <Mic size={20} />
-              </button>
-            </div>
+            {!isRecording ? (
+              <>
+                <div className="flex gap-1">
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-3 text-on-surface/60 hover:text-primary transition-colors bg-gray-100 rounded-xl"
+                    title="Enviar Foto ou Vídeo"
+                  >
+                    <Camera size={20} />
+                  </button>
+                  <button 
+                    onClick={startRecording}
+                    className="p-3 text-on-surface/60 hover:text-primary transition-colors bg-gray-100 rounded-xl"
+                    title="Gravar Áudio"
+                  >
+                    <Mic size={20} />
+                  </button>
+                </div>
 
-            <div className="flex-1 flex gap-2 bg-gray-100 p-1.5 rounded-2xl border border-gray-200 focus-within:border-primary/30 transition-colors">
-              <input 
-                type="text" 
-                value={newMessage}
-                onChange={e => setNewMessage(e.target.value)}
-                placeholder="Sua mensagem..."
-                className="flex-1 bg-transparent px-4 py-3 text-sm outline-none font-medium"
-                onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
-              />
-              <button 
-                onClick={() => handleSendMessage()}
-                disabled={(!newMessage.trim() && !uploading) || uploading}
-                className="bg-primary text-white p-3 rounded-xl shadow-lg shadow-primary/20 active:scale-95 transition-all disabled:opacity-50"
-              >
-                <Send size={20} />
-              </button>
-            </div>
+                <div className="flex-1 flex gap-2 bg-gray-100 p-1 rounded-2xl border border-gray-200 focus-within:border-primary/30 transition-colors items-center">
+                  <input 
+                    type="text" 
+                    value={newMessage}
+                    onChange={e => setNewMessage(e.target.value)}
+                    placeholder="Sua mensagem..."
+                    className="flex-1 bg-transparent px-3 py-2 text-sm outline-none font-medium"
+                    onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+                  />
+                  <button 
+                    onClick={() => handleSendMessage()}
+                    disabled={(!newMessage.trim() && !uploading) || uploading}
+                    className="bg-primary text-white p-2.5 rounded-xl shadow-lg shadow-primary/20 active:scale-95 transition-all disabled:opacity-50 flex-shrink-0"
+                  >
+                    <Send size={18} />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center gap-3 bg-primary/5 p-2 rounded-2xl border border-primary/20 animate-in slide-in-from-bottom-2">
+                <div className="flex items-center gap-2 px-2 flex-1">
+                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                  <span className="text-xs font-bold text-primary tabular-nums">
+                    Gravando: {formatDuration(recordingDuration)}
+                  </span>
+                </div>
+                <div className="flex gap-1">
+                  <button 
+                    onClick={cancelRecording}
+                    className="p-2.5 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                    title="Cancelar"
+                  >
+                    <Trash2 size={20} />
+                  </button>
+                  <button 
+                    onClick={stopRecording}
+                    className="p-2.5 bg-primary text-white rounded-xl shadow-lg shadow-primary/20 active:scale-95 transition-all"
+                    title="Enviar Áudio"
+                  >
+                    <Send size={20} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
