@@ -518,7 +518,8 @@ const FullScreenPostModal = ({
   onEdit, 
   currentUserId,
   onLike,
-  onComment
+  onComment,
+  onForward
 }: { 
   post: Post | null, 
   onClose: () => void, 
@@ -526,7 +527,8 @@ const FullScreenPostModal = ({
   onEdit?: (post: Post) => void,
   currentUserId?: string,
   onLike?: (id: string, isLiked: boolean) => void,
-  onComment?: (id: string, content: string) => void
+  onComment?: (id: string, content: string) => void,
+  onForward?: (post: Post) => void
 }) => {
   const isOwner = post?.creator.id === currentUserId;
   const [comments, setComments] = React.useState<Comment[]>([]);
@@ -707,6 +709,12 @@ const FullScreenPostModal = ({
                 >
                   <MessageCircle size={24} />
                   <span className="text-sm font-bold">{post.commentsCount || 0}</span>
+                </button>
+                <button 
+                  onClick={() => onForward && onForward(post)}
+                  className="flex items-center gap-2 text-white hover:text-primary transition-colors"
+                >
+                  <Send size={24} />
                 </button>
               </div>
             </div>
@@ -965,18 +973,25 @@ const ForwardModal = ({
           .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
 
         const contactMap = new Map<string, Creator>();
+        console.log('Fetched messages for contacts:', messages?.length);
         messages?.forEach((m: any) => {
           const other = m.sender_id === user.id ? m.receiver : m.sender;
-          if (other) contactMap.set(other.id, other as any);
+          if (other) {
+            console.log('Adding contact from message:', other.name);
+            contactMap.set(other.id, other as any);
+          }
         });
 
         // Also add the Master if not already there
         const { data: masterProfile } = await supabase.from('profiles').select('*').eq('email', MASTER_EMAIL).single();
         if (masterProfile && masterProfile.id !== user.id) {
+          console.log('Adding master profile to contacts');
           contactMap.set(masterProfile.id, masterProfile as any);
         }
 
-        setContacts(Array.from(contactMap.values()));
+        const allContacts = Array.from(contactMap.values());
+        console.log('Total contacts found for forwarding:', allContacts.length);
+        setContacts(allContacts);
       } catch (err) {
         console.error('Error fetching contacts for forward:', err);
       } finally {
@@ -1082,7 +1097,6 @@ const ScreenFeed = ({
 }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
-  const [forwardingPost, setForwardingPost] = React.useState<Post | null>(null);
   const [editingPost, setEditingPost] = React.useState<Post | null>(null);
   const [activeStoryIndex, setActiveStoryIndex] = React.useState<number | null>(null);
   const [showPostMenu, setShowPostMenu] = React.useState<string | null>(null);
@@ -1098,6 +1112,7 @@ const ScreenFeed = ({
         currentUserId={creator.id}
         onLike={onLikePost}
         onComment={onCommentPost}
+        onForward={onForwardPost}
       />
       {editingPost && <EditPostModal post={editingPost} onSave={onUpdatePost} onClose={() => setEditingPost(null)} />}
       {activeStoryIndex !== null && (
@@ -1471,7 +1486,8 @@ const ScreenProfile = ({
   isMaster,
   onLikePost,
   onCommentPost,
-  onMessage
+  onMessage,
+  onForwardPost
 }: { 
   onEdit: () => void, 
   creator: Creator, 
@@ -1485,7 +1501,8 @@ const ScreenProfile = ({
   isMaster: boolean,
   onLikePost?: (id: string, isLiked: boolean) => void,
   onCommentPost?: (id: string, content: string) => void,
-  onMessage?: (creator: Creator) => void
+  onMessage?: (creator: Creator) => void,
+  onForwardPost?: (post: Post) => void
 }) => {
   const [activeTab, setActiveTab] = React.useState<'all' | 'exclusive'>('all');
   const myPosts = posts.filter(p => p.creator?.id === creator?.id).filter(p => activeTab === 'all' ? true : p.isLocked);
@@ -1505,6 +1522,7 @@ const ScreenProfile = ({
         currentUserId={creator?.id}
         onLike={onLikePost}
         onComment={onCommentPost}
+        onForward={onForwardPost}
       />
       {editingPost && <EditPostModal post={editingPost} onSave={onUpdatePost} onClose={() => setEditingPost(null)} />}
       {activeStoryIndex !== null && (
@@ -1730,7 +1748,8 @@ const ScreenPublicProfile = ({
   onLikePost, 
   onCommentPost,
   onMessage,
-  isLoggedIn
+  isLoggedIn,
+  onForwardPost
 }: { 
   creator: Creator, 
   posts: Post[], 
@@ -1739,7 +1758,8 @@ const ScreenPublicProfile = ({
   onLikePost?: (id: string, isLiked: boolean) => void, 
   onCommentPost?: (id: string, content: string) => void,
   onMessage?: (creator: Creator) => void,
-  isLoggedIn: boolean
+  isLoggedIn: boolean,
+  onForwardPost?: (post: Post) => void
 }) => {
   const [activeTab, setActiveTab] = React.useState<'all' | 'exclusive'>('all');
   const myPosts = posts.filter(p => p.creator.id === creator.id).filter(p => activeTab === 'all' ? true : p.isLocked);
@@ -1806,6 +1826,7 @@ const ScreenPublicProfile = ({
         onClose={() => setSelectedPost(null)} 
         onLike={onLikePost}
         onComment={onCommentPost}
+        onForward={onForwardPost}
       />
       {activeStoryIndex !== null && (
         <StoryViewer 
@@ -3973,34 +3994,50 @@ export default function App() {
   const [forwardingPost, setForwardingPost] = React.useState<Post | null>(null);
 
   const handleForwardPost = async (post: Post, recipient: Creator) => {
+    console.log('handleForwardPost called', { post, recipient });
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.error('No user found in handleForwardPost');
+        return;
+      }
 
+      console.log('Inserting message for forward...');
+      const creatorName = post.creator?.name || 'Criador';
       const { error } = await supabase.from('messages').insert({
         sender_id: user.id,
         receiver_id: recipient.id,
-        content: `Encaminhou uma publicação de ${post.creator.name}`,
+        content: `Encaminhou uma publicação de ${creatorName}`,
         media_url: post.image,
         media_type: post.isVideo ? 'video' : 'image'
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error inserting message:', error);
+        throw error;
+      }
+
+      console.log('Message inserted successfully');
 
       // Create notification for the receiver
-      await supabase.from('notifications').insert({
+      const { error: notifError } = await supabase.from('notifications').insert({
         user_id: recipient.id,
         type: 'message',
         content: `encaminhou uma publicação para você`,
         created_at: new Date().toISOString()
       });
 
+      if (notifError) {
+        console.warn('Error creating notification (non-fatal):', notifError);
+      }
+
+      console.log('Navigating to chat with recipient:', recipient.id);
       setSelectedRecipient(recipient);
       setScreen('chat');
       setForwardingPost(null);
     } catch (err) {
       console.error('Error forwarding post:', err);
-      alert('Erro ao encaminhar publicação.');
+      alert('Erro ao encaminhar publicação. Verifique sua conexão.');
     }
   };
 
@@ -4834,6 +4871,10 @@ export default function App() {
             setSelectedRecipient(c);
             setScreen('chat');
           }}
+          onForwardPost={(post) => {
+            console.log('Forwarding post from profile:', post);
+            setForwardingPost(post);
+          }}
         />
       ) : null;
       case 'public-profile': 
@@ -4850,6 +4891,10 @@ export default function App() {
               setScreen('chat');
             }}
             isLoggedIn={isLoggedIn}
+            onForwardPost={(post) => {
+              console.log('Forwarding post from public profile:', post);
+              setForwardingPost(post);
+            }}
           />
         ) : (
           <ScreenFeed 
@@ -4865,7 +4910,10 @@ export default function App() {
             onLikePost={handleLikePost}
             onCommentPost={handleCommentPost}
             onViewProfile={handleViewProfile}
-            onForwardPost={(post) => setForwardingPost(post)}
+            onForwardPost={(post) => {
+              console.log('Forwarding post from feed (else):', post);
+              setForwardingPost(post);
+            }}
           />
         );
       case 'activity': 
@@ -4898,7 +4946,10 @@ export default function App() {
           onLikePost={handleLikePost}
           onCommentPost={handleCommentPost}
           onViewProfile={handleViewProfile}
-          onForwardPost={(post) => setForwardingPost(post)}
+          onForwardPost={(post) => {
+            console.log('Forwarding post from feed (default):', post);
+            setForwardingPost(post);
+          }}
         />
       );
     }
