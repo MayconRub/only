@@ -3304,13 +3304,13 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12 bg-background">
+    <div className="min-h-screen flex flex-col items-center justify-start px-8 pt-0 pb-12 bg-background">
       <div className="w-full max-w-md space-y-2">
         <div className="flex flex-col items-center space-y-0">
           <img 
             src={LOGIN_LOGO_URL} 
             alt="Logo" 
-            className="h-48 w-auto object-contain mb-0" 
+            className="h-32 w-auto object-contain mb-0" 
             referrerPolicy="no-referrer"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
@@ -3472,13 +3472,13 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12 bg-background">
+    <div className="min-h-screen flex flex-col items-center justify-start px-8 pt-0 pb-12 bg-background">
       <div className="w-full max-w-md space-y-2">
         <div className="flex flex-col items-center space-y-0">
           <img 
             src={LOGIN_LOGO_URL} 
             alt="Logo" 
-            className="h-48 w-auto object-contain mb-0" 
+            className="h-32 w-auto object-contain mb-0" 
             referrerPolicy="no-referrer"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
@@ -4655,7 +4655,13 @@ export default function App() {
     };
     checkConnection();
     // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error('Session check error:', error);
+        if (error.message.includes('Refresh Token Not Found')) {
+          supabase.auth.signOut();
+        }
+      }
       if (session) {
         setIsLoggedIn(true);
         setUserEmail(session.user.email || null);
@@ -4672,7 +4678,14 @@ export default function App() {
     });
 
     // Listen for changes on auth state
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setIsLoggedIn(false);
+        setScreen('login');
+        setLoading(false);
+        return;
+      }
+
       if (session) {
         // Check if profile exists for OAuth users
         const { data: profiles } = await supabase.from('profiles').select('id').eq('id', session.user.id);
@@ -4719,7 +4732,13 @@ export default function App() {
           setPublicCreator(profile as any);
           let subscribedCreatorIds = new Set();
           let purchasedPostIds = new Set();
-          const { data: { session } } = await supabase.auth.getSession();
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          if (sessionError) {
+            console.error('Public profile session check error:', sessionError);
+            if (sessionError.message.includes('Refresh Token Not Found')) {
+              supabase.auth.signOut();
+            }
+          }
           if (session?.user) {
              const { data: userPayments } = await supabase
               .from('payments')
