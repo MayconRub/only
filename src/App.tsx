@@ -3164,12 +3164,12 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12 bg-background">
-      <div className="w-full max-w-md space-y-12">
-        <div className="flex flex-col items-center space-y-6">
+      <div className="w-full max-w-md space-y-2">
+        <div className="flex flex-col items-center space-y-0">
           <img 
             src={LOGIN_LOGO_URL} 
             alt="Logo" 
-            className="h-48 w-auto object-contain mb-2" 
+            className="h-48 w-auto object-contain mb-0" 
             referrerPolicy="no-referrer"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
@@ -3182,8 +3182,8 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
               }
             }}
           />
-          <div className="text-center space-y-6 w-full">
-            <p className="text-on-surface/60 text-base font-bold max-w-[280px] mx-auto">Assine, interaja e conecte-se com acompanhantes e criadores em um clique.</p>
+          <div className="text-center w-full">
+            <p className="text-on-surface/60 text-sm font-bold max-w-[280px] mx-auto">Assine, interaja e conecte-se com acompanhantes e criadores em um clique.</p>
           </div>
         </div>
 
@@ -3332,12 +3332,12 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12 bg-background">
-      <div className="w-full max-w-md space-y-10">
-        <div className="flex flex-col items-center space-y-6">
+      <div className="w-full max-w-md space-y-2">
+        <div className="flex flex-col items-center space-y-0">
           <img 
             src={LOGIN_LOGO_URL} 
             alt="Logo" 
-            className="h-48 w-auto object-contain mb-2" 
+            className="h-48 w-auto object-contain mb-0" 
             referrerPolicy="no-referrer"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
@@ -3350,10 +3350,10 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
               }
             }}
           />
-          <div className="text-center space-y-6 w-full">
-            <div className="space-y-2">
-              <h1 className="text-5xl font-black tracking-tight leading-none text-on-surface">Criar Conta.</h1>
-              <p className="text-on-surface/60 text-base font-bold max-w-[280px] mx-auto">Assine, interaja e conecte-se com acompanhantes e criadores em um clique.</p>
+          <div className="text-center w-full">
+            <div className="space-y-0">
+              <h1 className="text-4xl font-black tracking-tight leading-none text-on-surface">Criar Conta</h1>
+              <p className="text-on-surface/60 text-sm font-bold max-w-[280px] mx-auto">Assine, interaja e conecte-se com acompanhantes e criadores em um clique.</p>
             </div>
 
             <div className="bg-primary/5 rounded-3xl p-6 space-y-4 border border-primary/10 text-left">
@@ -3446,8 +3446,8 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
 
           <div className="flex items-start gap-3 px-1">
             <input type="checkbox" className="mt-1 w-4 h-4 rounded border-primary/20 text-primary focus:ring-primary/20" required />
-            <p className="text-[10px] font-bold text-on-surface/60 leading-relaxed">
-              Eu aceito os <span className="text-primary underline">Termos de Serviço</span> e a <span className="text-primary underline">Política de Privacidade</span>.
+            <p className="text-[9px] font-bold text-on-surface/60 leading-relaxed">
+              Eu aceito os <span className="text-primary underline">Termos de Serviço</span> e a <span className="text-primary underline">Política de Privacidade</span>
             </p>
           </div>
 
