@@ -51,7 +51,7 @@ import { supabase } from './lib/supabase';
 
 // --- Constants ---
 
-const LOGO_URL = `${(import.meta as any).env.VITE_SUPABASE_URL}/storage/v1/object/public/avatars/logo.png`;
+const LOGO_URL = `${(import.meta as any).env.VITE_SUPABASE_URL}/storage/v1/object/public/avatars/scren.png`;
 
 // --- Mock Data ---
 
@@ -2928,7 +2928,7 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
           <img 
             src={LOGO_URL} 
             alt="Logo" 
-            className="h-20 w-auto object-contain mb-2" 
+            className="h-48 w-auto object-contain mb-2" 
             referrerPolicy="no-referrer"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
@@ -2941,8 +2941,8 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
               }
             }}
           />
-          <div className="text-center space-y-2">
-            <p className="text-on-surface/60 text-base font-bold max-w-[280px] mx-auto">Acesse sua galeria digital e gerencie seu legado.</p>
+          <div className="text-center space-y-6 w-full">
+            <p className="text-on-surface/60 text-base font-bold max-w-[280px] mx-auto">Assine, interaja e conecte-se com acompanhantes e criadores em um clique.</p>
           </div>
         </div>
 
@@ -3100,7 +3100,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
           <img 
             src={LOGO_URL} 
             alt="Logo" 
-            className="h-20 w-auto object-contain mb-2" 
+            className="h-48 w-auto object-contain mb-2" 
             referrerPolicy="no-referrer"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
@@ -3113,9 +3113,32 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
               }
             }}
           />
-          <div className="text-center space-y-2">
-            <h1 className="text-5xl font-black tracking-tight leading-none text-on-surface">Criar Conta.</h1>
-            <p className="text-on-surface/60 text-base font-bold max-w-[280px] mx-auto">Junte-se à elite dos criadores digitais.</p>
+          <div className="text-center space-y-6 w-full">
+            <div className="space-y-2">
+              <h1 className="text-5xl font-black tracking-tight leading-none text-on-surface">Criar Conta.</h1>
+              <p className="text-on-surface/60 text-base font-bold max-w-[280px] mx-auto">Assine, interaja e conecte-se com acompanhantes e criadores em um clique.</p>
+            </div>
+
+            <div className="bg-primary/5 rounded-3xl p-6 space-y-4 border border-primary/10 text-left">
+              <div className="flex items-center gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <Check size={14} className="text-primary" />
+                </div>
+                <span className="text-[11px] font-black text-on-surface/80 uppercase tracking-tight">Acesso total ao conteúdo deste usuário</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <Check size={14} className="text-primary" />
+                </div>
+                <span className="text-[11px] font-black text-on-surface/80 uppercase tracking-tight">Mensagem direta com este usuário</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <Check size={14} className="text-primary" />
+                </div>
+                <span className="text-[11px] font-black text-on-surface/80 uppercase tracking-tight">Cancele sua assinatura a qualquer momento</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -3545,6 +3568,7 @@ export default function App() {
   const [editingPost, setEditingPost] = React.useState<Post | null>(null);
   const [userEmail, setUserEmail] = React.useState<string | null>(null);
   const [selectedPostForPayment, setSelectedPostForPayment] = React.useState<Post | null>(null);
+  const [selectedRecipient, setSelectedRecipient] = React.useState<Creator | null>(null);
 
   const isMaster = userEmail === MASTER_EMAIL;
 
@@ -4372,6 +4396,7 @@ export default function App() {
       case 'edit-profile': return <ScreenEditProfile onBack={() => setScreen('profile')} creator={creator} onProfileUpdated={() => setRefreshKey(prev => prev + 1)} />;
       case 'create-post': return <ScreenCreatePost onBack={() => setScreen('feed')} onPostCreated={() => { setRefreshKey(prev => prev + 1); setScreen('feed'); }} />;
       case 'payment': return <ScreenPayment onBack={() => setScreen('feed')} creator={publicCreator || creator} post={selectedPostForPayment} />;
+      case 'chat': return selectedRecipient ? <ChatView recipient={selectedRecipient} onBack={() => setScreen('messages')} /> : null;
       default: return (
         <ScreenFeed 
           posts={posts} 

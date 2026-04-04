@@ -1,4 +1,4 @@
-export type Screen = 'feed' | 'profile' | 'activity' | 'messages' | 'login' | 'register' | 'edit-profile' | 'create-post' | 'public-profile' | 'payment' | 'wallet' | 'subscriptions';
+export type Screen = 'feed' | 'profile' | 'activity' | 'messages' | 'login' | 'register' | 'edit-profile' | 'create-post' | 'public-profile' | 'payment' | 'wallet' | 'subscriptions' | 'chat';
 
 export interface Creator {
   id: string;
