@@ -1177,26 +1177,51 @@ const ScreenFeed = ({
 const WelcomeAudioPlayer = ({ audioUrl }: { audioUrl: string }) => {
   const [isPlaying, setIsPlaying] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
+  const [duration, setDuration] = React.useState(0);
+  const [currentTime, setCurrentTime] = React.useState(0);
   const audioRef = React.useRef<HTMLAudioElement>(null);
 
-  const togglePlay = () => {
+  const formatTime = (time: number) => {
+    if (isNaN(time)) return "00:00";
+    const mins = Math.floor(time / 60);
+    const secs = Math.floor(time % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const togglePlay = async () => {
     if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current.play();
+      try {
+        if (isPlaying) {
+          audioRef.current.pause();
+          setIsPlaying(false);
+        } else {
+          if (audioRef.current.readyState < 2) {
+            audioRef.current.load();
+          }
+          await audioRef.current.play();
+          setIsPlaying(true);
+        }
+      } catch (err) {
+        console.error('Welcome audio playback failed:', err);
+        setIsPlaying(false);
       }
-      setIsPlaying(!isPlaying);
     }
   };
 
   const handleTimeUpdate = () => {
     if (audioRef.current) {
       const current = audioRef.current.currentTime;
-      const duration = audioRef.current.duration;
-      if (duration > 0) {
-        setProgress((current / duration) * 100);
+      const dur = audioRef.current.duration;
+      setCurrentTime(current);
+      if (dur > 0) {
+        setProgress((current / dur) * 100);
       }
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setDuration(audioRef.current.duration);
     }
   };
 
@@ -1212,6 +1237,10 @@ const WelcomeAudioPlayer = ({ audioUrl }: { audioUrl: string }) => {
         src={audioUrl} 
         onTimeUpdate={handleTimeUpdate}
         onEnded={handleEnded}
+        onLoadedMetadata={handleLoadedMetadata}
+        preload="metadata"
+        playsInline
+        crossOrigin="anonymous"
       />
       <button 
         onClick={togglePlay}
@@ -1221,8 +1250,12 @@ const WelcomeAudioPlayer = ({ audioUrl }: { audioUrl: string }) => {
       </button>
       <div className="flex-1">
         <div className="flex justify-between items-center mb-1">
-          <span className="text-xs font-black uppercase tracking-widest text-primary">Boas-vindas</span>
-          <Volume2 size={14} className="text-primary/60" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-primary">Boas-vindas</span>
+          <div className="flex items-center gap-2 text-[10px] font-bold text-primary/60">
+            <span>{formatTime(currentTime)}</span>
+            <span>/</span>
+            <span>{formatTime(duration)}</span>
+          </div>
         </div>
         <div className="h-2 bg-primary/10 rounded-full overflow-hidden">
           <div 
@@ -1864,12 +1897,18 @@ const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
       try {
         if (isPlaying) {
           audioRef.current.pause();
+          setIsPlaying(false);
         } else {
+          // On mobile, sometimes we need to explicitly call load() if it's not ready
+          if (audioRef.current.readyState < 2) {
+            audioRef.current.load();
+          }
           await audioRef.current.play();
+          setIsPlaying(true);
         }
-        setIsPlaying(!isPlaying);
       } catch (err) {
         console.error('Audio playback failed:', err);
+        setIsPlaying(false);
       }
     }
   };
@@ -1896,9 +1935,10 @@ const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
   };
 
   const formatTime = (time: number) => {
+    if (isNaN(time)) return "00:00";
     const mins = Math.floor(time / 60);
     const secs = Math.floor(time % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1918,16 +1958,16 @@ const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
         onTimeUpdate={onTimeUpdate}
         onEnded={onEnded}
         onCanPlay={onCanPlay}
-        preload="auto"
+        preload="metadata"
         playsInline
+        crossOrigin="anonymous"
       />
       
       <button 
         onClick={togglePlay}
-        disabled={!isReady}
         className={`w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all active:scale-90 shadow-sm ${
           isMe ? 'bg-white text-primary' : 'bg-primary text-white'
-        } ${!isReady ? 'opacity-50' : ''}`}
+        }`}
       >
         {isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} className="ml-0.5" fill="currentColor" />}
       </button>
@@ -1961,8 +2001,8 @@ const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
           onChange={handleProgressChange}
           className="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer"
         />
-        <div className={`flex justify-between text-[8px] sm:text-[9px] font-black uppercase tracking-tighter ${
-          isMe ? 'text-white/80' : 'text-on-surface/60'
+        <div className={`flex justify-between text-[10px] sm:text-[11px] font-black uppercase tracking-tighter mt-0.5 ${
+          isMe ? 'text-white' : 'text-on-surface/80'
         }`}>
           <span>{formatTime(currentTime)}</span>
           <span>{formatTime(duration)}</span>
