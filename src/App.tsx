@@ -1195,9 +1195,7 @@ const WelcomeAudioPlayer = ({ audioUrl }: { audioUrl: string }) => {
           audioRef.current.pause();
           setIsPlaying(false);
         } else {
-          if (audioRef.current.readyState < 2) {
-            audioRef.current.load();
-          }
+          // On mobile, we should just call play() directly
           await audioRef.current.play();
           setIsPlaying(true);
         }
@@ -1238,9 +1236,8 @@ const WelcomeAudioPlayer = ({ audioUrl }: { audioUrl: string }) => {
         onTimeUpdate={handleTimeUpdate}
         onEnded={handleEnded}
         onLoadedMetadata={handleLoadedMetadata}
-        preload="metadata"
+        preload="auto"
         playsInline
-        crossOrigin="anonymous"
       />
       <button 
         onClick={togglePlay}
@@ -1899,10 +1896,7 @@ const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
           audioRef.current.pause();
           setIsPlaying(false);
         } else {
-          // On mobile, sometimes we need to explicitly call load() if it's not ready
-          if (audioRef.current.readyState < 2) {
-            audioRef.current.load();
-          }
+          // On mobile, we should just call play() directly
           await audioRef.current.play();
           setIsPlaying(true);
         }
@@ -1960,7 +1954,6 @@ const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
         onCanPlay={onCanPlay}
         preload="auto"
         playsInline
-        crossOrigin="anonymous"
       />
       
       <button 
@@ -2151,7 +2144,11 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
 
       const { error: uploadError } = await supabase.storage
         .from('posts')
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          contentType: fileType,
+          cacheControl: '3600',
+          upsert: false
+        });
 
       if (uploadError) throw uploadError;
 
@@ -4321,6 +4318,18 @@ export default function App() {
   // Expose setScreen globally for the VIP button in ScreenProfile
   React.useEffect(() => {
     (window as any).setScreen = setScreen;
+  }, []);
+
+  // Audio unlocker for iOS
+  React.useEffect(() => {
+    const unlock = () => {
+      const audio = new Audio();
+      audio.play().catch(() => {});
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('touchstart', unlock);
+    };
+    window.addEventListener('click', unlock);
+    window.addEventListener('touchstart', unlock);
   }, []);
 
   if (loading) {
