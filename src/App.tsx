@@ -10,7 +10,6 @@ import {
   Heart, 
   MessageCircle, 
   Send, 
-  Bookmark, 
   Lock, 
   Play, 
   Pause,
@@ -710,12 +709,6 @@ const FullScreenPostModal = ({
                   <MessageCircle size={24} />
                   <span className="text-sm font-bold">{post.commentsCount || 0}</span>
                 </button>
-                <button 
-                  onClick={() => onForward && onForward(post)}
-                  className="flex items-center gap-2 text-white hover:text-primary transition-colors"
-                >
-                  <Send size={24} />
-                </button>
               </div>
             </div>
           )}
@@ -1309,12 +1302,7 @@ const ScreenFeed = ({
                   <MessageCircle className="text-on-surface" />
                   <span className="text-sm font-bold">{post.commentsCount || 0}</span>
                 </button>
-                <Send 
-                  className="text-on-surface cursor-pointer hover:text-primary transition-colors" 
-                  onClick={() => onForwardPost && onForwardPost(post)}
-                />
               </div>
-              <Bookmark className="text-on-surface cursor-pointer" />
             </div>
             <div className="space-y-1">
               <p className="text-sm font-bold">{post.likesCount || 0} curtidas</p>
@@ -1622,14 +1610,13 @@ const ScreenProfile = ({
               Editar Perfil
             </button>
           )}
+          <button 
+            onClick={onLogout}
+            className="w-full py-4 bg-red-500/10 text-red-500 font-bold rounded-2xl shadow-sm active:scale-95 transition-all uppercase tracking-widest text-xs"
+          >
+            Sair da Conta
+          </button>
         </div>
-        
-        <button 
-          onClick={onLogout}
-          className="text-red-500 font-bold text-xs uppercase tracking-widest hover:underline mb-12"
-        >
-          Sair da Conta
-        </button>
       </section>
 
       {isMaster && (
@@ -1725,7 +1712,7 @@ const ScreenProfile = ({
             </div>
           )
         ) : (
-          <div className="py-20 text-center">
+          <div className="pt-0 pb-20 text-center">
             <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
               <Crown className="text-primary" size={32} />
             </div>
@@ -3975,15 +3962,11 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [loading]);
 
-  const handleReset = async () => {
-    try {
-      await supabase.auth.signOut();
-      localStorage.clear();
-      window.location.reload();
-    } catch (err) {
-      console.error('Error resetting app:', err);
-      window.location.reload();
-    }
+  const handleReset = () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    supabase.auth.signOut().catch(console.error);
+    window.location.href = '/';
   };
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [dbStatus, setDbStatus] = React.useState<'checking' | 'connected' | 'error'>('checking');
@@ -4813,16 +4796,28 @@ export default function App() {
         <div className="text-primary font-black animate-pulse text-xl tracking-widest mb-8">CARREGANDO...</div>
         
         {showResetButton && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-xs">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-xs w-full">
             <p className="text-xs text-on-surface/40 font-bold uppercase tracking-widest mb-6 leading-relaxed">
-              O carregamento está demorando mais que o esperado. Isso pode ser um problema de cache ou sessão antiga.
+              O carregamento está demorando mais que o esperado.
             </p>
-            <button 
-              onClick={handleReset}
-              className="w-full py-4 bg-primary/5 text-primary font-black rounded-2xl border border-primary/10 active:scale-95 transition-all text-[10px] uppercase tracking-widest"
-            >
-              Limpar Dados e Sair
-            </button>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => {
+                  setShowResetButton(false);
+                  if (isLoggedIn) fetchData();
+                  else window.location.reload();
+                }}
+                className="w-full py-4 bg-primary text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all text-[10px] uppercase tracking-widest"
+              >
+                Tentar Novamente
+              </button>
+              <button 
+                onClick={handleReset}
+                className="w-full py-4 bg-red-500/10 text-red-500 font-black rounded-2xl active:scale-95 transition-all text-[10px] uppercase tracking-widest"
+              >
+                Sair da Conta
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -4855,8 +4850,25 @@ export default function App() {
       return <ScreenLogin onLogin={() => setScreen('feed')} onNavigateToRegister={() => setScreen('register')} />;
     }
 
+    if (!creator) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center">
+          <div className="text-primary font-black text-xl tracking-widest mb-4">ERRO DE CONEXÃO</div>
+          <p className="text-xs text-on-surface/40 font-bold uppercase tracking-widest mb-8 leading-relaxed max-w-xs">
+            Não foi possível carregar seu perfil. Os dados podem estar corrompidos ou houve um problema de rede.
+          </p>
+          <button 
+            onClick={handleReset}
+            className="w-full max-w-xs py-4 bg-primary/5 text-primary font-black rounded-2xl border border-primary/10 active:scale-95 transition-all text-[10px] uppercase tracking-widest"
+          >
+            Voltar para o Login
+          </button>
+        </div>
+      );
+    }
+
     switch (screen) {
-      case 'feed': return creator ? (
+      case 'feed': return (
         <ScreenFeed 
           posts={posts} 
           stories={stories.filter(s => s.creator_id === creator.id)} 
@@ -4871,8 +4883,8 @@ export default function App() {
           onCommentPost={handleCommentPost}
           onViewProfile={handleViewProfile}
         />
-      ) : null;
-      case 'profile': return creator ? (
+      );
+      case 'profile': return (
         <ScreenProfile 
           onEdit={() => setScreen('edit-profile')} 
           creator={creator} 
@@ -4895,7 +4907,7 @@ export default function App() {
             setForwardingPost(post);
           }}
         />
-      ) : null;
+      );
       case 'public-profile': 
         return publicCreator ? (
           <ScreenPublicProfile 
