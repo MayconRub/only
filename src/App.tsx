@@ -51,7 +51,8 @@ import { supabase } from './lib/supabase';
 
 // --- Constants ---
 
-const LOGO_URL = `${(import.meta as any).env.VITE_SUPABASE_URL}/storage/v1/object/public/avatars/scren.png`;
+const LOGIN_LOGO_URL = `${(import.meta as any).env.VITE_SUPABASE_URL}/storage/v1/object/public/avatars/scren.png`;
+const APP_LOGO_URL = `${(import.meta as any).env.VITE_SUPABASE_URL}/storage/v1/object/public/avatars/logoo.png`;
 
 // --- Mock Data ---
 
@@ -100,7 +101,7 @@ const TopNav = ({
   onMessageClick?: () => void,
   unreadCount?: number
 }) => (
-  <header className="fixed top-0 w-full flex justify-between items-center px-6 py-4 glass-header z-50">
+  <header className="fixed top-0 w-full flex justify-between items-center px-6 py-0 glass-header z-50">
     <div className="flex items-center gap-4">
       {showBack && (
         <button onClick={onBack} className="text-on-surface hover:opacity-80 transition-opacity">
@@ -108,23 +109,17 @@ const TopNav = ({
         </button>
       )}
       <div>
-        <div className="flex items-center">
+        <div className="flex items-center gap-3">
           <img 
-            src={LOGO_URL} 
+            src={APP_LOGO_URL} 
             alt="Logo" 
-            className="h-8 w-auto object-contain" 
+            className="h-12 w-auto object-contain" 
             referrerPolicy="no-referrer"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
-              const parent = (e.target as HTMLElement).parentElement;
-              if (parent) {
-                const text = document.createElement('div');
-                text.className = "text-2xl font-black text-primary tracking-tight leading-none";
-                text.innerText = title;
-                parent.appendChild(text);
-              }
             }}
           />
+          <span className="text-2xl font-black text-primary tracking-tighter leading-none">NUDLYE</span>
         </div>
       </div>
     </div>
@@ -353,10 +348,10 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
                 {subscribers.map((sub, index) => (
                   <div key={sub.id} className={`p-4 flex items-center justify-between ${index !== subscribers.length - 1 ? 'border-b border-primary/5' : ''}`}>
                     <div className="flex items-center gap-3">
-                      <img src={sub.avatar} alt={sub.name} className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
+                      <img src={sub?.avatar} alt={sub?.name} className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
                       <div>
-                        <p className="font-bold text-sm text-on-surface">{sub.name}</p>
-                        <p className="text-[10px] text-on-surface/60 font-medium">@{sub.username} • {sub.plan}</p>
+                        <p className="font-bold text-sm text-on-surface">{sub?.name}</p>
+                        <p className="text-[10px] text-on-surface/60 font-medium">@{sub?.username} • {sub?.plan}</p>
                       </div>
                     </div>
                     <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-1 rounded-md">Ativo</span>
@@ -375,10 +370,10 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
                 {purchases.map((purchase, index) => (
                   <div key={purchase.id} className={`p-4 flex items-center justify-between ${index !== purchases.length - 1 ? 'border-b border-primary/5' : ''}`}>
                     <div className="flex items-center gap-3">
-                      <img src={purchase.avatar} alt={purchase.name} className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
+                      <img src={purchase?.avatar} alt={purchase?.name} className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
                       <div>
-                        <p className="font-bold text-sm text-on-surface">{purchase.name}</p>
-                        <p className="text-[10px] text-on-surface/60 font-medium">Comprou: {purchase.item}</p>
+                        <p className="font-bold text-sm text-on-surface">{purchase?.name}</p>
+                        <p className="text-[10px] text-on-surface/60 font-medium">Comprou: {purchase?.item}</p>
                       </div>
                     </div>
                     <span className="font-black text-primary text-sm">{purchase.price}</span>
@@ -617,10 +612,10 @@ const FullScreenPostModal = ({
                 ) : (
                   comments.map(c => (
                     <div key={c.id} className="flex gap-3 group">
-                      <img src={c.user.avatar} className="w-10 h-10 rounded-full object-cover border border-primary/5" referrerPolicy="no-referrer" />
+                      <img src={c.user?.avatar} className="w-10 h-10 rounded-full object-cover border border-primary/5" referrerPolicy="no-referrer" />
                       <div className="flex-1">
                         <div className="bg-gray-50 p-3 rounded-2xl rounded-tl-none">
-                          <p className="text-xs font-black text-primary uppercase tracking-tight mb-0.5">{c.user.name}</p>
+                          <p className="text-xs font-black text-primary uppercase tracking-tight mb-0.5">{c.user?.name}</p>
                           <p className="text-sm text-on-surface/80 leading-relaxed">{c.content}</p>
                         </div>
                         <p className="text-[9px] font-bold text-on-surface/30 mt-1 ml-1 uppercase tracking-widest">
@@ -656,9 +651,9 @@ const FullScreenPostModal = ({
           {!showComments && (
             <div className="absolute bottom-0 w-full p-8 bg-gradient-to-t from-black/80 to-transparent text-white">
               <div className="flex items-center gap-3 mb-4">
-                <img src={post.creator.avatar} className="w-10 h-10 rounded-full object-cover border border-white/20" referrerPolicy="no-referrer" />
+                <img src={post.creator?.avatar} className="w-10 h-10 rounded-full object-cover border border-white/20" referrerPolicy="no-referrer" />
                 <div>
-                  <p className="font-bold text-sm">{post.creator.name}</p>
+                  <p className="font-bold text-sm">{post.creator?.name}</p>
                   <p className="text-[10px] text-white/60 uppercase tracking-widest">{post.time}</p>
                 </div>
               </div>
@@ -983,7 +978,7 @@ const ScreenFeed = ({
           >
             <div className="relative p-[3px] rounded-full story-ring">
               <div className="p-0.5 bg-white rounded-full">
-                <img src={creator.avatar} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
+                <img src={creator?.avatar} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
               </div>
               <div className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 border-2 border-white">
                 <PlusCircle size={14} />
@@ -1017,11 +1012,11 @@ const ScreenFeed = ({
           return (
             <article key={post.id} className="bg-white shadow-sm">
             <div className="flex items-center justify-between p-4">
-              <div className="flex items-center gap-3 cursor-pointer" onClick={() => onViewProfile && onViewProfile(post.creator.id)}>
-                <img src={post.creator.avatar} className="w-10 h-10 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
+              <div className="flex items-center gap-3 cursor-pointer" onClick={() => onViewProfile && onViewProfile(post.creator?.id || '')}>
+                <img src={post.creator?.avatar} className="w-10 h-10 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
                 <div>
                   <div className="flex items-center gap-1">
-                    <p className="font-bold text-sm hover:text-primary transition-colors">{post.creator.name}</p>
+                    <p className="font-bold text-sm hover:text-primary transition-colors">{post.creator?.name}</p>
                     <CheckCircle2 size={12} className="text-primary fill-primary/10" />
                   </div>
                   <p className="text-[10px] text-on-surface/40 font-bold uppercase tracking-wider">{post.time}</p>
@@ -1270,8 +1265,8 @@ const ScreenProfile = ({
   onMessage?: (creator: Creator) => void
 }) => {
   const [activeTab, setActiveTab] = React.useState<'all' | 'exclusive'>('all');
-  const myPosts = posts.filter(p => p.creator.id === creator.id).filter(p => activeTab === 'all' ? true : p.isLocked);
-  const myStories = stories.filter(s => s.creator_id === creator.id);
+  const myPosts = posts.filter(p => p.creator?.id === creator?.id).filter(p => activeTab === 'all' ? true : p.isLocked);
+  const myStories = stories.filter(s => s.creator_id === creator?.id);
   const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
   const [editingPost, setEditingPost] = React.useState<Post | null>(null);
   const [activeStoryIndex, setActiveStoryIndex] = React.useState<number | null>(null);
@@ -1284,7 +1279,7 @@ const ScreenProfile = ({
         onClose={() => setSelectedPost(null)} 
         onDelete={onDeletePost}
         onEdit={setEditingPost}
-        currentUserId={creator.id}
+        currentUserId={creator?.id}
         onLike={onLikePost}
         onComment={onCommentPost}
       />
@@ -1300,7 +1295,7 @@ const ScreenProfile = ({
       {/* Cover Image */}
       <div className="h-48 md:h-64 w-full relative overflow-hidden bg-on-surface/5">
         <img 
-          src={creator.cover_image || 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=1200'} 
+          src={creator?.cover_image || 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=1200'} 
           className="w-full h-full object-cover" 
           referrerPolicy="no-referrer"
           onError={(e) => {
@@ -1316,17 +1311,17 @@ const ScreenProfile = ({
             className="relative w-40 h-40 md:w-48 md:h-48 rounded-full p-[4px] story-ring bg-background shadow-2xl cursor-pointer"
             onClick={() => myStories.length > 0 && setActiveStoryIndex(0)}
           >
-            <img src={creator.avatar} className="w-full h-full object-cover rounded-full border-4 border-white" referrerPolicy="no-referrer" />
+            <img src={creator?.avatar} className="w-full h-full object-cover rounded-full border-4 border-white" referrerPolicy="no-referrer" />
             {myStories.length > 0 && (
               <div className="absolute inset-0 rounded-full border-4 border-primary animate-pulse pointer-events-none"></div>
             )}
           </div>
         </div>
-        <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator.name}</h1>
-        <p className="text-base text-primary font-bold mb-2">{creator.bio}</p>
-        {creator.services_bio && (
+        <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator?.name}</h1>
+        <p className="text-base text-primary font-bold mb-2">{creator?.bio}</p>
+        {creator?.services_bio && (
           <p className="text-xs text-on-surface/60 font-medium mb-8 max-w-md mx-auto leading-relaxed">
-            {creator.services_bio}
+            {creator?.services_bio}
           </p>
         )}
 
@@ -1543,13 +1538,13 @@ const ScreenPublicProfile = ({
       const { data: creatorPosts } = await supabase
         .from('posts')
         .select('id, post_likes(count)')
-        .eq('creator_id', creator.id);
+        .eq('creator_id', creator?.id);
       
       const totalLikes = creatorPosts?.reduce((acc, post: any) => acc + (post.post_likes?.[0]?.count || 0), 0) || 0;
       setLikesCount(totalLikes);
     };
     fetchFollowData();
-  }, [creator.id, isLoggedIn]);
+  }, [creator?.id, isLoggedIn]);
 
   const handleFollow = async () => {
     if (!isLoggedIn) {
@@ -1560,11 +1555,11 @@ const ScreenPublicProfile = ({
     if (!user) return;
 
     if (isFollowing) {
-      await supabase.from('follows').delete().eq('follower_id', user.id).eq('following_id', creator.id);
+      await supabase.from('follows').delete().eq('follower_id', user.id).eq('following_id', creator?.id);
       setIsFollowing(false);
       setFollowerCount(prev => Math.max(0, prev - 1));
     } else {
-      await supabase.from('follows').insert({ follower_id: user.id, following_id: creator.id });
+      await supabase.from('follows').insert({ follower_id: user.id, following_id: creator?.id });
       setIsFollowing(true);
       setFollowerCount(prev => prev + 1);
     }
@@ -1591,7 +1586,7 @@ const ScreenPublicProfile = ({
       {/* Cover Image */}
       <div className="h-48 md:h-64 w-full relative overflow-hidden bg-on-surface/5">
         <img 
-          src={creator.cover_image || 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=1200'} 
+          src={creator?.cover_image || 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=1200'} 
           className="w-full h-full object-cover" 
           referrerPolicy="no-referrer"
           onError={(e) => {
@@ -1607,17 +1602,17 @@ const ScreenPublicProfile = ({
             className="relative w-40 h-40 md:w-48 md:h-48 rounded-full p-[4px] story-ring bg-background shadow-2xl cursor-pointer"
             onClick={() => myStories.length > 0 && setActiveStoryIndex(0)}
           >
-            <img src={creator.avatar} className="w-full h-full object-cover rounded-full border-4 border-white" referrerPolicy="no-referrer" />
+            <img src={creator?.avatar} className="w-full h-full object-cover rounded-full border-4 border-white" referrerPolicy="no-referrer" />
             {myStories.length > 0 && (
               <div className="absolute inset-0 rounded-full border-4 border-primary animate-pulse pointer-events-none"></div>
             )}
           </div>
         </div>
-        <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator.name}</h1>
-        <p className="text-base text-primary font-bold mb-2">{creator.bio}</p>
-        {creator.services_bio && (
+        <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator?.name}</h1>
+        <p className="text-base text-primary font-bold mb-2">{creator?.bio}</p>
+        {creator?.services_bio && (
           <p className="text-xs text-on-surface/60 font-medium mb-8 max-w-md mx-auto leading-relaxed">
-            {creator.services_bio}
+            {creator?.services_bio}
           </p>
         )}
 
@@ -1817,8 +1812,8 @@ const ScreenActivity = ({ notifications, onRefresh }: { notifications: Notificat
                 {items.map((notif: Notification) => (
                   <div key={notif.id} className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-primary/5">
                     <div className="relative">
-                      <img src={notif.user.avatar} className="w-12 h-12 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
-                      {notif.user.isVerified && (
+                      <img src={notif.user?.avatar} className="w-12 h-12 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
+                      {notif.user?.isVerified && (
                         <span className="absolute -bottom-1 -right-1 bg-primary text-white rounded-full p-0.5 border-2 border-white">
                           <CheckCircle2 size={10} fill="white" />
                         </span>
@@ -1831,7 +1826,7 @@ const ScreenActivity = ({ notifications, onRefresh }: { notifications: Notificat
                         </span>
                       )}
                       <p className="text-xs font-medium leading-relaxed text-on-surface">
-                        <span className="font-bold">{notif.user.name}</span> {notif.content}
+                        <span className="font-bold">{notif.user?.name}</span> {notif.content}
                       </p>
                       <span className="text-[10px] text-on-surface/40 mt-0.5 block font-bold uppercase tracking-tighter">
                         {notif.created_at ? formatRelativeTime(notif.created_at) : notif.time}
@@ -2199,9 +2194,9 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
           </button>
         )}
         <div className="flex items-center gap-3">
-          <img src={recipient.avatar} className="w-10 h-10 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
+          <img src={recipient?.avatar} className="w-10 h-10 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
           <div>
-            <h3 className="font-black text-sm uppercase tracking-tight">{recipient.name}</h3>
+            <h3 className="font-black text-sm uppercase tracking-tight">{recipient?.name}</h3>
             <div className="flex items-center gap-1">
               <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
               <span className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">Online agora</span>
@@ -2406,8 +2401,8 @@ const ScreenMessages = ({ messages, isMaster }: { messages: Message[], isMaster:
                 onClick={() => setSelectedRecipient(contact)}
                 className="flex flex-col items-center gap-2 min-w-[70px]"
               >
-                <img src={contact.avatar} className="w-14 h-14 rounded-full object-cover border-2 border-primary/10 p-0.5" referrerPolicy="no-referrer" />
-                <span className="text-[10px] font-bold truncate w-full text-center">{contact.name.split(' ')[0]}</span>
+                <img src={contact?.avatar} className="w-14 h-14 rounded-full object-cover border-2 border-primary/10 p-0.5" referrerPolicy="no-referrer" />
+                <span className="text-[10px] font-bold truncate w-full text-center">{contact?.name?.split(' ')[0]}</span>
               </button>
             ))}
           </div>
@@ -2432,12 +2427,12 @@ const ScreenMessages = ({ messages, isMaster }: { messages: Message[], isMaster:
               className="group relative flex items-center gap-4 p-4 rounded-2xl bg-white transition-all hover:shadow-md cursor-pointer border border-primary/5"
             >
               <div className="relative flex-shrink-0">
-                <img src={msg.user.avatar} className={`w-14 h-14 rounded-full object-cover border border-primary/10 p-0.5 ${msg.isLocked ? 'grayscale opacity-50' : ''}`} referrerPolicy="no-referrer" />
+                <img src={msg.user?.avatar} className={`w-14 h-14 rounded-full object-cover border border-primary/10 p-0.5 ${msg.isLocked ? 'grayscale opacity-50' : ''}`} referrerPolicy="no-referrer" />
                 {msg.isOnline && <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></div>}
               </div>
               <div className="flex-grow min-w-0">
                 <div className="flex justify-between items-baseline mb-0.5">
-                  <h3 className={`font-bold text-base truncate ${msg.isLocked ? 'text-on-surface/60' : 'text-on-surface'}`}>{msg.user.name}</h3>
+                  <h3 className={`font-bold text-base truncate ${msg.isLocked ? 'text-on-surface/60' : 'text-on-surface'}`}>{msg.user?.name}</h3>
                   <span className="text-[10px] font-bold text-on-surface/40 uppercase tracking-tighter">{msg.time}</span>
                 </div>
                 <p className={`text-xs truncate ${msg.isLocked ? 'text-primary font-bold' : 'text-on-surface/60 font-medium'}`}>
@@ -2926,7 +2921,7 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
       <div className="w-full max-w-md space-y-12">
         <div className="flex flex-col items-center space-y-6">
           <img 
-            src={LOGO_URL} 
+            src={LOGIN_LOGO_URL} 
             alt="Logo" 
             className="h-48 w-auto object-contain mb-2" 
             referrerPolicy="no-referrer"
@@ -2936,7 +2931,7 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
               if (parent) {
                 const text = document.createElement('div');
                 text.className = "text-4xl font-black text-primary tracking-tighter";
-                text.innerText = "Novinha +18";
+                text.innerText = "NUDLYE";
                 parent.appendChild(text);
               }
             }}
@@ -3098,7 +3093,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
       <div className="w-full max-w-md space-y-10">
         <div className="flex flex-col items-center space-y-6">
           <img 
-            src={LOGO_URL} 
+            src={LOGIN_LOGO_URL} 
             alt="Logo" 
             className="h-48 w-auto object-contain mb-2" 
             referrerPolicy="no-referrer"
@@ -3108,7 +3103,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
               if (parent) {
                 const text = document.createElement('div');
                 text.className = "text-4xl font-black text-primary tracking-tighter";
-                text.innerText = "Novinha do JOB MOC";
+                text.innerText = "NUDLYE";
                 parent.appendChild(text);
               }
             }}
@@ -4393,7 +4388,9 @@ export default function App() {
       case 'messages': return <ScreenMessages messages={messages} isMaster={isMaster} />;
       case 'wallet': return <ScreenWallet onBack={() => setScreen('feed')} isMaster={isMaster} />;
       case 'subscriptions': return <ScreenSubscriptions onBack={() => setScreen('feed')} />;
-      case 'edit-profile': return <ScreenEditProfile onBack={() => setScreen('profile')} creator={creator} onProfileUpdated={() => setRefreshKey(prev => prev + 1)} />;
+      case 'edit-profile': 
+        if (!creator) return null;
+        return <ScreenEditProfile onBack={() => setScreen('profile')} creator={creator} onProfileUpdated={() => setRefreshKey(prev => prev + 1)} />;
       case 'create-post': return <ScreenCreatePost onBack={() => setScreen('feed')} onPostCreated={() => { setRefreshKey(prev => prev + 1); setScreen('feed'); }} />;
       case 'payment': return <ScreenPayment onBack={() => setScreen('feed')} creator={publicCreator || creator} post={selectedPostForPayment} />;
       case 'chat': return selectedRecipient ? <ChatView recipient={selectedRecipient} onBack={() => setScreen('messages')} /> : null;
@@ -4449,7 +4446,7 @@ export default function App() {
               setScreen(screen === 'edit-profile' ? 'profile' : 'feed');
             }
           }} 
-          avatar={isLoggedIn ? creator.avatar : publicCreator?.avatar}
+          avatar={isLoggedIn ? creator?.avatar : publicCreator?.avatar}
           isMaster={isMaster}
           onMessageClick={() => setScreen('messages')}
           unreadCount={unreadMessagesCount}
