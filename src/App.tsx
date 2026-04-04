@@ -960,47 +960,49 @@ const ScreenFeed = ({
       )}
 
       {/* Stories */}
-      <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 py-6 bg-white border-b border-primary/5">
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          className="hidden" 
-          accept="image/*,video/*"
-          onChange={(e) => {
-            if (e.target.files?.[0]) onStoryUpload(e.target.files[0]);
-          }}
-        />
-        {isMaster && (
-          <div 
-            className="flex flex-col items-center gap-2 flex-shrink-0 cursor-pointer"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <div className="relative p-[3px] rounded-full story-ring">
-              <div className="p-0.5 bg-white rounded-full">
-                <img src={creator?.avatar} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
+      {(isMaster || stories.length > 0) && (
+        <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 py-6 bg-white border-b border-primary/5">
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            className="hidden" 
+            accept="image/*,video/*"
+            onChange={(e) => {
+              if (e.target.files?.[0]) onStoryUpload(e.target.files[0]);
+            }}
+          />
+          {isMaster && (
+            <div 
+              className="flex flex-col items-center gap-2 flex-shrink-0 cursor-pointer"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <div className="relative p-[3px] rounded-full story-ring">
+                <div className="p-0.5 bg-white rounded-full">
+                  <img src={creator?.avatar} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
+                </div>
+                <div className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 border-2 border-white">
+                  <PlusCircle size={14} />
+                </div>
               </div>
-              <div className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 border-2 border-white">
-                <PlusCircle size={14} />
-              </div>
+              <span className="text-[10px] font-bold text-on-surface">Você</span>
             </div>
-            <span className="text-[10px] font-bold text-on-surface">Você</span>
-          </div>
-        )}
-        {stories.map((story, index) => (
-          <div 
-            key={story.id} 
-            className="flex flex-col items-center gap-2 flex-shrink-0 cursor-pointer"
-            onClick={() => setActiveStoryIndex(index)}
-          >
-            <div className="p-[3px] rounded-full story-ring">
-              <div className="p-0.5 bg-white rounded-full">
-                <img src={story.image} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
+          )}
+          {stories.map((story, index) => (
+            <div 
+              key={story.id} 
+              className="flex flex-col items-center gap-2 flex-shrink-0 cursor-pointer"
+              onClick={() => setActiveStoryIndex(index)}
+            >
+              <div className="p-[3px] rounded-full story-ring">
+                <div className="p-0.5 bg-white rounded-full">
+                  <img src={story.image} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
+                </div>
               </div>
+              <span className="text-[10px] font-bold text-on-surface/60">{story.creator_name || 'Você'}</span>
             </div>
-            <span className="text-[10px] font-bold text-on-surface/60">{story.creator_name || 'Você'}</span>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
     {/* Posts */}
     <div className="space-y-4 py-4">
@@ -1956,7 +1958,7 @@ const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
         onTimeUpdate={onTimeUpdate}
         onEnded={onEnded}
         onCanPlay={onCanPlay}
-        preload="metadata"
+        preload="auto"
         playsInline
         crossOrigin="anonymous"
       />
@@ -2128,7 +2130,8 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
 
     if (e instanceof Blob) {
       file = e;
-      fileName = `${Math.random()}.webm`;
+      const isMP4 = e.type.includes('mp4');
+      fileName = `${Math.random()}.${isMP4 ? 'mp4' : 'webm'}`;
       fileType = e.type;
     } else {
       const selectedFile = e.target.files?.[0];
@@ -2170,7 +2173,13 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      
+      // iOS compatibility: check for supported types
+      const mimeType = MediaRecorder.isTypeSupported('audio/mp4') 
+        ? 'audio/mp4' 
+        : 'audio/webm';
+        
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -2181,7 +2190,7 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         if (audioChunksRef.current.length > 0) {
           await handleMediaUpload(audioBlob);
         }
