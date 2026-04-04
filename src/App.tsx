@@ -939,6 +939,118 @@ const EditPostModal = ({ post, onSave, onClose }: { post: Post, onSave: (id: str
 
 // --- Screens ---
 
+const ForwardModal = ({ 
+  post, 
+  onClose, 
+  onForward 
+}: { 
+  post: Post, 
+  onClose: () => void, 
+  onForward: (recipient: Creator) => void 
+}) => {
+  const [contacts, setContacts] = useState<Creator[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+
+  React.useEffect(() => {
+    const fetchContacts = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Fetch all profiles that the user has interacted with or follows
+        const { data: messages } = await supabase
+          .from('messages')
+          .select('sender:profiles!sender_id(*), receiver:profiles!receiver_id(*)')
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+
+        const contactMap = new Map<string, Creator>();
+        messages?.forEach((m: any) => {
+          const other = m.sender_id === user.id ? m.receiver : m.sender;
+          if (other) contactMap.set(other.id, other as any);
+        });
+
+        // Also add the Master if not already there
+        const { data: masterProfile } = await supabase.from('profiles').select('*').eq('email', MASTER_EMAIL).single();
+        if (masterProfile && masterProfile.id !== user.id) {
+          contactMap.set(masterProfile.id, masterProfile as any);
+        }
+
+        setContacts(Array.from(contactMap.values()));
+      } catch (err) {
+        console.error('Error fetching contacts for forward:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchContacts();
+  }, []);
+
+  const filteredContacts = contacts.filter(c => 
+    c.name?.toLowerCase().includes(search.toLowerCase()) || 
+    c.username?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col max-h-[80vh] animate-in slide-in-from-bottom-10 duration-300 shadow-2xl">
+        <div className="p-6 border-b border-primary/5 flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-black tracking-tight text-on-surface">Encaminhar para...</h3>
+            <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">Selecione um contato</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-primary/5 rounded-full transition-colors">
+            <X size={20} className="text-on-surface/40" />
+          </button>
+        </div>
+
+        <div className="p-4 border-b border-primary/5">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface/40" size={16} />
+            <input 
+              type="text" 
+              placeholder="Buscar contatos..." 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-primary/5 border-none rounded-xl pl-11 pr-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+        </div>
+
+        <div className="flex-grow overflow-y-auto p-2 space-y-1">
+          {loading ? (
+            <div className="flex justify-center py-10">
+              <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+            </div>
+          ) : filteredContacts.length > 0 ? (
+            filteredContacts.map(contact => (
+              <button 
+                key={contact.id}
+                onClick={() => onForward(contact)}
+                className="w-full flex items-center gap-4 p-3 rounded-2xl hover:bg-primary/5 transition-all text-left group"
+              >
+                <img src={contact.avatar} className="w-12 h-12 rounded-full object-cover border border-primary/10 p-0.5" referrerPolicy="no-referrer" />
+                <div className="flex-grow">
+                  <h4 className="font-bold text-sm text-on-surface group-hover:text-primary transition-colors">{contact.name}</h4>
+                  <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-tight">@{contact.username}</p>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary opacity-0 group-hover:opacity-100 transition-all">
+                  <Send size={14} />
+                </div>
+              </button>
+            ))
+          ) : (
+            <div className="text-center py-10 opacity-30">
+              <User size={40} className="mx-auto mb-2" />
+              <p className="text-[10px] font-black uppercase tracking-widest">Nenhum contato encontrado</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ScreenFeed = ({ 
   posts, 
   stories, 
@@ -951,7 +1063,8 @@ const ScreenFeed = ({
   isMaster,
   onLikePost,
   onCommentPost,
-  onViewProfile
+  onViewProfile,
+  onForwardPost
 }: { 
   posts: Post[], 
   stories: any[], 
@@ -964,10 +1077,12 @@ const ScreenFeed = ({
   isMaster: boolean,
   onLikePost?: (id: string, isLiked: boolean) => void,
   onCommentPost?: (id: string, content: string) => void,
-  onViewProfile?: (creatorId: string) => void
+  onViewProfile?: (creatorId: string) => void,
+  onForwardPost?: (post: Post) => void
 }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
+  const [forwardingPost, setForwardingPost] = React.useState<Post | null>(null);
   const [editingPost, setEditingPost] = React.useState<Post | null>(null);
   const [activeStoryIndex, setActiveStoryIndex] = React.useState<number | null>(null);
   const [showPostMenu, setShowPostMenu] = React.useState<string | null>(null);
@@ -1179,7 +1294,10 @@ const ScreenFeed = ({
                   <MessageCircle className="text-on-surface" />
                   <span className="text-sm font-bold">{post.commentsCount || 0}</span>
                 </button>
-                <Send className="text-on-surface cursor-pointer" />
+                <Send 
+                  className="text-on-surface cursor-pointer hover:text-primary transition-colors" 
+                  onClick={() => onForwardPost && onForwardPost(post)}
+                />
               </div>
               <Bookmark className="text-on-surface cursor-pointer" />
             </div>
@@ -3833,6 +3951,39 @@ export default function App() {
   const [userEmail, setUserEmail] = React.useState<string | null>(null);
   const [selectedPostForPayment, setSelectedPostForPayment] = React.useState<Post | null>(null);
   const [selectedRecipient, setSelectedRecipient] = React.useState<Creator | null>(null);
+  const [forwardingPost, setForwardingPost] = React.useState<Post | null>(null);
+
+  const handleForwardPost = async (post: Post, recipient: Creator) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase.from('messages').insert({
+        sender_id: user.id,
+        receiver_id: recipient.id,
+        content: `Encaminhou uma publicação de ${post.creator.name}`,
+        media_url: post.image,
+        media_type: post.isVideo ? 'video' : 'image'
+      });
+
+      if (error) throw error;
+
+      // Create notification for the receiver
+      await supabase.from('notifications').insert({
+        user_id: recipient.id,
+        type: 'message',
+        content: `encaminhou uma publicação para você`,
+        created_at: new Date().toISOString()
+      });
+
+      setSelectedRecipient(recipient);
+      setScreen('chat');
+      setForwardingPost(null);
+    } catch (err) {
+      console.error('Error forwarding post:', err);
+      alert('Erro ao encaminhar publicação.');
+    }
+  };
 
   const isMaster = userEmail === MASTER_EMAIL;
 
@@ -4680,6 +4831,7 @@ export default function App() {
             onLikePost={handleLikePost}
             onCommentPost={handleCommentPost}
             onViewProfile={handleViewProfile}
+            onForwardPost={(post) => setForwardingPost(post)}
           />
         );
       case 'activity': 
@@ -4712,6 +4864,7 @@ export default function App() {
           onLikePost={handleLikePost}
           onCommentPost={handleCommentPost}
           onViewProfile={handleViewProfile}
+          onForwardPost={(post) => setForwardingPost(post)}
         />
       );
     }
@@ -4775,6 +4928,13 @@ export default function App() {
           onChange={setScreen} 
           isMaster={isMaster} 
           unreadCount={isMaster ? unreadNotificationsCount : unreadMessagesCount} 
+        />
+      )}
+      {forwardingPost && (
+        <ForwardModal 
+          post={forwardingPost} 
+          onClose={() => setForwardingPost(null)} 
+          onForward={(recipient) => handleForwardPost(forwardingPost, recipient)} 
         />
       )}
     </div>
