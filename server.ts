@@ -3,11 +3,17 @@ import { createTurbofyClient } from "@turbofy/sdk";
 import { createClient } from "@supabase/supabase-js";
 import path from "path";
 import dotenv from "dotenv";
+import multer from "multer";
+import ffmpeg from "fluent-ffmpeg";
+import fs from "fs";
+import os from "os";
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+const upload = multer({ dest: os.tmpdir() });
 
 // Middleware for parsing JSON
 app.use(express.json());
@@ -145,6 +151,60 @@ app.post("/api/webhooks/turbofy", async (req, res) => {
   } catch (error) {
     console.error("Webhook error:", error);
     res.status(500).send("Error processing webhook");
+  }
+});
+
+// API Route: Convert and Upload Audio
+app.post("/api/audio/convert", upload.single("audio"), async (req, res) => {
+  const file = req.file;
+  const userId = req.body.userId;
+
+  if (!file || !userId) {
+    return res.status(400).json({ error: "Missing audio file or userId" });
+  }
+
+  const inputPath = file.path;
+  const outputPath = path.join(os.tmpdir(), `${file.filename}.m4a`);
+
+  try {
+    // Convert to AAC (.m4a)
+    await new Promise((resolve, reject) => {
+      ffmpeg(inputPath)
+        .toFormat("ipod") // 'ipod' is a shortcut for m4a/aac compatible with iOS
+        .audioCodec("aac")
+        .on("end", resolve)
+        .on("error", reject)
+        .save(outputPath);
+    });
+
+    // Read the converted file
+    const fileBuffer = fs.readFileSync(outputPath);
+    const fileName = `chat/${userId}/${Math.random()}.m4a`;
+
+    // Upload to Supabase
+    const { data, error: uploadError } = await supabase.storage
+      .from("posts")
+      .upload(fileName, fileBuffer, {
+        contentType: "audio/mp4",
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data: publicUrlData } = supabase.storage.from("posts").getPublicUrl(fileName);
+
+    // Cleanup temp files
+    fs.unlinkSync(inputPath);
+    fs.unlinkSync(outputPath);
+
+    res.json({ url: publicUrlData.publicUrl });
+  } catch (error: any) {
+    console.error("Audio conversion error:", error);
+    // Cleanup temp files on error
+    if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+    if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    res.status(500).json({ error: "Failed to convert audio: " + error.message });
   }
 });
 

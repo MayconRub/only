@@ -1182,6 +1182,15 @@ const WelcomeAudioPlayer = ({ audioUrl }: { audioUrl: string }) => {
   const [isBuffering, setIsBuffering] = React.useState(false);
   const audioRef = React.useRef<HTMLAudioElement>(null);
 
+  React.useEffect(() => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setProgress(0);
+    if (audioRef.current) {
+      audioRef.current.load();
+    }
+  }, [audioUrl]);
+
   const formatTime = (time: number) => {
     if (isNaN(time)) return "00:00";
     const mins = Math.floor(time / 60);
@@ -1918,6 +1927,9 @@ const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
     setIsPlaying(false);
     setCurrentTime(0);
     setIsBuffering(false);
+    if (audioRef.current) {
+      audioRef.current.load();
+    }
   }, [src]);
 
   const togglePlay = async () => {
@@ -2194,8 +2206,7 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
 
     if (e instanceof Blob) {
       file = e;
-      const isMP4 = e.type.includes('mp4');
-      fileName = `${Math.random()}.${isMP4 ? 'mp4' : 'webm'}`;
+      fileName = `audio_${Date.now()}.webm`; // Default name, backend will rename to .m4a
       fileType = e.type;
     } else {
       const selectedFile = e.target.files?.[0];
@@ -2209,6 +2220,26 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
 
     setUploading(true);
     try {
+      if (fileType.startsWith('audio/')) {
+        const formData = new FormData();
+        formData.append('audio', file);
+        formData.append('userId', currentUser.id);
+
+        const response = await fetch('/api/audio/convert', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Falha na conversão de áudio');
+        }
+        
+        const data = await response.json();
+        await handleSendMessage(data.url, 'audio');
+        return;
+      }
+
       const fileExt = fileName.split('.').pop();
       const finalFileName = `${Math.random()}.${fileExt}`;
       const filePath = `chat/${currentUser.id}/${finalFileName}`;
@@ -2243,9 +2274,17 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
       // iOS compatibility: check for supported types
-      const mimeType = MediaRecorder.isTypeSupported('audio/mp4') 
-        ? 'audio/mp4' 
-        : 'audio/webm';
+      // Prefer audio/mp4 for iOS, but most browsers will use audio/webm
+      const supportedTypes = [
+        'audio/mp4',
+        'audio/aac',
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+      ];
+      
+      const mimeType = supportedTypes.find(type => MediaRecorder.isTypeSupported(type)) || 'audio/webm';
+      console.log('Using MIME type for recording:', mimeType);
         
       const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
@@ -2265,7 +2304,8 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
         stream.getTracks().forEach(track => track.stop());
       };
 
-      mediaRecorder.start();
+      // Request data every 1 second to avoid large chunks issues on some browsers
+      mediaRecorder.start(1000);
       setIsRecording(true);
       setRecordingDuration(0);
       timerRef.current = setInterval(() => {
@@ -2639,6 +2679,35 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
     setCropImage(null);
   };
 
+  const handleAudioUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      const formData = new FormData();
+      formData.append('audio', file);
+      formData.append('userId', user.id);
+
+      const response = await fetch('/api/audio/convert', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Falha na conversão de áudio');
+      }
+      
+      const data = await response.json();
+      setWelcomeAudio(data.url);
+    } catch (err: any) {
+      alert(`Erro no upload de áudio: ${err.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -2763,8 +2832,7 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
                   onChange={async (e) => {
                     if (e.target.files && e.target.files.length > 0) {
                       const file = e.target.files[0];
-                      const url = await handleFileUpload(file, 'avatars');
-                      if (url) setWelcomeAudio(url);
+                      await handleAudioUpload(file);
                     }
                   }} 
                   disabled={uploading} 
