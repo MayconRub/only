@@ -3945,6 +3945,25 @@ export default function App() {
   const [publicCreator, setPublicCreator] = React.useState<Creator | null>(null);
   const [publicPosts, setPublicPosts] = React.useState<Post[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [showResetButton, setShowResetButton] = React.useState(false);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (loading) setShowResetButton(true);
+    }, 8000); // Show reset button after 8 seconds of loading
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  const handleReset = async () => {
+    try {
+      await supabase.auth.signOut();
+      localStorage.clear();
+      window.location.reload();
+    } catch (err) {
+      console.error('Error resetting app:', err);
+      window.location.reload();
+    }
+  };
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [dbStatus, setDbStatus] = React.useState<'checking' | 'connected' | 'error'>('checking');
   const [editingPost, setEditingPost] = React.useState<Post | null>(null);
@@ -3993,6 +4012,7 @@ export default function App() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         console.log('No user found in fetchData');
+        setLoading(false);
         return;
       }
       console.log('Fetching data for user:', user.email, 'ID:', user.id);
@@ -4733,8 +4753,22 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-primary font-bold animate-pulse">CARREGANDO...</div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center">
+        <div className="text-primary font-black animate-pulse text-xl tracking-widest mb-8">CARREGANDO...</div>
+        
+        {showResetButton && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-xs">
+            <p className="text-xs text-on-surface/40 font-bold uppercase tracking-widest mb-6 leading-relaxed">
+              O carregamento está demorando mais que o esperado. Isso pode ser um problema de cache ou sessão antiga.
+            </p>
+            <button 
+              onClick={handleReset}
+              className="w-full py-4 bg-primary/5 text-primary font-black rounded-2xl border border-primary/10 active:scale-95 transition-all text-[10px] uppercase tracking-widest"
+            >
+              Limpar Dados e Sair
+            </button>
+          </div>
+        )}
       </div>
     );
   }
