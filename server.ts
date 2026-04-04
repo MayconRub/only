@@ -5,8 +5,13 @@ import path from "path";
 import dotenv from "dotenv";
 import multer from "multer";
 import ffmpeg from "fluent-ffmpeg";
+import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
+import ffprobeInstaller from "@ffprobe-installer/ffprobe";
 import fs from "fs";
 import os from "os";
+
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+ffmpeg.setFfprobePath(ffprobeInstaller.path);
 
 dotenv.config();
 
@@ -170,7 +175,7 @@ app.post("/api/audio/convert", upload.single("audio"), async (req, res) => {
     // Convert to AAC (.m4a)
     await new Promise((resolve, reject) => {
       ffmpeg(inputPath)
-        .toFormat("ipod") // 'ipod' is a shortcut for m4a/aac compatible with iOS
+        .toFormat("mp4")
         .audioCodec("aac")
         .on("end", resolve)
         .on("error", reject)

@@ -1,1 +1,0 @@
-"import { execSync } from 'child_process';\ntry {\n  const output = execSync('ffmpeg -encoders | grep mp3').toString();\n  console.log(output);\n} catch (e) {\n  console.error('mp3 encoder not found');\n}\n"

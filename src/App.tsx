@@ -2220,7 +2220,8 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
 
     setUploading(true);
     try {
-      if (fileType.startsWith('audio/')) {
+      const isSupportedByIOS = fileType.includes('mp4') || fileType.includes('aac') || fileType.includes('mpeg');
+      if (fileType.startsWith('audio/') && !isSupportedByIOS) {
         const formData = new FormData();
         formData.append('audio', file);
         formData.append('userId', currentUser.id);
@@ -2684,6 +2685,13 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
+
+      const isSupportedByIOS = file.type.includes('mp4') || file.type.includes('aac') || file.type.includes('mpeg');
+      if (isSupportedByIOS) {
+        const url = await handleFileUpload(file, 'avatars');
+        if (url) setWelcomeAudio(url);
+        return;
+      }
 
       const formData = new FormData();
       formData.append('audio', file);
