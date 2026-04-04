@@ -2143,7 +2143,7 @@ const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
   );
 };
 
-const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => void }) => {
+const ChatView = ({ recipient, onBack, onMessagesRead }: { recipient: Creator, onBack?: () => void, onMessagesRead?: () => void }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -2181,6 +2181,8 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
             .from('messages')
             .update({ is_read: true })
             .in('id', unreadIds);
+          
+          if (onMessagesRead) onMessagesRead();
         }
       }
     } catch (err) {
@@ -2189,7 +2191,7 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
       setLoading(false);
       setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     }
-  }, [recipient.id]);
+  }, [recipient.id, onMessagesRead]);
 
   React.useEffect(() => {
     const setup = async () => {
@@ -2547,7 +2549,7 @@ const ChatView = ({ recipient, onBack }: { recipient: Creator, onBack?: () => vo
   );
 };
 
-const ScreenMessages = ({ messages, isMaster }: { messages: Message[], isMaster: boolean }) => {
+const ScreenMessages = ({ messages, isMaster, onMessagesRead }: { messages: Message[], isMaster: boolean, onMessagesRead?: () => void }) => {
   const [selectedRecipient, setSelectedRecipient] = useState<Creator | null>(null);
   const [contacts, setContacts] = useState<Creator[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2590,7 +2592,7 @@ const ScreenMessages = ({ messages, isMaster }: { messages: Message[], isMaster:
   }, [isMaster]);
 
   if (selectedRecipient) {
-    return <ChatView recipient={selectedRecipient} onBack={() => setSelectedRecipient(null)} />;
+    return <ChatView recipient={selectedRecipient} onBack={() => setSelectedRecipient(null)} onMessagesRead={onMessagesRead} />;
   }
 
   return (
@@ -4685,9 +4687,9 @@ export default function App() {
         if (isMaster) {
           return <ScreenActivity notifications={notifications} onRefresh={fetchData} />;
         } else {
-          return <ScreenMessages messages={messages} isMaster={isMaster} />;
+          return <ScreenMessages messages={messages} isMaster={isMaster} onMessagesRead={() => setRefreshKey(prev => prev + 1)} />;
         }
-      case 'messages': return <ScreenMessages messages={messages} isMaster={isMaster} />;
+      case 'messages': return <ScreenMessages messages={messages} isMaster={isMaster} onMessagesRead={() => setRefreshKey(prev => prev + 1)} />;
       case 'wallet': return <ScreenWallet onBack={() => setScreen('feed')} isMaster={isMaster} />;
       case 'subscriptions': return <ScreenSubscriptions onBack={() => setScreen('feed')} />;
       case 'edit-profile': 
@@ -4695,7 +4697,7 @@ export default function App() {
         return <ScreenEditProfile onBack={() => setScreen('profile')} creator={creator} onProfileUpdated={() => setRefreshKey(prev => prev + 1)} />;
       case 'create-post': return <ScreenCreatePost onBack={() => setScreen('feed')} onPostCreated={() => { setRefreshKey(prev => prev + 1); setScreen('feed'); }} />;
       case 'payment': return <ScreenPayment onBack={() => setScreen('feed')} creator={publicCreator || creator} post={selectedPostForPayment} />;
-      case 'chat': return selectedRecipient ? <ChatView recipient={selectedRecipient} onBack={() => setScreen('messages')} /> : null;
+      case 'chat': return selectedRecipient ? <ChatView recipient={selectedRecipient} onBack={() => setScreen('messages')} onMessagesRead={() => setRefreshKey(prev => prev + 1)} /> : null;
       default: return (
         <ScreenFeed 
           posts={posts} 
