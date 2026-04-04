@@ -654,7 +654,6 @@ const FullScreenPostModal = ({
                 <img src={post.creator?.avatar} className="w-10 h-10 rounded-full object-cover border border-white/20" referrerPolicy="no-referrer" />
                 <div>
                   <p className="font-bold text-sm">{post.creator?.name}</p>
-                  <p className="text-[10px] text-white/60 uppercase tracking-widest">{post.time}</p>
                 </div>
               </div>
               <p className="text-sm text-white/80 leading-relaxed mb-4">{post.caption}</p>
@@ -1019,7 +1018,6 @@ const ScreenFeed = ({
                     <p className="font-bold text-sm hover:text-primary transition-colors">{post.creator?.name}</p>
                     <CheckCircle2 size={12} className="text-primary fill-primary/10" />
                   </div>
-                  <p className="text-[10px] text-on-surface/40 font-bold uppercase tracking-wider">{post.time}</p>
                 </div>
               </div>
               
@@ -1790,7 +1788,7 @@ const formatRelativeTime = (dateString: string) => {
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (diffInSeconds < 60) return 'Agora mesmo';
+  if (diffInSeconds < 60) return '';
   if (diffInSeconds < 3600) return `Há ${Math.floor(diffInSeconds / 60)} min`;
   if (diffInSeconds < 86400) return `Há ${Math.floor(diffInSeconds / 3600)} h`;
   if (diffInSeconds < 604800) return `Há ${Math.floor(diffInSeconds / 86400)} d`;
@@ -2800,7 +2798,7 @@ const ScreenCreatePost = ({ onBack, onPostCreated }: { onBack: () => void, onPos
         price: isLocked ? price : null,
         is_locked: isLocked,
         is_video: isVideo,
-        time: 'Agora mesmo'
+        time: ''
       });
 
       if (error) throw error;
