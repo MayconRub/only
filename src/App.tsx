@@ -84,6 +84,24 @@ const MESSAGES: Message[] = [];
 
 // --- Components ---
 
+const FormattedText = ({ text, className }: { text: string, className?: string }) => {
+  if (!text) return null;
+  
+  // Split by ** to find bold parts
+  const parts = text.split(/(\*\*.*?\*\*)/g);
+  
+  return (
+    <p className={className}>
+      {parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={i} className="font-black">{part.slice(2, -2)}</strong>;
+        }
+        return part;
+      })}
+    </p>
+  );
+};
+
 const TopNav = ({ 
   title = "Novinha do JOB MOC", 
   showBack = false, 
@@ -1389,14 +1407,24 @@ const ScreenProfile = ({
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator?.name}</h1>
         <p className="text-base text-primary font-bold mb-2">{creator?.bio}</p>
-        {creator?.services_bio && (
-          <p className="text-xs text-on-surface/60 font-medium mb-8 max-w-md mx-auto leading-relaxed">
-            {creator?.services_bio}
-          </p>
-        )}
 
         {creator.welcome_audio && (
           <WelcomeAudioPlayer audioUrl={creator.welcome_audio} />
+        )}
+
+        {creator?.services_bio && (
+          <div className="bg-white p-6 rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5 mb-8 text-left">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="bg-primary/10 p-2 rounded-xl">
+                <Star size={20} className="text-primary" fill="currentColor" />
+              </div>
+              <h4 className="font-black text-xs uppercase tracking-widest text-primary">Serviços & Preços</h4>
+            </div>
+            <FormattedText 
+              text={creator?.services_bio} 
+              className="text-sm text-black leading-relaxed whitespace-pre-wrap"
+            />
+          </div>
         )}
 
         {isMaster && (
@@ -1680,14 +1708,24 @@ const ScreenPublicProfile = ({
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator?.name}</h1>
         <p className="text-base text-primary font-bold mb-2">{creator?.bio}</p>
-        {creator?.services_bio && (
-          <p className="text-xs text-on-surface/60 font-medium mb-8 max-w-md mx-auto leading-relaxed">
-            {creator?.services_bio}
-          </p>
-        )}
 
         {creator.welcome_audio && (
           <WelcomeAudioPlayer audioUrl={creator.welcome_audio} />
+        )}
+
+        {creator?.services_bio && (
+          <div className="bg-white p-6 rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5 mb-8 text-left">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="bg-primary/10 p-2 rounded-xl">
+                <Star size={20} className="text-primary" fill="currentColor" />
+              </div>
+              <h4 className="font-black text-xs uppercase tracking-widest text-primary">Serviços & Preços</h4>
+            </div>
+            <FormattedText 
+              text={creator?.services_bio} 
+              className="text-sm text-black leading-relaxed whitespace-pre-wrap"
+            />
+          </div>
         )}
 
         <div className="flex justify-center items-center gap-4 sm:gap-10 mb-10 py-6 px-4 sm:px-8 bg-white rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5 overflow-hidden">
@@ -2820,7 +2858,7 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
             <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Preços e Serviços</label>
             <textarea 
               className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm text-xs leading-relaxed min-h-[80px] resize-none font-medium text-on-surface/60" 
-              placeholder="Ex: Video Chamada R$ 50,00 | Conteúdo VIP R$ 30,00"
+              placeholder="Use **texto** para negrito. Ex: **Video Chamada** R$ 50,00"
               value={servicesBio}
               onChange={(e) => setServicesBio(e.target.value)}
             />
