@@ -1179,6 +1179,7 @@ const WelcomeAudioPlayer = ({ audioUrl }: { audioUrl: string }) => {
   const [progress, setProgress] = React.useState(0);
   const [duration, setDuration] = React.useState(0);
   const [currentTime, setCurrentTime] = React.useState(0);
+  const [isBuffering, setIsBuffering] = React.useState(false);
   const audioRef = React.useRef<HTMLAudioElement>(null);
 
   const formatTime = (time: number) => {
@@ -1189,19 +1190,37 @@ const WelcomeAudioPlayer = ({ audioUrl }: { audioUrl: string }) => {
   };
 
   const togglePlay = async () => {
-    if (audioRef.current) {
+    if (!audioRef.current) return;
+
+    try {
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        setIsBuffering(true);
+        if (audioRef.current.readyState < 2) {
+          audioRef.current.load();
+        }
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          await playPromise;
+          setIsPlaying(true);
+        }
+        setIsBuffering(false);
+      }
+    } catch (err) {
+      console.error('Welcome audio playback failed:', err);
+      setIsPlaying(false);
+      setIsBuffering(false);
+      
       try {
-        if (isPlaying) {
-          audioRef.current.pause();
-          setIsPlaying(false);
-        } else {
-          // On mobile, we should just call play() directly
+        if (audioRef.current) {
+          audioRef.current.load();
           await audioRef.current.play();
           setIsPlaying(true);
         }
-      } catch (err) {
-        console.error('Welcome audio playback failed:', err);
-        setIsPlaying(false);
+      } catch (retryErr) {
+        console.error('Welcome retry failed:', retryErr);
       }
     }
   };
@@ -1236,14 +1255,26 @@ const WelcomeAudioPlayer = ({ audioUrl }: { audioUrl: string }) => {
         onTimeUpdate={handleTimeUpdate}
         onEnded={handleEnded}
         onLoadedMetadata={handleLoadedMetadata}
+        onWaiting={() => setIsBuffering(true)}
+        onPlaying={() => {
+          setIsBuffering(false);
+          setIsPlaying(true);
+        }}
         preload="auto"
         playsInline
       />
       <button 
         onClick={togglePlay}
-        className="w-12 h-12 flex-shrink-0 bg-primary text-white rounded-full flex items-center justify-center shadow-md shadow-primary/20 active:scale-95 transition-all"
+        disabled={isBuffering && !isPlaying}
+        className="w-12 h-12 flex-shrink-0 bg-primary text-white rounded-full flex items-center justify-center shadow-md shadow-primary/20 active:scale-95 transition-all disabled:opacity-70"
       >
-        {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
+        {isBuffering && !isPlaying ? (
+          <RefreshCw size={20} className="animate-spin" />
+        ) : isPlaying ? (
+          <Pause size={20} fill="currentColor" />
+        ) : (
+          <Play size={20} fill="currentColor" className="ml-1" />
+        )}
       </button>
       <div className="flex-1">
         <div className="flex justify-between items-center mb-1">
@@ -1880,29 +1911,51 @@ const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
-  const [isReady, setIsReady] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
   const audioRef = React.useRef<HTMLAudioElement>(null);
 
   React.useEffect(() => {
     setIsPlaying(false);
     setCurrentTime(0);
-    setIsReady(false);
+    setIsBuffering(false);
   }, [src]);
 
   const togglePlay = async () => {
-    if (audioRef.current) {
+    if (!audioRef.current) return;
+
+    try {
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        setIsBuffering(true);
+        
+        // iOS Surgical Fix: Ensure the element is "warmed up"
+        if (audioRef.current.readyState < 2) {
+          audioRef.current.load();
+        }
+        
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          await playPromise;
+          setIsPlaying(true);
+        }
+        setIsBuffering(false);
+      }
+    } catch (err) {
+      console.error('Audio playback failed:', err);
+      setIsPlaying(false);
+      setIsBuffering(false);
+      
+      // Secondary attempt for iOS
       try {
-        if (isPlaying) {
-          audioRef.current.pause();
-          setIsPlaying(false);
-        } else {
-          // On mobile, we should just call play() directly
+        if (audioRef.current) {
+          audioRef.current.load();
           await audioRef.current.play();
           setIsPlaying(true);
         }
-      } catch (err) {
-        console.error('Audio playback failed:', err);
-        setIsPlaying(false);
+      } catch (retryErr) {
+        console.error('Retry failed:', retryErr);
       }
     }
   };
@@ -1914,7 +1967,16 @@ const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
   };
 
   const onCanPlay = () => {
-    setIsReady(true);
+    setIsBuffering(false);
+  };
+
+  const onWaiting = () => {
+    setIsBuffering(true);
+  };
+
+  const onPlaying = () => {
+    setIsBuffering(false);
+    setIsPlaying(true);
   };
 
   const onTimeUpdate = () => {
@@ -1952,17 +2014,26 @@ const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
         onTimeUpdate={onTimeUpdate}
         onEnded={onEnded}
         onCanPlay={onCanPlay}
+        onWaiting={onWaiting}
+        onPlaying={onPlaying}
         preload="auto"
         playsInline
       />
       
       <button 
         onClick={togglePlay}
+        disabled={isBuffering && !isPlaying}
         className={`w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all active:scale-90 shadow-sm ${
           isMe ? 'bg-white text-primary' : 'bg-primary text-white'
-        }`}
+        } ${isBuffering && !isPlaying ? 'opacity-70' : ''}`}
       >
-        {isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} className="ml-0.5" fill="currentColor" />}
+        {isBuffering && !isPlaying ? (
+          <RefreshCw size={16} className="animate-spin" />
+        ) : isPlaying ? (
+          <Pause size={16} fill="currentColor" />
+        ) : (
+          <Play size={16} className="ml-0.5" fill="currentColor" />
+        )}
       </button>
 
       <div className="flex-1 flex flex-col gap-1 sm:gap-1.5 pr-1 overflow-hidden relative">
@@ -4323,8 +4394,15 @@ export default function App() {
   // Audio unlocker for iOS
   React.useEffect(() => {
     const unlock = () => {
+      // Create a silent buffer to unlock audio
       const audio = new Audio();
-      audio.play().catch(() => {});
+      audio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
+      audio.play().then(() => {
+        console.log("Audio unlocked successfully");
+      }).catch((e) => {
+        console.warn("Audio unlock failed:", e);
+      });
+      
       window.removeEventListener('click', unlock);
       window.removeEventListener('touchstart', unlock);
     };
