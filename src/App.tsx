@@ -1406,7 +1406,7 @@ const ScreenProfile = ({
           </div>
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator?.name}</h1>
-        <p className="text-base text-primary font-bold mb-2">{creator?.bio}</p>
+        <p className="text-sm text-primary font-bold mb-2">{creator?.bio}</p>
 
         {creator.welcome_audio && (
           <WelcomeAudioPlayer audioUrl={creator.welcome_audio} />
@@ -1707,7 +1707,7 @@ const ScreenPublicProfile = ({
           </div>
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator?.name}</h1>
-        <p className="text-base text-primary font-bold mb-2">{creator?.bio}</p>
+        <p className="text-sm text-primary font-bold mb-2">{creator?.bio}</p>
 
         {creator.welcome_audio && (
           <WelcomeAudioPlayer audioUrl={creator.welcome_audio} />
