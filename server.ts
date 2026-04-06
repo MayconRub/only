@@ -31,7 +31,8 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // API Route: Create Pix Payment
 app.post("/api/payments/pix", async (req, res) => {
   try {
-    const { amount, description, payerEmail, userId, creatorId, planId } = req.body;
+    const body = req.body || {};
+    const { amount, description, payerEmail, userId, creatorId, planId } = body;
 
     if (!process.env.TURBOFY_CLIENT_ID || !process.env.TURBOFY_CLIENT_SECRET) {
       return res.status(500).json({ error: "Turbofy credentials not configured." });
@@ -107,30 +108,44 @@ app.post("/api/payments/pix", async (req, res) => {
 // API Route: Turbofy Webhook
 app.post("/api/webhooks/turbofy", async (req, res) => {
   try {
+    console.log("Webhook received:", JSON.stringify(req.body));
+    
     // Turbofy webhook payload structure based on standard event formats
-    const { event, data } = req.body;
+    const body = req.body || {};
+    const event = body.event;
+    const data = body.data;
 
     // We only care about when a charge is paid
     if (event === "charge.paid" && data) {
-      const { id, status, externalRef } = data;
+      // Turbofy sometimes nests the charge object inside data.charge
+      const charge = data.charge || data;
+      const { id, status, externalRef } = charge;
 
       if (id && externalRef) {
         // Update payment status in our database
         // Turbofy uses "PAID" for successful payments
         const newStatus = status === "PAID" ? "approved" : status.toLowerCase();
         
-        await supabase
+        const { error: updateError } = await supabase
           .from("payments")
           .update({ status: newStatus })
           .eq("id", externalRef);
 
+        if (updateError) {
+          console.error("Error updating payment status:", updateError);
+        }
+
         // If approved, create/update the subscription
         if (status === "PAID") {
-          const { data: paymentRecord } = await supabase
+          const { data: paymentRecord, error: fetchError } = await supabase
             .from("payments")
             .select("*")
             .eq("id", externalRef)
             .single();
+
+          if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+            console.error("Error fetching payment record:", fetchError);
+          }
 
           if (paymentRecord) {
             // Create subscription
@@ -140,21 +155,29 @@ app.post("/api/webhooks/turbofy", async (req, res) => {
             else if (paymentRecord.plan_id === 'yearly') endDate.setDate(endDate.getDate() + 365);
             else endDate.setDate(endDate.getDate() + 30); // Default 30 days
 
-            await supabase.from("subscriptions").insert({
+            const { error: subError } = await supabase.from("subscriptions").insert({
               user_id: paymentRecord.user_id,
               creator_id: paymentRecord.creator_id,
               plan_id: paymentRecord.plan_id,
               status: "active",
               end_date: endDate.toISOString(),
             });
+
+            if (subError) {
+              console.error("Error creating subscription:", subError);
+            }
           }
         }
       }
     }
 
+    // Always return 200 OK to Turbofy so they know we received it
+    // Even if it's a test event or an event we don't care about
     res.status(200).send("OK");
   } catch (error) {
     console.error("Webhook error:", error);
+    // Even on error, it's often better to return 200 so the webhook doesn't get disabled,
+    // but returning 500 lets Turbofy know to retry.
     res.status(500).send("Error processing webhook");
   }
 });
