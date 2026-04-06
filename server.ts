@@ -4,22 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 import path from "path";
 import dotenv from "dotenv";
 import multer from "multer";
-import ffmpeg from "fluent-ffmpeg";
-import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
-import ffprobeInstaller from "@ffprobe-installer/ffprobe";
 import fs from "fs";
 import os from "os";
-
-try {
-  if (ffmpegInstaller && ffmpegInstaller.path) {
-    ffmpeg.setFfmpegPath(ffmpegInstaller.path);
-  }
-  if (ffprobeInstaller && ffprobeInstaller.path) {
-    ffmpeg.setFfprobePath(ffprobeInstaller.path);
-  }
-} catch (e) {
-  console.error("Failed to set ffmpeg paths:", e);
-}
 
 dotenv.config();
 
@@ -209,6 +195,17 @@ app.post("/api/audio/convert", upload.single("audio"), async (req, res) => {
   const outputPath = path.join(os.tmpdir(), `${file.filename}.m4a`);
 
   try {
+    // Dynamically import ffmpeg to avoid crashing the server on boot in Vercel
+    const ffmpeg = (await import("fluent-ffmpeg")).default;
+    try {
+      const ffmpegInstaller = (await import("@ffmpeg-installer/ffmpeg")).default;
+      if (ffmpegInstaller && ffmpegInstaller.path) ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+      const ffprobeInstaller = (await import("@ffprobe-installer/ffprobe")).default;
+      if (ffprobeInstaller && ffprobeInstaller.path) ffmpeg.setFfprobePath(ffprobeInstaller.path);
+    } catch (e) {
+      console.warn("Could not load ffmpeg installers, using system ffmpeg if available");
+    }
+
     // Convert to AAC (.m4a)
     await new Promise((resolve, reject) => {
       ffmpeg(inputPath)
