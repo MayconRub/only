@@ -31,15 +31,12 @@ const upload = multer({ dest: os.tmpdir() });
 // Middleware for parsing JSON
 app.use(express.json());
 
-// Initialize Supabase Client (Admin)
-const supabaseUrl = process.env.VITE_SUPABASE_URL || "https://placeholder.supabase.co";
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "placeholder";
-
-if (!process.env.VITE_SUPABASE_URL) {
-  console.warn("WARNING: VITE_SUPABASE_URL is not set. Supabase will not work.");
+// Helper to get Supabase client lazily to prevent boot crashes
+function getSupabase() {
+  const url = (process.env.VITE_SUPABASE_URL || "https://placeholder.supabase.co").replace(/^["']|["']$/g, '');
+  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "placeholder").replace(/^["']|["']$/g, '');
+  return createClient(url, key);
 }
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // API Route: Create Pix Payment
 app.post("/api/payments/pix", async (req, res) => {
@@ -55,10 +52,12 @@ app.post("/api/payments/pix", async (req, res) => {
     const turbofyClient = createTurbofyClient({
       baseUrl: "https://api.turbofypay.com",
       credentials: {
-        clientId: process.env.TURBOFY_CLIENT_ID.trim(),
-        clientSecret: process.env.TURBOFY_CLIENT_SECRET.trim(),
+        clientId: process.env.TURBOFY_CLIENT_ID.replace(/^["']|["']$/g, '').trim(),
+        clientSecret: process.env.TURBOFY_CLIENT_SECRET.replace(/^["']|["']$/g, '').trim(),
       },
     });
+
+    const supabase = getSupabase();
 
     // Create a payment record in Supabase first to get an ID
     const { data: paymentRecord, error: dbError } = await supabase
@@ -138,6 +137,8 @@ app.post("/api/webhooks/turbofy", async (req, res) => {
         // Update payment status in our database
         // Turbofy uses "PAID" for successful payments
         const newStatus = status === "PAID" ? "approved" : status.toLowerCase();
+        
+        const supabase = getSupabase();
         
         const { error: updateError } = await supabase
           .from("payments")
@@ -223,6 +224,7 @@ app.post("/api/audio/convert", upload.single("audio"), async (req, res) => {
     const fileName = `chat/${userId}/${Math.random()}.m4a`;
 
     // Upload to Supabase
+    const supabase = getSupabase();
     const { data, error: uploadError } = await supabase.storage
       .from("posts")
       .upload(fileName, fileBuffer, {
