@@ -9,6 +9,7 @@ export interface Creator {
   bio?: string;
   services_bio?: string;
   welcome_audio?: string;
+  role?: 'user' | 'admin' | 'master';
   stats?: {
     posts: string;
     followers: string;

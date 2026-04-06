@@ -124,6 +124,7 @@ app.post("/api/webhooks/turbofy", async (req, res) => {
         // Turbofy uses "PAID" for successful payments
         const newStatus = status === "PAID" ? "approved" : status.toLowerCase();
         
+        console.log(`Updating payment ${externalRef} to status ${newStatus}`);
         const supabase = getSupabase();
         
         const { error: updateError } = await supabase
@@ -137,6 +138,7 @@ app.post("/api/webhooks/turbofy", async (req, res) => {
 
         // If approved, create/update the subscription
         if (status === "PAID") {
+          console.log(`Payment ${externalRef} is PAID, creating subscription`);
           const { data: paymentRecord, error: fetchError } = await supabase
             .from("payments")
             .select("*")
@@ -165,10 +167,18 @@ app.post("/api/webhooks/turbofy", async (req, res) => {
 
             if (subError) {
               console.error("Error creating subscription:", subError);
+            } else {
+              console.log(`Subscription created for user ${paymentRecord.user_id}`);
             }
+          } else {
+            console.warn(`Payment record not found for externalRef: ${externalRef}`);
           }
         }
+      } else {
+        console.warn("Webhook missing id or externalRef", { id, externalRef });
       }
+    } else {
+      console.log("Ignoring webhook event:", event);
     }
 
     // Always return 200 OK to Turbofy so they know we received it

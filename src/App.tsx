@@ -46,6 +46,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import Cropper from 'react-easy-crop';
 import { Screen, Post, Notification, Message, Creator, ChatMessage } from './types';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { supabase } from './lib/supabase';
 
 // --- Constants ---
@@ -468,8 +469,6 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
     </div>
   );
 };
-
-const MASTER_EMAIL = 'mayconrubemx@gmail.com';
 
 const BottomNav = ({ active, onChange, isMaster, unreadCount }: { active: Screen, onChange: (s: Screen) => void, isMaster: boolean, unreadCount: number }) => (
   <nav className="fixed bottom-0 w-full flex justify-around items-center px-4 py-3 bg-white border-t border-primary/5 z-50">
@@ -986,7 +985,7 @@ const ForwardModal = ({
         });
 
         // Also add the Master if not already there
-        const { data: masterProfile } = await supabase.from('profiles').select('*').eq('email', MASTER_EMAIL).single();
+        const { data: masterProfile } = await supabase.from('profiles').select('*').eq('role', 'master').single();
         if (masterProfile && masterProfile.id !== user.id) {
           console.log('Adding master profile to contacts');
           contactMap.set(masterProfile.id, masterProfile as any);
@@ -1107,6 +1106,11 @@ const ScreenFeed = ({
 
   return (
     <div className="pt-20 pb-24 max-w-2xl mx-auto">
+      {/* Debug Info */}
+      <div className="bg-red-500 text-white p-2 text-xs text-center mb-4">
+        Debug: {posts.length} posts carregados. isMaster: {isMaster ? 'Sim' : 'Não'}.
+      </div>
+
       {/* Modals */}
       <FullScreenPostModal 
         post={selectedPost} 
@@ -1518,7 +1522,10 @@ const ScreenProfile = ({
   onForwardPost?: (post: Post) => void
 }) => {
   const [activeTab, setActiveTab] = React.useState<'all' | 'exclusive'>('all');
-  const myPosts = posts.filter(p => p.creator?.id === creator?.id).filter(p => activeTab === 'all' ? true : p.isLocked);
+  const myPosts = (posts || []).filter(p => {
+    const pCreatorId = p.creator?.id || p.creator_id;
+    return pCreatorId && creator?.id && pCreatorId === creator.id;
+  }).filter(p => activeTab === 'all' ? true : p.isLocked);
   const myStories = stories.filter(s => s.creator_id === creator?.id);
   const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
   const [openComments, setOpenComments] = React.useState(false);
@@ -1527,6 +1534,11 @@ const ScreenProfile = ({
   
   return (
     <div className="pt-0 pb-24">
+      {/* Debug Info */}
+      <div className="bg-red-500 text-white p-2 text-xs text-center">
+        Debug Profile: {posts?.length || 0} posts totais, {myPosts.length} meus posts.
+      </div>
+
       {/* Modals */}
       <FullScreenPostModal 
         post={selectedPost} 
@@ -2746,7 +2758,7 @@ const ScreenMessages = ({ messages, isMaster, onMessagesRead }: { messages: Mess
           setContacts(Array.from(contactMap.values()));
         } else {
           // For subscribers, always show the Master as a contact
-          const { data: masterProfile } = await supabase.from('profiles').select('*').eq('email', MASTER_EMAIL).single();
+          const { data: masterProfile } = await supabase.from('profiles').select('*').eq('role', 'master').single();
           if (masterProfile) {
             setContacts([masterProfile as any]);
           }
@@ -3978,168 +3990,172 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
 
 // --- Main App ---
 
+// --- Constants ---
+const MASTER_EMAIL = 'mayconrubemx@gmail.com';
+
 export default function App() {
+  const { user, profile, loading: authLoading, error: authError, signOut, refreshProfile } = useAuth();
   const [screen, setScreen] = React.useState<Screen>(() => {
     const saved = localStorage.getItem('novinha_screen');
     if (saved && ['feed', 'profile', 'activity', 'messages', 'edit-profile', 'create-post', 'wallet', 'payment'].includes(saved)) {
       return saved as Screen;
     }
-    return 'login';
+    return 'feed';
   });
-  const [isLoggedIn, setIsLoggedIn] = React.useState(false);
+  
   const [posts, setPosts] = React.useState<Post[]>([]);
   const [stories, setStories] = React.useState<any[]>([]);
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = React.useState(0);
   const [messages, setMessages] = React.useState<Message[]>([]);
-  const [creator, setCreator] = React.useState<Creator | null>(null);
   const [publicCreator, setPublicCreator] = React.useState<Creator | null>(null);
   const [publicPosts, setPublicPosts] = React.useState<Post[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const [dataLoading, setDataLoading] = React.useState(true);
   const [showResetButton, setShowResetButton] = React.useState(false);
+  const [refreshKey, setRefreshKey] = React.useState(0);
+  const [selectedPostForPayment, setSelectedPostForPayment] = React.useState<Post | null>(null);
+  const [selectedRecipient, setSelectedRecipient] = React.useState<Creator | null>(null);
+  const [forwardingPost, setForwardingPost] = React.useState<Post | null>(null);
+  const [editingPost, setEditingPost] = React.useState<Post | null>(null);
+
+  const isMaster = profile?.role === 'master' || profile?.role === 'admin' || user?.email === MASTER_EMAIL;
+  const isLoggedIn = !!user;
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
-      if (loading) setShowResetButton(true);
-    }, 8000); // Show reset button after 8 seconds of loading
+      if (authLoading || dataLoading) setShowResetButton(true);
+    }, 8000);
     return () => clearTimeout(timer);
-  }, [loading]);
+  }, [authLoading, dataLoading]);
+
+  const [fetchError, setFetchError] = React.useState<string | null>(null);
 
   const handleReset = () => {
     localStorage.clear();
     sessionStorage.clear();
-    supabase.auth.signOut().catch(console.error);
+    signOut().catch(console.error);
     window.location.href = '/';
   };
-  const [refreshKey, setRefreshKey] = React.useState(0);
-  const [dbStatus, setDbStatus] = React.useState<'checking' | 'connected' | 'error'>('checking');
-  const [editingPost, setEditingPost] = React.useState<Post | null>(null);
-  const [userEmail, setUserEmail] = React.useState<string | null>(null);
-  const [selectedPostForPayment, setSelectedPostForPayment] = React.useState<Post | null>(null);
-  const [selectedRecipient, setSelectedRecipient] = React.useState<Creator | null>(null);
-  const [forwardingPost, setForwardingPost] = React.useState<Post | null>(null);
-
-  const handleForwardPost = async (post: Post, recipient: Creator) => {
-    console.log('handleForwardPost called', { post, recipient });
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.error('No user found in handleForwardPost');
-        return;
-      }
-
-      console.log('Inserting message for forward...');
-      const creatorName = post.creator?.name || 'Criador';
-      const { error } = await supabase.from('messages').insert({
-        sender_id: user.id,
-        receiver_id: recipient.id,
-        content: `Encaminhou uma publicação de ${creatorName}`,
-        media_url: post.image,
-        media_type: post.isVideo ? 'video' : 'image'
-      });
-
-      if (error) {
-        console.error('Error inserting message:', error);
-        throw error;
-      }
-
-      console.log('Message inserted successfully');
-
-      // Create notification for the receiver
-      const { error: notifError } = await supabase.from('notifications').insert({
-        user_id: recipient.id,
-        type: 'message',
-        content: `encaminhou uma publicação para você`,
-        created_at: new Date().toISOString()
-      });
-
-      if (notifError) {
-        console.warn('Error creating notification (non-fatal):', notifError);
-      }
-
-      console.log('Navigating to chat with recipient:', recipient.id);
-      setSelectedRecipient(recipient);
-      setScreen('chat');
-      setForwardingPost(null);
-    } catch (err) {
-      console.error('Error forwarding post:', err);
-      alert('Erro ao encaminhar publicação. Verifique sua conexão.');
-    }
-  };
-
-  const isMaster = userEmail === MASTER_EMAIL;
 
   const fetchData = React.useCallback(async () => {
-    console.log('fetchData called');
+    if (!user || !profile) {
+      setDataLoading(false);
+      return;
+    }
+    
+    setDataLoading(true);
+    setFetchError(null);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.log('No user found in fetchData');
-        setLoading(false);
-        return;
-      }
-      console.log('Fetching data for user:', user.email, 'ID:', user.id);
-
-      // Fetch profile
-      const { data: profileData, error: profileFetchError } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      console.log('Fetching data for user:', user.id);
       
-      // Fetch follower count
-      const { count: followerCount } = await supabase
-        .from('follows')
-        .select('*', { count: 'exact', head: true })
-        .eq('following_id', user.id);
-
-      // Fetch total likes for user's posts
-      const { data: userPostsLikes } = await supabase
-        .from('posts')
-        .select('id, post_likes(count)')
-        .eq('creator_id', user.id);
-      
-      const totalLikes = userPostsLikes?.reduce((acc, post: any) => acc + (post.post_likes?.[0]?.count || 0), 0) || 0;
-      const totalPosts = userPostsLikes?.length || 0;
-
-      if (profileData) {
-        setCreator({
-          ...profileData,
-          stats: {
-            ...profileData.stats,
-            followers: followerCount?.toString() || '0',
-            likes: totalLikes.toString(),
-            posts: totalPosts.toString()
-          }
-        } as any);
-        console.log('Profile fetched:', profileData.name);
-        // If profile exists but email is missing, update it
-        if (!profileData.email && user.email) {
-          console.log('Updating profile with missing email:', user.email);
-          await supabase.from('profiles').update({ email: user.email }).eq('id', user.id);
-        }
-      } else if (profileFetchError && profileFetchError.code === 'PGRST116') {
-        console.log('Profile not found, creating default profile for user:', user.id);
-        const newProfile = {
-          id: user.id,
-          email: user.email,
-          name: user.user_metadata?.full_name || 'Novo Criador',
-          username: user.email?.split('@')[0] + Math.floor(Math.random() * 1000),
-          avatar: `https://picsum.photos/seed/${user.id}/400`,
-          bio: 'Bem-vindo ao meu perfil!',
-          stats: { posts: '0', followers: '0', likes: '0' }
-        };
-        
-        const { data: createdProfile, error: createError } = await supabase
+      // Get master profile ID for filtering
+      let masterId = null;
+      try {
+        const { data: masterProfile } = await supabase
           .from('profiles')
-          .insert(newProfile)
-          .select()
+          .select('id')
+          .eq('email', MASTER_EMAIL)
           .single();
-          
-        if (createError) {
-          console.error('Error creating fallback profile:', createError);
-        } else if (createdProfile) {
-          setCreator(createdProfile as any);
-        }
+        masterId = masterProfile?.id;
+        console.log('Master ID found:', masterId);
+      } catch (e) {
+        console.log('Master profile not found by email, showing all posts');
       }
 
-      // Fetch user's active payments
+      // Fetch posts with likes and comments
+      let postsData: any[] = [];
+      let postsError: any = null;
+
+      try {
+        const { data, error } = await supabase
+          .from('posts')
+          .select(`
+            *,
+            profiles:creator_id (*),
+            post_likes (*),
+            post_comments (*, profiles:user_id (*))
+          `);
+        
+        if (error) throw error;
+        postsData = data || [];
+      } catch (err: any) {
+        console.warn('Full posts query failed, trying simpler query:', err.message);
+        const { data, error } = await supabase
+          .from('posts')
+          .select('*');
+        
+        if (error) {
+          console.error('Simple posts query also failed:', error);
+          throw error;
+        }
+        postsData = data || [];
+      }
+      
+      // Sort posts in JS to avoid created_at column issues
+      postsData.sort((a, b) => {
+        const dateA = new Date(a.created_at || a.time || 0).getTime();
+        const dateB = new Date(b.created_at || b.time || 0).getTime();
+        return dateB - dateA;
+      });
+
+      // Filter posts:
+      // 1. If user is the master, show ALL posts.
+      // 2. If no masterId is found, show all posts.
+      // 3. Always show user's OWN posts.
+      // 4. Otherwise, show only master's posts.
+      const filteredPostsData = postsData.filter((p: any) => {
+        if (isMaster) return true;
+        if (p.creator_id === user.id) return true;
+        if (!masterId) return true;
+        return p.creator_id === masterId;
+      });
+
+      // Fetch stories
+      let storiesData: any[] = [];
+      try {
+        const { data, error } = await supabase
+          .from('stories')
+          .select('*, profiles:creator_id (*)');
+        if (error) throw error;
+        storiesData = data || [];
+      } catch (err: any) {
+        console.warn('Stories query failed, trying simpler query:', err.message);
+        const { data, error } = await supabase
+          .from('stories')
+          .select('*');
+        if (error) throw error;
+        storiesData = data || [];
+      }
+      
+      storiesData.sort((a, b) => {
+        const dateA = new Date(a.created_at || a.time || 0).getTime();
+        const dateB = new Date(b.created_at || b.time || 0).getTime();
+        return dateB - dateA;
+      });
+
+      const filteredStoriesData = storiesData.filter((s: any) => {
+        if (isMaster) return true;
+        if (s.creator_id === user.id) return true;
+        if (!masterId) return true;
+        return s.creator_id === masterId;
+      });
+
+      // Fetch notifications
+      const { data: notificationsDataRaw, error: notificationsError } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('recipient_id', user.id);
+
+      if (notificationsError) throw notificationsError;
+      
+      const notificationsData = notificationsDataRaw || [];
+      notificationsData.sort((a, b) => {
+        const dateA = new Date(a.created_at || a.time || 0).getTime();
+        const dateB = new Date(b.created_at || b.time || 0).getTime();
+        return dateB - dateA;
+      });
+
+      // Fetch user payments for access control
       const { data: userPayments } = await supabase
         .from('payments')
         .select('creator_id, post_id')
@@ -4149,306 +4165,121 @@ export default function App() {
       const subscribedCreatorIds = new Set(userPayments?.filter(p => !p.post_id).map(p => p.creator_id) || []);
       const purchasedPostIds = new Set(userPayments?.filter(p => p.post_id).map(p => p.post_id) || []);
 
-      // Fetch posts
-      // Try to find master profile by email. If it fails, masterId will be undefined and we show all posts.
-      let masterId: string | undefined = undefined;
-      try {
-        const { data: masterProfile } = await supabase.from('profiles').select('id').eq('email', MASTER_EMAIL).single();
-        masterId = masterProfile?.id;
-        console.log('Master ID found:', masterId);
-      } catch (e) {
-        console.log('Master profile not found by email, showing all posts');
-      }
+      // Fetch messages (conversations)
+      const { data: messagesDataRaw, error: messagesError } = await supabase
+        .from('messages')
+        .select('*, profiles:sender_id (*), recipient:recipient_id (*)')
+        .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`);
 
-      const { data: postsData, error: postsError } = await supabase
-        .from('posts')
-        .select('*, creator:profiles(*), post_likes!post_id(user_id), post_comments!post_id(id)')
-        .order('created_at', { ascending: false });
-
-      if (postsError) {
-        console.error('Error fetching posts with likes/comments:', postsError);
-        
-        if (postsError.message?.includes('relation "public.post_likes" does not exist') || 
-            postsError.message?.includes('relation "public.post_comments" does not exist') ||
-            postsError.message?.includes('relation "post_likes" does not exist') ||
-            postsError.message?.includes('relation "post_comments" does not exist')) {
-          console.warn('Database tables for likes/comments are missing. Please run the migration script.');
-        }
-
-        // Fallback to fetching posts without likes/comments if tables don't exist
-        const { data: fallbackPosts, error: fallbackError } = await supabase
-          .from('posts')
-          .select('*, creator:profiles(*)')
-          .order('created_at', { ascending: false });
-        
-        if (fallbackError) {
-          console.error('Error fetching fallback posts:', fallbackError);
-        } else if (fallbackPosts) {
-          console.log(`Fetched ${fallbackPosts.length} fallback posts`);
-          const filteredPosts = masterId 
-            ? fallbackPosts.filter((p: any) => p.creator_id === masterId)
-            : fallbackPosts;
-          
-          setPosts(filteredPosts.map((p: any) => ({
-            ...p,
-            isLocked: p.is_locked,
-            hasAccess: p.creator_id === user.id ? true : (subscribedCreatorIds.has(p.creator_id) ? true : !p.is_locked),
-            isVideo: p.is_video,
-            likesCount: 0,
-            commentsCount: 0,
-            isLikedByMe: false
-          })) as any);
-        }
-      } else if (postsData) {
-        console.log(`Fetched ${postsData.length} posts`);
-        // Filter posts to only show master's posts if masterId exists
-        const filteredPosts = masterId 
-          ? postsData.filter((p: any) => p.creator_id === masterId)
-          : postsData;
-        
-        setPosts(filteredPosts.map((p: any) => ({
-          ...p,
-          isLocked: p.is_locked,
-          hasAccess: p.creator_id === user.id ? true : (subscribedCreatorIds.has(p.creator_id) || purchasedPostIds.has(p.id) ? true : !p.is_locked),
-          isVideo: p.is_video,
-          likesCount: p.post_likes?.length || 0,
-          commentsCount: p.post_comments?.length || 0,
-          isLikedByMe: p.post_likes?.some((l: any) => l.user_id === user.id)
-        })) as any);
-      }
-
-      // Fetch stories (only from the last 24 hours)
-      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const { data: storiesData } = await supabase
-        .from('stories')
-        .select('*')
-        .gte('created_at', twentyFourHoursAgo)
-        .order('created_at', { ascending: false });
-        
-      if (storiesData) {
-        const filteredStories = masterId
-          ? storiesData.filter((s: any) => s.creator_id === masterId)
-          : storiesData;
-        setStories(filteredStories);
-      }
-
-      // Fetch notifications
-      let allNotifications: Notification[] = [];
-      try {
-        // Fetch from notifications table (system/other notifications)
-        const { data: notificationsData, error: notifErr } = await supabase
-          .from('notifications')
-          .select('*, user:profiles!user_id(name, avatar)')
-          .eq('user_id', user.id) // Only for the current user
-          .order('created_at', { ascending: false });
-        
-        if (notifErr) {
-          console.log('Notifications table query failed:', notifErr.message);
-        } else if (notificationsData) {
-          allNotifications = notificationsData.map((n: any) => ({
-            ...n,
-            user: {
-              name: n.user?.name || 'Sistema',
-              avatar: n.user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=system',
-              isVerified: n.user?.is_verified
-            }
-          }));
-        }
-      } catch (e) {
-        console.log('Error fetching from notifications table:', e);
-      }
-
-      // Fetch payments for notifications (subscriptions)
-      try {
-        const { data: paymentsData, error: payErr } = await supabase
-          .from('payments')
-          .select('*, user:profiles!user_id(name, avatar)')
-          .eq('creator_id', user.id)
-          .eq('status', 'approved')
-          .order('created_at', { ascending: false });
-
-        if (payErr) {
-          console.error('Error fetching payments for notifications:', payErr);
-        } else if (paymentsData) {
-          console.log(`Fetched ${paymentsData.length} payments for notifications`);
-          const paymentNotifications: Notification[] = paymentsData.map((p: any) => ({
-            id: `payment-${p.id}`,
-            type: 'subscription',
-            user: {
-              name: p.user?.name || 'Usuário Anônimo',
-              avatar: p.user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous',
-              isVerified: p.user?.is_verified
-            },
-            content: `assinou seu conteúdo VIP!`,
-            time: new Date(p.created_at).toLocaleDateString('pt-BR'),
-            badge: 'NOVO ASSINANTE',
-            created_at: p.created_at
-          }));
-          
-          allNotifications = [...allNotifications, ...paymentNotifications];
-        }
-      } catch (e) {
-        console.error('Error in payments notification block:', e);
-      }
-
-      // Fetch user's posts to get their IDs for filtering likes/comments
-      const { data: myPosts } = await supabase
-        .from('posts')
-        .select('id')
-        .eq('creator_id', user.id);
+      if (messagesError) throw messagesError;
       
-      const myPostIds = myPosts?.map(p => p.id) || [];
-      console.log(`User has ${myPostIds.length} posts for notification filtering. IDs:`, myPostIds);
-
-      // Fetch likes for notifications
-      if (myPostIds.length > 0) {
-        try {
-          const { data: likesData, error: likesErr } = await supabase
-            .from('post_likes')
-            .select('*, user:profiles!user_id(name, avatar), posts!post_id(image)')
-            .in('post_id', myPostIds)
-            .order('created_at', { ascending: false })
-            .limit(50);
-
-          if (likesErr) {
-            console.error('Error in likesData query:', likesErr);
-          } else if (likesData) {
-            console.log(`Fetched ${likesData.length} likes for notifications`);
-            const likeNotifications: Notification[] = likesData
-              .filter((l: any) => l.user_id !== user.id) // Don't notify about own likes
-              .map((l: any) => ({
-                id: `like-${l.id}`,
-                type: 'like',
-                user: {
-                  name: l.user?.name || 'Usuário',
-                  avatar: l.user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=user'
-                },
-                content: `curtiu sua publicação`,
-                time: l.created_at ? new Date(l.created_at).toLocaleDateString('pt-BR') : 'Recentemente',
-                thumbnail: l.posts?.image,
-                badge: 'CURTIDA',
-                created_at: l.created_at || new Date().toISOString()
-              }));
-            allNotifications = [...allNotifications, ...likeNotifications];
-          }
-        } catch (e) {
-          console.error('Error fetching like notifications:', e);
-        }
-
-        // Fetch comments for notifications
-        try {
-          const { data: commentsData, error: commentsErr } = await supabase
-            .from('post_comments')
-            .select('*, user:profiles!user_id(name, avatar), posts!post_id(image)')
-            .in('post_id', myPostIds)
-            .order('created_at', { ascending: false })
-            .limit(50);
-
-          if (commentsErr) {
-            console.error('Error in commentsData query:', commentsErr);
-          } else if (commentsData) {
-            console.log(`Fetched ${commentsData.length} comments for notifications`);
-            const commentNotifications: Notification[] = commentsData
-              .filter((c: any) => c.user_id !== user.id) // Don't notify about own comments
-              .map((c: any) => ({
-                id: `comment-${c.id}`,
-                type: 'comment',
-                user: {
-                  name: c.user?.name || 'Usuário',
-                  avatar: c.user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=user'
-                },
-                content: `comentou: "${c.content.substring(0, 30)}${c.content.length > 30 ? '...' : ''}"`,
-                time: c.created_at ? new Date(c.created_at).toLocaleDateString('pt-BR') : 'Recentemente',
-                thumbnail: c.posts?.image,
-                badge: 'COMENTÁRIO',
-                created_at: c.created_at || new Date().toISOString()
-              }));
-            allNotifications = [...allNotifications, ...commentNotifications];
-          }
-        } catch (e) {
-          console.error('Error fetching comment notifications:', e);
-        }
-      }
-
-      // Sort all notifications by date
-      allNotifications.sort((a: any, b: any) => {
-        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      const messagesData = messagesDataRaw || [];
+      messagesData.sort((a, b) => {
+        const dateA = new Date(a.created_at || a.time || 0).getTime();
+        const dateB = new Date(b.created_at || b.time || 0).getTime();
         return dateB - dateA;
       });
-      
-      console.log('Total notifications aggregated:', allNotifications.length);
-      setNotifications(allNotifications);
 
-      // Calculate unread count
-      const lastSeen = localStorage.getItem('last_seen_notification_time');
-      if (lastSeen) {
-        const lastSeenTime = new Date(lastSeen).getTime();
-        const unread = allNotifications.filter(n => {
-          const nTime = n.created_at ? new Date(n.created_at).getTime() : 0;
-          return nTime > lastSeenTime;
-        }).length;
-        setUnreadNotificationsCount(unread);
-      } else {
-        setUnreadNotificationsCount(allNotifications.length);
-      }
+      // Fetch all profiles to map creators
+      const { data: allProfiles } = await supabase.from('profiles').select('*');
+      const profilesMap = new Map(allProfiles?.map(p => [p.id, p]) || []);
 
-      // Fetch messages
-      const { data: messagesData, error: messagesError } = await supabase
-        .from('messages')
-        .select('*, sender:profiles!sender_id(*), receiver:profiles!receiver_id(*)')
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-        .order('created_at', { ascending: false });
-
-      if (messagesError) {
-        console.error('Error fetching messages:', messagesError);
-      } else if (messagesData) {
-        // Group messages by conversation (the other person)
-        const conversationsMap = new Map<string, any>();
+      // Process posts
+      const processedPosts = filteredPostsData.map(post => {
+        const isOwner = post.creator_id === user.id;
+        const isMasterUser = user.email === MASTER_EMAIL || profile.role === 'master' || profile.role === 'admin';
         
-        messagesData.forEach((m: any) => {
-          const otherPerson = m.sender_id === user.id ? m.receiver : m.sender;
-          if (!otherPerson) return;
-          
-          if (!conversationsMap.has(otherPerson.id)) {
-            let lastMsgText = m.content;
-            if (!lastMsgText && m.media_url) {
-              if (m.media_type === 'image') lastMsgText = '📷 Foto';
-              else if (m.media_type === 'video') lastMsgText = '🎥 Vídeo';
-              else if (m.media_type === 'audio') lastMsgText = '🎤 Áudio';
-            }
+        // Try to get creator profile from the join first, then from the map
+        let creatorProfile = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
+        if (!creatorProfile) {
+          creatorProfile = profilesMap.get(post.creator_id);
+        }
+        
+        // If still null and it's my post, use my profile
+        if (!creatorProfile && isOwner) {
+          creatorProfile = profile;
+        }
+        
+        return {
+          ...post,
+          creator: creatorProfile || { id: post.creator_id, name: 'Criador', avatar: 'https://images.unsplash.com/photo-1633078654544-61b3455b9161?q=80&w=400&auto=format&fit=crop' },
+          likes: String(post.post_likes?.length || 0),
+          likesCount: post.post_likes?.length || 0,
+          commentsCount: post.post_comments?.length || 0,
+          isLikedByMe: post.post_likes?.some((l: any) => l.user_id === user.id),
+          isLocked: post.is_locked,
+          isVideo: post.is_video,
+          hasAccess: isOwner || isMasterUser || subscribedCreatorIds.has(post.creator_id) || purchasedPostIds.has(post.id) || !post.is_locked,
+          commentList: (post.post_comments || []).map((c: any) => ({
+            id: c.id,
+            user: c.profiles?.name || 'Usuário',
+            text: c.content,
+            time: new Date(c.created_at).toLocaleDateString()
+          }))
+        };
+      });
 
-            conversationsMap.set(otherPerson.id, {
-              id: m.id,
-              user: otherPerson,
-              lastMessage: lastMsgText,
-              time: formatRelativeTime(m.created_at),
-              unreadCount: m.sender_id !== user.id && !m.is_read ? 1 : 0,
-              created_at: m.created_at,
-              isOnline: false // Could be implemented with presence
-            });
-          } else {
-            const conv = conversationsMap.get(otherPerson.id);
-            if (m.sender_id !== user.id && !m.is_read) {
-              conv.unreadCount += 1;
-            }
-          }
-        });
+      // Process stories
+      const processedStories = filteredStoriesData.map(story => {
+        let creatorProfile = Array.isArray(story.profiles) ? story.profiles[0] : story.profiles;
+        if (!creatorProfile) {
+          creatorProfile = profilesMap.get(story.creator_id);
+        }
+        
+        return {
+          ...story,
+          creator: creatorProfile,
+          creator_name: creatorProfile?.name || 'Criador'
+        };
+      });
 
-        setMessages(Array.from(conversationsMap.values()));
-      }
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching data from Supabase:', error);
-      setLoading(false);
+      // Process messages into conversations
+      const conversationsMap = new Map<string, any>();
+      messagesData.forEach((m: any) => {
+        const otherUser = m.sender_id === user.id ? m.recipient : m.profiles;
+        if (!otherUser) return;
+        
+        const existing = conversationsMap.get(otherUser.id);
+        if (!existing || new Date(m.created_at) > new Date(existing.time)) {
+          conversationsMap.set(otherUser.id, {
+            id: otherUser.id,
+            name: otherUser.name,
+            avatar: otherUser.avatar,
+            lastMessage: m.content,
+            time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            unreadCount: m.recipient_id === user.id && !m.read ? 1 : 0,
+            online: false
+          });
+        } else if (m.recipient_id === user.id && !m.read) {
+          existing.unreadCount++;
+        }
+      });
+
+      setPosts(processedPosts as any);
+      setStories(processedStories as any);
+      setNotifications(notificationsData as any);
+      setUnreadNotificationsCount(notificationsData.filter((n: any) => !n.read).length);
+      setMessages(Array.from(conversationsMap.values()));
+      setDataLoading(false);
+    } catch (error: any) {
+      console.error('Error fetching data:', error);
+      setFetchError(error.message || JSON.stringify(error));
+      setDataLoading(false);
     }
-  }, [refreshKey, screen]);
+  }, [user, profile, refreshKey, screen]);
 
+  // Initial data fetch
   React.useEffect(() => {
-    if (isLoggedIn) {
+    if (isLoggedIn && profile) {
       fetchData();
+    } else if (!authLoading && !isLoggedIn) {
+      setDataLoading(false);
+    } else if (!authLoading && isLoggedIn && !profile) {
+      // Logged in but no profile - maybe fetch failed or is being created
+      console.warn('User is logged in but profile is missing');
+      setDataLoading(false);
     }
-  }, [isLoggedIn, fetchData]);
+  }, [isLoggedIn, profile, fetchData, authLoading]);
 
   // Real-time updates for notifications
   React.useEffect(() => {
@@ -4512,18 +4343,72 @@ export default function App() {
     }
   }, [screen, notifications]);
 
+  const handleForwardPost = async (post: Post, recipient: Creator) => {
+    console.log('handleForwardPost called', { post, recipient });
+    try {
+      if (!user) {
+        console.error('No user found in handleForwardPost');
+        return;
+      }
+
+      console.log('Inserting message for forward...');
+      const creatorName = post.creator?.name || 'Criador';
+      const { error } = await supabase.from('messages').insert({
+        sender_id: user.id,
+        receiver_id: recipient.id,
+        content: `Encaminhou uma publicação de ${creatorName}`,
+        media_url: post.image,
+        media_type: post.isVideo ? 'video' : 'image'
+      });
+
+      if (error) {
+        console.error('Error inserting message:', error);
+        throw error;
+      }
+
+      console.log('Message inserted successfully');
+
+      // Create notification for the receiver
+      const { error: notifError } = await supabase.from('notifications').insert({
+        user_id: recipient.id,
+        type: 'message',
+        content: `encaminhou uma publicação para você`,
+        created_at: new Date().toISOString()
+      });
+
+      if (notifError) {
+        console.warn('Error creating notification (non-fatal):', notifError);
+      }
+
+      console.log('Navigating to chat with recipient:', recipient.id);
+      setSelectedRecipient(recipient);
+      setScreen('chat');
+      setForwardingPost(null);
+    } catch (err) {
+      console.error('Error forwarding post:', err);
+      alert('Erro ao encaminhar publicação. Verifique sua conexão.');
+    }
+  };
+
   const handleViewProfile = async (creatorId: string) => {
     try {
-      if (creator && creatorId === creator.id) {
+      if (profile && creatorId === profile.id) {
         setScreen('profile');
         return;
       }
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', creatorId).single();
-      if (profile) {
-        setPublicCreator(profile as any);
+      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', creatorId).single();
+      if (profileData) {
+        setPublicCreator(profileData as any);
         // Fetch posts for this creator
-        const { data: posts } = await supabase.from('posts').select('*, creator:profiles(*)').eq('creator_id', creatorId).order('created_at', { ascending: false });
-        if (posts) setPublicPosts(posts as any);
+        const { data: postsData } = await supabase.from('posts').select('*, creator:profiles(*)').eq('creator_id', creatorId);
+        if (postsData) {
+          const sortedPosts = [...postsData].sort((a, b) => {
+            const dateA = new Date(a.created_at || a.time || 0).getTime();
+            const dateB = new Date(b.created_at || b.time || 0).getTime();
+            return dateB - dateA;
+          });
+          setPublicPosts(sortedPosts as any);
+        }
         setScreen('public-profile');
       }
     } catch (err) {
@@ -4567,7 +4452,6 @@ export default function App() {
 
   const handleLikePost = async (postId: string, isLiked: boolean) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       if (isLiked) {
@@ -4599,7 +4483,6 @@ export default function App() {
 
   const handleCommentPost = async (postId: string, content: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { error } = await supabase.from('post_comments').insert({ post_id: postId, user_id: user.id, content });
@@ -4639,8 +4522,7 @@ export default function App() {
 
   const handleStoryUpload = async (file: File) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user || !profile) return;
 
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
@@ -4657,12 +4539,10 @@ export default function App() {
       const { error: insertError } = await supabase.from('stories').insert({
         creator_id: user.id,
         image: publicUrl,
-        creator_name: creator.name
+        creator_name: profile.name
       });
 
       if (insertError) {
-        // If table doesn't exist, we might need to create it or handle it.
-        // For now, we'll assume it exists or use a fallback.
         console.error('Error inserting story record:', insertError);
       }
       setRefreshKey(prev => prev + 1);
@@ -4670,86 +4550,6 @@ export default function App() {
       console.error('Error uploading story:', err);
     }
   };
-
-  React.useEffect(() => {
-    const checkConnection = async () => {
-      try {
-        // Test connection by fetching a single profile or just checking health
-        const { error } = await supabase.from('profiles').select('id').limit(1);
-        if (error) throw error;
-        setDbStatus('connected');
-      } catch (err) {
-        console.error('Supabase connection test failed:', err);
-        setDbStatus('error');
-      }
-    };
-    checkConnection();
-    // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) {
-        console.error('Session check error:', error);
-        if (error.message.includes('Refresh Token Not Found')) {
-          supabase.auth.signOut();
-        }
-      }
-      if (session) {
-        setIsLoggedIn(true);
-        setUserEmail(session.user.email || null);
-        setScreen(prev => {
-          if (['login', 'register'].includes(prev)) {
-            const saved = localStorage.getItem('novinha_screen');
-            return (saved as Screen) || 'feed';
-          }
-          return prev;
-        });
-      }
-      // Don't set loading false here, wait for fetchData if logged in
-      if (!session) setLoading(false);
-    });
-
-    // Listen for changes on auth state
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT') {
-        setIsLoggedIn(false);
-        setScreen('login');
-        setLoading(false);
-        return;
-      }
-
-      if (session) {
-        // Check if profile exists for OAuth users
-        const { data: profiles } = await supabase.from('profiles').select('id').eq('id', session.user.id);
-        
-        if (!profiles || profiles.length === 0) {
-          console.log('OAuth login: Profile not found, creating one...');
-          await supabase.from('profiles').insert({
-            id: session.user.id,
-            name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || 'Usuário',
-            username: (session.user.email?.split('@')[0] || 'user') + Math.floor(Math.random() * 1000),
-            avatar: session.user.user_metadata.avatar_url || `https://picsum.photos/seed/${session.user.id}/400`,
-            bio: 'Novo criador no pedaço!',
-            stats: { posts: '0', followers: '0', likes: '0' },
-            is_verified: false
-          });
-        }
-
-        setIsLoggedIn(true);
-        setUserEmail(session.user.email || null);
-        setScreen(prev => {
-          if (['login', 'register'].includes(prev)) {
-            const saved = localStorage.getItem('novinha_screen');
-            return (saved as Screen) || 'feed';
-          }
-          return prev;
-        });
-      } else {
-        setIsLoggedIn(false);
-        setScreen('login');
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -4779,13 +4579,18 @@ export default function App() {
              purchasedPostIds = new Set(userPayments?.filter(p => p.post_id).map(p => p.post_id) || []);
           }
 
-          const { data: posts, error: postsError } = await supabase.from('posts').select('*, creator:profiles(*), post_likes(user_id), post_comments(id)').eq('creator_id', profile.id).order('created_at', { ascending: false });
+          const { data: posts, error: postsError } = await supabase.from('posts').select('*, creator:profiles(*), post_likes(user_id), post_comments(id)').eq('creator_id', profile.id);
           
           if (postsError) {
             console.error('Error fetching public posts with likes/comments:', postsError);
-            const { data: fallbackPosts } = await supabase.from('posts').select('*, creator:profiles(*)').eq('creator_id', profile.id).order('created_at', { ascending: false });
+            const { data: fallbackPosts } = await supabase.from('posts').select('*, creator:profiles(*)').eq('creator_id', profile.id);
             if (fallbackPosts) {
-              setPublicPosts(fallbackPosts.map((p: any) => ({
+              const sortedFallback = [...fallbackPosts].sort((a, b) => {
+                const dateA = new Date(a.created_at || a.time || 0).getTime();
+                const dateB = new Date(b.created_at || b.time || 0).getTime();
+                return dateB - dateA;
+              });
+              setPublicPosts(sortedFallback.map((p: any) => ({
                 ...p,
                 isLocked: p.is_locked,
                 hasAccess: session?.user?.id === p.creator_id ? true : (subscribedCreatorIds.has(p.creator_id) || purchasedPostIds.has(p.id) ? true : !p.is_locked),
@@ -4796,7 +4601,12 @@ export default function App() {
               })) as any);
             }
           } else if (posts) {
-            setPublicPosts(posts.map((p: any) => ({
+            const sortedPosts = [...posts].sort((a, b) => {
+              const dateA = new Date(a.created_at || a.time || 0).getTime();
+              const dateB = new Date(b.created_at || b.time || 0).getTime();
+              return dateB - dateA;
+            });
+            setPublicPosts(sortedPosts.map((p: any) => ({
               ...p,
               isLocked: p.is_locked,
               hasAccess: session?.user?.id === p.creator_id ? true : (subscribedCreatorIds.has(p.creator_id) || purchasedPostIds.has(p.id) ? true : !p.is_locked),
@@ -4837,7 +4647,24 @@ export default function App() {
     window.addEventListener('touchstart', unlock);
   }, []);
 
-  if (loading) {
+  if (authError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center">
+        <div className="text-red-500 font-black text-xl tracking-widest mb-4 uppercase">Erro de Autenticação</div>
+        <p className="text-on-surface/60 text-sm mb-8 max-w-xs mx-auto uppercase tracking-wider leading-relaxed">
+          {authError}
+        </p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-8 py-4 bg-primary text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all text-[10px] uppercase tracking-widest"
+        >
+          Recarregar Aplicativo
+        </button>
+      </div>
+    );
+  }
+
+  if (authLoading || (isLoggedIn && dataLoading)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center">
         <div className="text-primary font-black animate-pulse text-xl tracking-widest mb-8">CARREGANDO...</div>
@@ -4897,12 +4724,12 @@ export default function App() {
       return <ScreenLogin onLogin={() => setScreen('feed')} onNavigateToRegister={() => setScreen('register')} />;
     }
 
-    if (!creator) {
+    if (!profile || fetchError) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center">
-          <div className="text-primary font-black text-xl tracking-widest mb-4">ERRO DE CONEXÃO</div>
+          <div className="text-primary font-black text-xl tracking-widest mb-4">ERRO DE PERFIL OU DADOS</div>
           <p className="text-xs text-on-surface/40 font-bold uppercase tracking-widest mb-8 leading-relaxed max-w-xs">
-            Não foi possível carregar seu perfil. Os dados podem estar corrompidos ou houve um problema de rede.
+            {fetchError ? `Erro: ${fetchError}` : 'Não foi possível carregar seu perfil. Tente novamente ou entre em contato com o suporte.'}
           </p>
           <button 
             onClick={handleReset}
@@ -4918,9 +4745,9 @@ export default function App() {
       case 'feed': return (
         <ScreenFeed 
           posts={posts} 
-          stories={stories.filter(s => s.creator_id === creator.id)} 
+          stories={stories.filter(s => s.creator_id === profile.id)} 
           onStoryUpload={handleStoryUpload} 
-          creator={creator} 
+          creator={profile} 
           onDeletePost={handleDeletePost}
           onUpdatePost={handleUpdatePost}
           onDeleteStory={handleDeleteStory}
@@ -4934,12 +4761,12 @@ export default function App() {
       case 'profile': return (
         <ScreenProfile 
           onEdit={() => setScreen('edit-profile')} 
-          creator={creator} 
-          onLogout={() => supabase.auth.signOut()} 
+          creator={profile} 
+          onLogout={() => signOut()} 
           posts={posts}
           onDeletePost={handleDeletePost}
           onUpdatePost={handleUpdatePost}
-          onSubscribe={(post) => handleSubscribe(creator, post)}
+          onSubscribe={(post) => handleSubscribe(profile, post)}
           stories={stories}
           onDeleteStory={handleDeleteStory}
           isMaster={isMaster}
@@ -4977,9 +4804,9 @@ export default function App() {
         ) : (
           <ScreenFeed 
             posts={posts} 
-            stories={stories.filter(s => s.creator_id === creator.id)} 
+            stories={stories.filter(s => s.creator_id === profile.id)} 
             onStoryUpload={handleStoryUpload} 
-            creator={creator} 
+            creator={profile} 
             onDeletePost={handleDeletePost}
             onUpdatePost={handleUpdatePost}
             onDeleteStory={handleDeleteStory}
@@ -5005,17 +4832,17 @@ export default function App() {
       case 'wallet': return <ScreenWallet onBack={() => setScreen('feed')} isMaster={isMaster} />;
       case 'subscriptions': return <ScreenSubscriptions onBack={() => setScreen('feed')} />;
       case 'edit-profile': 
-        if (!creator) return null;
-        return <ScreenEditProfile onBack={() => setScreen('profile')} creator={creator} onProfileUpdated={() => setRefreshKey(prev => prev + 1)} />;
+        if (!profile) return null;
+        return <ScreenEditProfile onBack={() => setScreen('profile')} creator={profile} onProfileUpdated={() => { refreshProfile(); setRefreshKey(prev => prev + 1); }} />;
       case 'create-post': return <ScreenCreatePost onBack={() => setScreen('feed')} onPostCreated={() => { setRefreshKey(prev => prev + 1); setScreen('feed'); }} />;
-      case 'payment': return <ScreenPayment onBack={() => setScreen('feed')} creator={publicCreator || creator} post={selectedPostForPayment} />;
+      case 'payment': return <ScreenPayment onBack={() => setScreen('feed')} creator={publicCreator || profile} post={selectedPostForPayment} />;
       case 'chat': return selectedRecipient ? <ChatView recipient={selectedRecipient} onBack={() => setScreen('messages')} onMessagesRead={() => setRefreshKey(prev => prev + 1)} /> : null;
       default: return (
         <ScreenFeed 
           posts={posts} 
-          stories={stories.filter(s => s.creator_id === creator.id)} 
+          stories={stories.filter(s => s.creator_id === profile.id)} 
           onStoryUpload={handleStoryUpload} 
-          creator={creator} 
+          creator={profile} 
           onDeletePost={handleDeletePost}
           onUpdatePost={handleUpdatePost}
           onDeleteStory={handleDeleteStory}
@@ -5066,7 +4893,7 @@ export default function App() {
               setScreen(screen === 'edit-profile' ? 'profile' : 'feed');
             }
           }} 
-          avatar={isLoggedIn ? creator?.avatar : publicCreator?.avatar}
+          avatar={isLoggedIn ? profile?.avatar : publicCreator?.avatar}
           isMaster={isMaster}
           onMessageClick={() => setScreen('messages')}
           unreadCount={unreadMessagesCount}
