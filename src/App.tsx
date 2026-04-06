@@ -1106,11 +1106,6 @@ const ScreenFeed = ({
 
   return (
     <div className="pt-20 pb-24 max-w-2xl mx-auto">
-      {/* Debug Info */}
-      <div className="bg-red-500 text-white p-2 text-xs text-center mb-4">
-        Debug: {posts.length} posts carregados. isMaster: {isMaster ? 'Sim' : 'Não'}.
-      </div>
-
       {/* Modals */}
       <FullScreenPostModal 
         post={selectedPost} 
@@ -1534,11 +1529,6 @@ const ScreenProfile = ({
   
   return (
     <div className="pt-0 pb-24">
-      {/* Debug Info */}
-      <div className="bg-red-500 text-white p-2 text-xs text-center">
-        Debug Profile: {posts?.length || 0} posts totais, {myPosts.length} meus posts.
-      </div>
-
       {/* Modals */}
       <FullScreenPostModal 
         post={selectedPost} 
@@ -3991,7 +3981,6 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
 // --- Main App ---
 
 // --- Constants ---
-const MASTER_EMAIL = 'mayconrubemx@gmail.com';
 
 export default function App() {
   const { user, profile, loading: authLoading, error: authError, signOut, refreshProfile } = useAuth();
@@ -4018,7 +4007,7 @@ export default function App() {
   const [forwardingPost, setForwardingPost] = React.useState<Post | null>(null);
   const [editingPost, setEditingPost] = React.useState<Post | null>(null);
 
-  const isMaster = profile?.role === 'master' || profile?.role === 'admin' || user?.email === MASTER_EMAIL;
+  const isMaster = profile?.role === 'master' || profile?.role === 'admin';
   const isLoggedIn = !!user;
 
   React.useEffect(() => {
@@ -4054,12 +4043,13 @@ export default function App() {
         const { data: masterProfile } = await supabase
           .from('profiles')
           .select('id')
-          .eq('email', MASTER_EMAIL)
-          .single();
+          .eq('role', 'admin')
+          .limit(1)
+          .maybeSingle();
         masterId = masterProfile?.id;
         console.log('Master ID found:', masterId);
       } catch (e) {
-        console.log('Master profile not found by email, showing all posts');
+        console.log('Master profile not found, showing all posts');
       }
 
       // Fetch posts with likes and comments
@@ -4187,7 +4177,7 @@ export default function App() {
       // Process posts
       const processedPosts = filteredPostsData.map(post => {
         const isOwner = post.creator_id === user.id;
-        const isMasterUser = user.email === MASTER_EMAIL || profile.role === 'master' || profile.role === 'admin';
+        const isMasterUser = profile.role === 'master' || profile.role === 'admin';
         
         // Try to get creator profile from the join first, then from the map
         let creatorProfile = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
