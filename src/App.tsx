@@ -518,7 +518,8 @@ const FullScreenPostModal = ({
   currentUserId,
   onLike,
   onComment,
-  onForward
+  onForward,
+  initialShowComments = false
 }: { 
   post: Post | null, 
   onClose: () => void, 
@@ -527,12 +528,21 @@ const FullScreenPostModal = ({
   currentUserId?: string,
   onLike?: (id: string, isLiked: boolean) => void,
   onComment?: (id: string, content: string) => void,
-  onForward?: (post: Post) => void
+  onForward?: (post: Post) => void,
+  initialShowComments?: boolean
 }) => {
   const isOwner = post?.creator.id === currentUserId;
   const [comments, setComments] = React.useState<Comment[]>([]);
   const [newComment, setNewComment] = React.useState('');
-  const [showComments, setShowComments] = React.useState(false);
+  const [showComments, setShowComments] = React.useState(initialShowComments);
+
+  React.useEffect(() => {
+    if (post) {
+      setShowComments(initialShowComments);
+    } else {
+      setShowComments(false);
+    }
+  }, [post, initialShowComments]);
 
   React.useEffect(() => {
     if (post && showComments) {
@@ -1090,6 +1100,7 @@ const ScreenFeed = ({
 }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
+  const [openComments, setOpenComments] = React.useState(false);
   const [editingPost, setEditingPost] = React.useState<Post | null>(null);
   const [activeStoryIndex, setActiveStoryIndex] = React.useState<number | null>(null);
   const [showPostMenu, setShowPostMenu] = React.useState<string | null>(null);
@@ -1099,13 +1110,17 @@ const ScreenFeed = ({
       {/* Modals */}
       <FullScreenPostModal 
         post={selectedPost} 
-        onClose={() => setSelectedPost(null)} 
+        onClose={() => {
+          setSelectedPost(null);
+          setOpenComments(false);
+        }} 
         onDelete={onDeletePost}
         onEdit={setEditingPost}
         currentUserId={creator.id}
         onLike={onLikePost}
         onComment={onCommentPost}
         onForward={onForwardPost}
+        initialShowComments={openComments}
       />
       {editingPost && <EditPostModal post={editingPost} onSave={onUpdatePost} onClose={() => setEditingPost(null)} />}
       {activeStoryIndex !== null && (
@@ -1230,7 +1245,12 @@ const ScreenFeed = ({
           
           <div 
             className="aspect-square relative overflow-hidden bg-on-surface/5 cursor-pointer"
-            onClick={() => post.hasAccess && setSelectedPost(post)}
+            onClick={() => {
+              if (post.hasAccess) {
+                setSelectedPost(post);
+                setOpenComments(false);
+              }
+            }}
           >
             {post.isVideo ? (
               <video 
@@ -1298,7 +1318,12 @@ const ScreenFeed = ({
                   <Heart className={post.isLikedByMe ? "text-primary" : "text-on-surface"} fill={post.isLikedByMe ? "currentColor" : "none"} />
                   <span className="text-sm font-bold">{post.likesCount || 0}</span>
                 </button>
-                <button onClick={() => post.hasAccess && setSelectedPost(post)} className="flex items-center gap-2">
+                <button onClick={() => {
+                  if (post.hasAccess) {
+                    setSelectedPost(post);
+                    setOpenComments(true);
+                  }
+                }} className="flex items-center gap-2">
                   <MessageCircle className="text-on-surface" />
                   <span className="text-sm font-bold">{post.commentsCount || 0}</span>
                 </button>
@@ -1496,6 +1521,7 @@ const ScreenProfile = ({
   const myPosts = posts.filter(p => p.creator?.id === creator?.id).filter(p => activeTab === 'all' ? true : p.isLocked);
   const myStories = stories.filter(s => s.creator_id === creator?.id);
   const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
+  const [openComments, setOpenComments] = React.useState(false);
   const [editingPost, setEditingPost] = React.useState<Post | null>(null);
   const [activeStoryIndex, setActiveStoryIndex] = React.useState<number | null>(null);
   
@@ -1504,13 +1530,17 @@ const ScreenProfile = ({
       {/* Modals */}
       <FullScreenPostModal 
         post={selectedPost} 
-        onClose={() => setSelectedPost(null)} 
+        onClose={() => {
+          setSelectedPost(null);
+          setOpenComments(false);
+        }} 
         onDelete={onDeletePost}
         onEdit={setEditingPost}
         currentUserId={creator?.id}
         onLike={onLikePost}
         onComment={onCommentPost}
         onForward={onForwardPost}
+        initialShowComments={openComments}
       />
       {editingPost && <EditPostModal post={editingPost} onSave={onUpdatePost} onClose={() => setEditingPost(null)} />}
       {activeStoryIndex !== null && (
@@ -1649,7 +1679,12 @@ const ScreenProfile = ({
                 <div 
                   key={post.id} 
                   className="relative aspect-square overflow-hidden rounded-2xl bg-on-surface/5 shadow-sm group cursor-pointer"
-                  onClick={() => post.hasAccess && setSelectedPost(post)}
+                  onClick={() => {
+                    if (post.hasAccess) {
+                      setSelectedPost(post);
+                      setOpenComments(false);
+                    }
+                  }}
                 >
                   {post.isVideo ? (
                     <video 
@@ -1752,6 +1787,7 @@ const ScreenPublicProfile = ({
   const myPosts = posts.filter(p => p.creator.id === creator.id).filter(p => activeTab === 'all' ? true : p.isLocked);
   const myStories = stories.filter(s => s.creator_id === creator.id);
   const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
+  const [openComments, setOpenComments] = React.useState(false);
   const [activeStoryIndex, setActiveStoryIndex] = React.useState<number | null>(null);
   const [isFollowing, setIsFollowing] = React.useState(false);
   const [followerCount, setFollowerCount] = React.useState(Number(creator.stats?.followers || 0));
@@ -1810,10 +1846,14 @@ const ScreenPublicProfile = ({
       {/* Full Screen Modal */}
       <FullScreenPostModal 
         post={selectedPost} 
-        onClose={() => setSelectedPost(null)} 
+        onClose={() => {
+          setSelectedPost(null);
+          setOpenComments(false);
+        }} 
         onLike={onLikePost}
         onComment={onCommentPost}
         onForward={onForwardPost}
+        initialShowComments={openComments}
       />
       {activeStoryIndex !== null && (
         <StoryViewer 
@@ -1951,7 +1991,10 @@ const ScreenPublicProfile = ({
               className="relative aspect-square overflow-hidden rounded-2xl bg-on-surface/5 shadow-sm group cursor-pointer"
               onClick={() => {
                 if (!post.hasAccess) onSubscribe(post);
-                else setSelectedPost(post);
+                else {
+                  setSelectedPost(post);
+                  setOpenComments(false);
+                }
               }}
             >
               {post.isVideo ? (
@@ -4471,6 +4514,10 @@ export default function App() {
 
   const handleViewProfile = async (creatorId: string) => {
     try {
+      if (creator && creatorId === creator.id) {
+        setScreen('profile');
+        return;
+      }
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', creatorId).single();
       if (profile) {
         setPublicCreator(profile as any);
