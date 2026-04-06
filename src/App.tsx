@@ -4144,7 +4144,7 @@ export default function App() {
       const { data: notificationsDataRaw, error: notificationsError } = await supabase
         .from('notifications')
         .select('*')
-        .eq('recipient_id', user.id);
+        .eq('user_id', user.id);
 
       if (notificationsError) throw notificationsError;
       
@@ -4168,8 +4168,8 @@ export default function App() {
       // Fetch messages (conversations)
       const { data: messagesDataRaw, error: messagesError } = await supabase
         .from('messages')
-        .select('*, profiles:sender_id (*), recipient:recipient_id (*)')
-        .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`);
+        .select('*, profiles:sender_id (*), receiver:receiver_id (*)')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
 
       if (messagesError) throw messagesError;
       
@@ -4247,10 +4247,10 @@ export default function App() {
             avatar: otherUser.avatar,
             lastMessage: m.content,
             time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            unreadCount: m.recipient_id === user.id && !m.read ? 1 : 0,
+            unreadCount: m.receiver_id === user.id && !m.is_read ? 1 : 0,
             online: false
           });
-        } else if (m.recipient_id === user.id && !m.read) {
+        } else if (m.receiver_id === user.id && !m.is_read) {
           existing.unreadCount++;
         }
       });
