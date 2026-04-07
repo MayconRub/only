@@ -2348,12 +2348,17 @@ const ChatView = ({ recipient, onBack, onMessagesRead }: { recipient: Creator, o
           .map(m => m.id);
         
         if (unreadIds.length > 0) {
-          await supabase
+          const { error: updateError } = await supabase
             .from('messages')
             .update({ is_read: true })
             .in('id', unreadIds);
           
-          if (onMessagesRead) onMessagesRead();
+          if (updateError) {
+            console.error('Error updating messages as read:', updateError);
+          } else {
+            console.log(`Successfully marked ${unreadIds.length} messages as read`);
+            if (onMessagesRead) onMessagesRead();
+          }
         }
       }
     } catch (err) {
@@ -4226,21 +4231,32 @@ export default function App() {
       // Process messages into conversations
       const conversationsMap = new Map<string, any>();
       messagesData.forEach((m: any) => {
-        const otherUser = m.sender_id === user.id ? m.recipient : m.profiles;
+        const otherUser = m.sender_id === user.id ? m.receiver : m.profiles;
         if (!otherUser) return;
         
         const existing = conversationsMap.get(otherUser.id);
-        if (!existing || new Date(m.created_at) > new Date(existing.time)) {
+        const msgTime = new Date(m.created_at || m.time || 0).getTime();
+        const isUnread = m.receiver_id === user.id && !m.is_read;
+
+        if (!existing) {
           conversationsMap.set(otherUser.id, {
-            id: otherUser.id, // This is the conversation ID, we can use the other user's ID
+            id: otherUser.id,
             user: otherUser as any,
             lastMessage: m.content,
             time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            unreadCount: m.receiver_id === user.id && !m.is_read ? 1 : 0,
-            isOnline: false
+            unreadCount: isUnread ? 1 : 0,
+            isOnline: false,
+            _rawTime: msgTime
           });
-        } else if (m.receiver_id === user.id && !m.is_read) {
-          existing.unreadCount++;
+        } else {
+          if (isUnread) {
+            existing.unreadCount++;
+          }
+          if (msgTime > existing._rawTime) {
+            existing.lastMessage = m.content;
+            existing.time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            existing._rawTime = msgTime;
+          }
         }
       });
 
