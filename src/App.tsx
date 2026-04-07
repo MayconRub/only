@@ -198,9 +198,9 @@ const ScreenCreatorPlans = ({ onBack, profile }: { onBack: () => void, profile: 
   React.useEffect(() => {
     if (profile) {
       const existingPlans = profile.stats?.plans || [
-        { id: 'monthly', name: 'Mensal', price: '29.90', description: 'Acesso total por 30 dias' },
-        { id: 'quarterly', name: 'Trimestral', price: '79.90', description: 'Economize 15% - 90 dias', badge: 'Popular' },
-        { id: 'yearly', name: 'Anual', price: '249.90', description: 'Economize 30% - 365 dias', badge: 'Melhor Valor' },
+        { id: 'monthly', name: 'Mensal', price: '29.90', description: 'Acesso total por 30 dias', duration: 30 },
+        { id: 'quarterly', name: 'Trimestral', price: '79.90', description: 'Economize 15% - 90 dias', badge: 'Popular', duration: 90 },
+        { id: 'yearly', name: 'Anual', price: '249.90', description: 'Economize 30% - 365 dias', badge: 'Melhor Valor', duration: 365 },
       ];
       setPlans(existingPlans);
       setLoading(false);
@@ -274,7 +274,7 @@ const ScreenCreatorPlans = ({ onBack, profile }: { onBack: () => void, profile: 
           <p className="text-on-surface/60 text-sm font-medium">Gerencie seus planos de assinatura.</p>
         </div>
         <button 
-          onClick={() => setEditingPlan({ isNew: true, name: '', price: '', description: '', badge: '' })}
+          onClick={() => setEditingPlan({ isNew: true, name: '', price: '', description: '', badge: '', duration: 30 })}
           className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md"
         >
           + Novo Plano
@@ -318,6 +318,17 @@ const ScreenCreatorPlans = ({ onBack, profile }: { onBack: () => void, profile: 
               />
             </div>
             <div>
+              <label className="block text-xs font-bold text-on-surface/60 mb-1">Duração (Dias)</label>
+              <input 
+                required
+                type="number"
+                value={editingPlan.duration || ''}
+                onChange={e => setEditingPlan({...editingPlan, duration: parseInt(e.target.value)})}
+                className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
+                placeholder="Ex: 30"
+              />
+            </div>
+            <div>
               <label className="block text-xs font-bold text-on-surface/60 mb-1">Badge (Opcional)</label>
               <input 
                 value={editingPlan.badge || ''}
@@ -358,6 +369,7 @@ const ScreenCreatorPlans = ({ onBack, profile }: { onBack: () => void, profile: 
                   )}
                 </div>
                 <p className="text-xs font-bold text-on-surface/60">{plan.description}</p>
+                <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest mt-1">Duração: {plan.duration || 30} dias</p>
                 <p className="text-primary font-black mt-2">R$ {parseFloat(plan.price).toFixed(2).replace('.', ',')}</p>
               </div>
               <div className="flex gap-2">
@@ -398,11 +410,11 @@ const ScreenSubscriptions = ({ onBack }: { onBack: () => void }) => {
         if (!user) return;
 
         const { data, error } = await supabase
-          .from('payments')
+          .from('subscriptions')
           .select('*, creator:profiles!creator_id(*)')
           .eq('user_id', user.id)
-          .eq('status', 'approved')
-          .order('created_at', { ascending: false });
+          .eq('status', 'active')
+          .order('end_date', { ascending: false });
 
         if (error) throw error;
         if (data) setSubscriptions(data);
@@ -442,13 +454,20 @@ const ScreenSubscriptions = ({ onBack }: { onBack: () => void }) => {
                   <h3 className="font-black text-on-surface text-base uppercase tracking-tight">{sub.creator?.name}</h3>
                   <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">Plano: {sub.plan_id || 'VIP'}</p>
                   <p className="text-[9px] font-bold text-primary/60 uppercase tracking-widest mt-1">
-                    Ativo desde {new Date(sub.created_at).toLocaleDateString('pt-BR')}
+                    Expira em {new Date(sub.end_date).toLocaleDateString('pt-BR')}
                   </p>
+                  {(() => {
+                    const remainingDays = Math.ceil((new Date(sub.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                    return (
+                      <p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${remainingDays <= 3 ? 'text-red-500' : 'text-green-600'}`}>
+                        {remainingDays > 0 ? `${remainingDays} dias restantes` : 'Expirado'}
+                      </p>
+                    );
+                  })()}
                 </div>
               </div>
               <div className="text-right">
-                <span className="block font-black text-primary text-sm">R$ {sub.amount?.toFixed(2).replace('.', ',')}</span>
-                <span className="text-[8px] font-black text-green-600 uppercase tracking-widest bg-green-50 px-2 py-1 rounded-md border border-green-100">Confirmado</span>
+                <span className="text-[8px] font-black text-green-600 uppercase tracking-widest bg-green-50 px-2 py-1 rounded-md border border-green-100">Ativa</span>
               </div>
             </div>
           ))}
@@ -4374,9 +4393,9 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   const defaultPlans = [
-    { id: 'monthly', name: 'Mensal', price: '29.90', description: 'Acesso total por 30 dias' },
-    { id: 'quarterly', name: 'Trimestral', price: '79.90', description: 'Economize 15% - 90 dias', badge: 'Popular' },
-    { id: 'yearly', name: 'Anual', price: '249.90', description: 'Economize 30% - 365 dias', badge: 'Melhor Valor' },
+    { id: 'monthly', name: 'Mensal', price: '29.90', description: 'Acesso total por 30 dias', duration: 30 },
+    { id: 'quarterly', name: 'Trimestral', price: '79.90', description: 'Economize 15% - 90 dias', badge: 'Popular', duration: 90 },
+    { id: 'yearly', name: 'Anual', price: '249.90', description: 'Economize 30% - 365 dias', badge: 'Melhor Valor', duration: 365 },
   ];
 
   const plans = creator?.stats?.plans || defaultPlans;
@@ -4409,15 +4428,18 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
       let amount = 0;
       let description = "";
       let planId = selectedPlan;
+      let duration = 30;
 
       if (post) {
         amount = parseFloat(postPrice.replace('R$ ', '').replace(',', '.') || '0');
         description = `Compra de Post - ${creator.name}`;
         planId = `post_${post.id}`;
+        duration = 9999; // Lifetime for posts
       } else {
         const selectedPlanData = plans.find((p: any) => p.id === selectedPlan);
         amount = parseFloat(String(selectedPlanData?.price).replace('R$ ', '').replace(',', '.') || '0');
         description = `Assinatura ${selectedPlanData?.name} - ${creator.name}`;
+        duration = selectedPlanData?.duration || 30;
       }
 
       const response = await fetch('/api/payments/pix', {
@@ -4430,7 +4452,8 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
           userId: currentUser.id,
           creatorId: creator.id,
           planId,
-          postId: post?.id
+          postId: post?.id,
+          duration
         })
       });
 
@@ -4858,19 +4881,32 @@ export default function App() {
       let purchasedPostIds = new Set<string>();
       
       try {
+        // Fetch active subscriptions
+        const { data: activeSubs } = await supabase
+          .from('subscriptions')
+          .select('creator_id')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .gt('end_date', new Date().toISOString());
+        
+        subscribedCreatorIds = new Set(activeSubs?.map(s => s.creator_id) || []);
+
+        // Fetch purchased posts
         const { data: userPayments, error: paymentsError } = await supabase
           .from('payments')
-          .select('creator_id') // Removido post_id que está causando erro 400
+          .select('creator_id, post_id')
           .eq('user_id', user.id)
           .eq('status', 'approved');
 
         if (paymentsError) {
-          console.warn('Payments table query failed (expected if schema is old):', paymentsError.message);
+          console.warn('Payments table query failed:', paymentsError.message);
         } else {
-          subscribedCreatorIds = new Set(userPayments?.map(p => p.creator_id) || []);
+          userPayments?.forEach(p => {
+            if (p.post_id) purchasedPostIds.add(p.post_id);
+          });
         }
       } catch (err) {
-        console.warn('Error fetching payments:', err);
+        console.warn('Error fetching access data:', err);
       }
 
       // Fetch messages (conversations)
@@ -5312,13 +5348,26 @@ export default function App() {
             }
           }
           if (session?.user) {
+             // Fetch active subscriptions
+             const { data: activeSubs } = await supabase
+               .from('subscriptions')
+               .select('creator_id')
+               .eq('user_id', session.user.id)
+               .eq('status', 'active')
+               .gt('end_date', new Date().toISOString());
+             
+             subscribedCreatorIds = new Set(activeSubs?.map(s => s.creator_id) || []);
+
+             // Fetch purchased posts
              const { data: userPayments } = await supabase
               .from('payments')
               .select('creator_id, post_id')
               .eq('user_id', session.user.id)
               .eq('status', 'approved');
-             subscribedCreatorIds = new Set(userPayments?.filter(p => !p.post_id).map(p => p.creator_id) || []);
-             purchasedPostIds = new Set(userPayments?.filter(p => p.post_id).map(p => p.post_id) || []);
+             
+             userPayments?.forEach((p: any) => {
+               if (p.post_id) purchasedPostIds.add(p.post_id);
+             });
           }
 
           const { data: posts, error: postsError } = await supabase.from('posts').select('*, creator:profiles(*), post_likes(user_id), post_comments(id)').eq('creator_id', profile.id);

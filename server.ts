@@ -28,7 +28,7 @@ function getSupabase() {
 app.post("/api/payments/pix", async (req, res) => {
   try {
     const body = req.body || {};
-    const { amount, description, payerEmail, userId, creatorId, planId } = body;
+    const { amount, description, payerEmail, userId, creatorId, planId, duration } = body;
 
     if (!process.env.TURBOFY_CLIENT_ID || !process.env.TURBOFY_CLIENT_SECRET) {
       return res.status(500).json({ error: "Turbofy credentials not configured." });
@@ -53,6 +53,7 @@ app.post("/api/payments/pix", async (req, res) => {
         creator_id: creatorId,
         amount: amount,
         plan_id: planId,
+        duration: duration,
         status: "pending",
       })
       .select()
@@ -151,11 +152,9 @@ app.post("/api/webhooks/turbofy", async (req, res) => {
 
           if (paymentRecord) {
             // Create subscription
+            const duration = paymentRecord.duration || 30;
             const endDate = new Date();
-            if (paymentRecord.plan_id === 'monthly') endDate.setDate(endDate.getDate() + 30);
-            else if (paymentRecord.plan_id === 'quarterly') endDate.setDate(endDate.getDate() + 90);
-            else if (paymentRecord.plan_id === 'yearly') endDate.setDate(endDate.getDate() + 365);
-            else endDate.setDate(endDate.getDate() + 30); // Default 30 days
+            endDate.setDate(endDate.getDate() + duration);
 
             const { error: subError } = await supabase.from("subscriptions").insert({
               user_id: paymentRecord.user_id,
