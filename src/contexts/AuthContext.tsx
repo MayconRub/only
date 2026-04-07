@@ -67,13 +67,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Fetch social connections
+      console.log('AuthContext: Buscando conexões sociais para:', userId);
       const { data: socialData, error: socialError } = await supabase
         .from('social_connections')
         .select('platform, url')
         .eq('profile_id', userId);
 
       if (socialError) {
-        console.error('Error fetching social connections:', socialError);
+        console.error('AuthContext: Erro ao buscar conexões sociais:', socialError);
+        // Se o erro for 404 ou similar, pode ser que a tabela não exista
+        if (socialError.code === '42P01') {
+          console.error('CRÍTICO: A tabela social_connections não existe no banco de dados!');
+        }
       }
 
       const socialLinks = (socialData || []).reduce((acc: any, curr: any) => {
@@ -81,7 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return acc;
       }, {});
 
-      console.log('Fetched social links for user:', userId, socialLinks);
+      console.log('AuthContext: Links sociais recuperados:', socialLinks);
 
       return { ...data, social_links: socialLinks } as Creator;
     } catch (err: any) {

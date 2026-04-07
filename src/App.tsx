@@ -3233,7 +3233,11 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
         role: isCreator ? 'creator' : 'user'
       }).eq('id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao atualizar perfil:', error);
+        alert(`Erro ao atualizar perfil: ${error.message}`);
+        throw error;
+      }
 
       // Save social connections
       const socialLinks = [
@@ -3242,24 +3246,29 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
         { platform: 'tiktok', url: tiktok }
       ];
 
-      console.log('Iniciando salvamento de redes sociais...', socialLinks);
+      console.log('Iniciando salvamento de redes sociais para o usuário:', user.id, socialLinks);
 
       for (const link of socialLinks) {
         try {
           if (link.url && link.url.trim() !== '') {
-            const { error: socialError } = await supabase
+            console.log(`Tentando upsert para ${link.platform}:`, link.url.trim());
+            const { data: upsertData, error: socialError } = await supabase
               .from('social_connections')
               .upsert(
                 { profile_id: user.id, platform: link.platform, url: link.url.trim() },
                 { onConflict: 'profile_id, platform' }
-              );
+              )
+              .select();
             
             if (socialError) {
-              console.error(`Erro ao salvar ${link.platform}:`, socialError);
-              throw new Error(`Falha ao salvar ${link.platform}: ${socialError.message}`);
+              console.error(`Erro detalhado ao salvar ${link.platform}:`, socialError);
+              alert(`Erro ao salvar ${link.platform}: ${socialError.message}`);
+            } else {
+              console.log(`Sucesso ao salvar ${link.platform}:`, upsertData);
             }
           } else {
             // Se a URL estiver vazia, removemos a conexão existente
+            console.log(`Removendo conexão vazia para ${link.platform}`);
             const { error: deleteError } = await supabase
               .from('social_connections')
               .delete()
@@ -3269,8 +3278,7 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
             if (deleteError) console.warn(`Aviso ao remover ${link.platform}:`, deleteError);
           }
         } catch (socialErr: any) {
-          console.error(`Erro no loop de redes sociais (${link.platform}):`, socialErr);
-          // Não interrompemos o salvamento do perfil principal, mas avisamos
+          console.error(`Exceção no loop de redes sociais (${link.platform}):`, socialErr);
         }
       }
 
@@ -4520,14 +4528,25 @@ export default function App() {
       });
 
       // Fetch user payments for access control
-      const { data: userPayments } = await supabase
-        .from('payments')
-        .select('creator_id, post_id')
-        .eq('user_id', user.id)
-        .eq('status', 'approved');
+      let subscribedCreatorIds = new Set<string>();
+      let purchasedPostIds = new Set<string>();
+      
+      try {
+        const { data: userPayments, error: paymentsError } = await supabase
+          .from('payments')
+          .select('creator_id, post_id')
+          .eq('user_id', user.id)
+          .eq('status', 'approved');
 
-      const subscribedCreatorIds = new Set(userPayments?.filter(p => !p.post_id).map(p => p.creator_id) || []);
-      const purchasedPostIds = new Set(userPayments?.filter(p => p.post_id).map(p => p.post_id) || []);
+        if (paymentsError) {
+          console.warn('Payments table might be missing or query failed:', paymentsError.message);
+        } else {
+          subscribedCreatorIds = new Set(userPayments?.filter(p => !p.post_id).map(p => p.creator_id) || []);
+          purchasedPostIds = new Set(userPayments?.filter(p => p.post_id).map(p => p.post_id) || []);
+        }
+      } catch (err) {
+        console.warn('Error fetching payments:', err);
+      }
 
       // Fetch messages (conversations)
       const { data: messagesDataRaw, error: messagesError } = await supabase
