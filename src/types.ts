@@ -15,6 +15,11 @@ export interface Creator {
     followers: string;
     likes: string;
   };
+  social_links?: {
+    instagram?: string;
+    twitter?: string;
+    tiktok?: string;
+  };
 }
 
 export interface Comment {

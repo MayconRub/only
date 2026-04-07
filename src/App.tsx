@@ -43,7 +43,10 @@ import {
   Image as ImageIcon,
   Video as VideoIcon,
   Settings,
-  Edit2
+  Edit2,
+  Instagram,
+  Twitter,
+  Music
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Cropper from 'react-easy-crop';
@@ -3065,6 +3068,9 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
   const [avatar, setAvatar] = useState(creator.avatar);
   const [coverImage, setCoverImage] = useState(creator.cover_image || '');
   const [isCreator, setIsCreator] = useState(creator.role === 'creator');
+  const [instagram, setInstagram] = useState('');
+  const [twitter, setTwitter] = useState('');
+  const [tiktok, setTiktok] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -3178,6 +3184,22 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
       }).eq('id', user.id);
 
       if (error) throw error;
+
+      // Save social connections
+      const socialLinks = [
+        { platform: 'instagram', url: instagram },
+        { platform: 'twitter', url: twitter },
+        { platform: 'tiktok', url: tiktok }
+      ];
+
+      for (const link of socialLinks) {
+        if (link.url) {
+          await supabase
+            .from('social_connections')
+            .upsert({ profile_id: user.id, platform: link.platform, url: link.url }, { onConflict: 'profile_id, platform' });
+        }
+      }
+
       onProfileUpdated();
       onBack();
     } catch (err: any) {
@@ -3261,6 +3283,33 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
             <p className="text-[11px] font-bold text-on-surface/80 leading-relaxed">
               Sou um <span className="text-primary">Criador de Conteúdo</span>
             </p>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Instagram</label>
+            <input 
+              className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
+              value={instagram}
+              onChange={(e) => setInstagram(e.target.value)}
+              placeholder="https://instagram.com/usuario"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Twitter</label>
+            <input 
+              className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
+              value={twitter}
+              onChange={(e) => setTwitter(e.target.value)}
+              placeholder="https://twitter.com/usuario"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">TikTok</label>
+            <input 
+              className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
+              value={tiktok}
+              onChange={(e) => setTiktok(e.target.value)}
+              placeholder="https://tiktok.com/@usuario"
+            />
           </div>
           <div className="space-y-1.5">
             <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Bio Editorial</label>
