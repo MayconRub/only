@@ -2033,7 +2033,7 @@ const ScreenPublicProfile = ({
 
   const handleFollow = async () => {
     if (!isLoggedIn) {
-      alert('Faça login para seguir!');
+      setScreen('register');
       return;
     }
     const { data: { user } } = await supabase.auth.getUser();
