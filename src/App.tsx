@@ -4232,13 +4232,12 @@ export default function App() {
         const existing = conversationsMap.get(otherUser.id);
         if (!existing || new Date(m.created_at) > new Date(existing.time)) {
           conversationsMap.set(otherUser.id, {
-            id: otherUser.id,
-            name: otherUser.name,
-            avatar: otherUser.avatar,
+            id: otherUser.id, // This is the conversation ID, we can use the other user's ID
+            user: otherUser as any,
             lastMessage: m.content,
             time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             unreadCount: m.receiver_id === user.id && !m.is_read ? 1 : 0,
-            online: false
+            isOnline: false
           });
         } else if (m.receiver_id === user.id && !m.is_read) {
           existing.unreadCount++;
