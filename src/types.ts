@@ -9,11 +9,12 @@ export interface Creator {
   bio?: string;
   services_bio?: string;
   welcome_audio?: string;
-  role?: 'user' | 'admin' | 'master';
+  role?: 'user' | 'admin' | 'master' | 'creator';
   stats?: {
     posts: string;
     followers: string;
     likes: string;
+    plans?: any[];
   };
   social_links?: {
     instagram?: string;
@@ -32,6 +33,7 @@ export interface Comment {
 export interface Post {
   id: string;
   creator: Creator;
+  creator_id?: string;
   image: string;
   likes: string;
   caption: string;

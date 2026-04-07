@@ -1791,6 +1791,26 @@ const ScreenProfile = ({
         <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator?.name}</h1>
         <p className="text-sm text-primary font-bold mb-2">{creator?.bio}</p>
 
+        {creator.social_links && (
+          <div className="flex justify-center gap-4 mb-4">
+            {creator.social_links.instagram && (
+              <a href={creator.social_links.instagram} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
+                <Instagram size={24} />
+              </a>
+            )}
+            {creator.social_links.twitter && (
+              <a href={creator.social_links.twitter} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
+                <Twitter size={24} />
+              </a>
+            )}
+            {creator.social_links.tiktok && (
+              <a href={creator.social_links.tiktok} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
+                <Music size={24} />
+              </a>
+            )}
+          </div>
+        )}
+
         {creator.welcome_audio && (
           <WelcomeAudioPlayer audioUrl={creator.welcome_audio} />
         )}
@@ -1983,7 +2003,8 @@ const ScreenPublicProfile = ({
   onCommentPost,
   onMessage,
   isLoggedIn,
-  onForwardPost
+  onForwardPost,
+  onNavigate
 }: { 
   creator: Creator, 
   posts: Post[], 
@@ -1993,7 +2014,8 @@ const ScreenPublicProfile = ({
   onCommentPost?: (id: string, content: string) => void,
   onMessage?: (creator: Creator) => void,
   isLoggedIn: boolean,
-  onForwardPost?: (post: Post) => void
+  onForwardPost?: (post: Post) => void,
+  onNavigate?: (screen: Screen) => void
 }) => {
   const [activeTab, setActiveTab] = React.useState<'all' | 'exclusive'>('all');
   const myPosts = posts.filter(p => p.creator.id === creator.id).filter(p => activeTab === 'all' ? true : p.isLocked);
@@ -2036,7 +2058,7 @@ const ScreenPublicProfile = ({
 
   const handleFollow = async () => {
     if (!isLoggedIn) {
-      setScreen('register');
+      if (onNavigate) onNavigate('register');
       return;
     }
     const { data: { user } } = await supabase.auth.getUser();
@@ -2103,6 +2125,26 @@ const ScreenPublicProfile = ({
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator?.name}</h1>
         <p className="text-sm text-primary font-bold mb-2">{creator?.bio}</p>
+
+        {creator.social_links && (
+          <div className="flex justify-center gap-4 mb-4">
+            {creator.social_links.instagram && (
+              <a href={creator.social_links.instagram} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
+                <Instagram size={24} />
+              </a>
+            )}
+            {creator.social_links.twitter && (
+              <a href={creator.social_links.twitter} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
+                <Twitter size={24} />
+              </a>
+            )}
+            {creator.social_links.tiktok && (
+              <a href={creator.social_links.tiktok} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
+                <Music size={24} />
+              </a>
+            )}
+          </div>
+        )}
 
         {creator.welcome_audio && (
           <WelcomeAudioPlayer audioUrl={creator.welcome_audio} />
@@ -3068,10 +3110,18 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
   const [avatar, setAvatar] = useState(creator.avatar);
   const [coverImage, setCoverImage] = useState(creator.cover_image || '');
   const [isCreator, setIsCreator] = useState(creator.role === 'creator');
-  const [instagram, setInstagram] = useState('');
-  const [twitter, setTwitter] = useState('');
-  const [tiktok, setTiktok] = useState('');
+  const [instagram, setInstagram] = useState(creator.social_links?.instagram || '');
+  const [twitter, setTwitter] = useState(creator.social_links?.twitter || '');
+  const [tiktok, setTiktok] = useState(creator.social_links?.tiktok || '');
   const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    if (creator.social_links) {
+      setInstagram(creator.social_links.instagram || '');
+      setTwitter(creator.social_links.twitter || '');
+      setTiktok(creator.social_links.tiktok || '');
+    }
+  }, [creator.social_links]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cropImage, setCropImage] = useState<{ url: string, bucket: string, aspect: number } | null>(null);
@@ -3194,9 +3244,17 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
 
       for (const link of socialLinks) {
         if (link.url) {
-          await supabase
+          const { error: socialError } = await supabase
             .from('social_connections')
             .upsert({ profile_id: user.id, platform: link.platform, url: link.url }, { onConflict: 'profile_id, platform' });
+          if (socialError) console.error(`Error saving ${link.platform}:`, socialError);
+        } else {
+          // If URL is empty, delete the connection
+          await supabase
+            .from('social_connections')
+            .delete()
+            .eq('profile_id', user.id)
+            .eq('platform', link.platform);
         }
       }
 
@@ -4698,7 +4756,18 @@ export default function App() {
       }
       const { data: profileData } = await supabase.from('profiles').select('*').eq('id', creatorId).single();
       if (profileData) {
-        setPublicCreator(profileData as any);
+        // Fetch social connections
+        const { data: socialData } = await supabase
+          .from('social_connections')
+          .select('platform, url')
+          .eq('profile_id', creatorId);
+
+        const socialLinks = socialData?.reduce((acc: any, curr: any) => {
+          acc[curr.platform] = curr.url;
+          return acc;
+        }, {});
+
+        setPublicCreator({ ...profileData, social_links: socialLinks } as any);
         // Fetch posts for this creator
         const { data: postsData } = await supabase.from('posts').select('*, creator:profiles(*)').eq('creator_id', creatorId);
         if (postsData) {
@@ -4859,7 +4928,18 @@ export default function App() {
       const fetchPublicProfile = async () => {
         const { data: profile } = await supabase.from('profiles').select('*').eq('username', username).single();
         if (profile) {
-          setPublicCreator(profile as any);
+          // Fetch social connections
+          const { data: socialData } = await supabase
+            .from('social_connections')
+            .select('platform, url')
+            .eq('profile_id', profile.id);
+
+          const socialLinks = socialData?.reduce((acc: any, curr: any) => {
+            acc[curr.platform] = curr.url;
+            return acc;
+          }, {});
+
+          setPublicCreator({ ...profile, social_links: socialLinks } as any);
           let subscribedCreatorIds = new Set();
           let purchasedPostIds = new Set();
           const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -5015,6 +5095,7 @@ export default function App() {
             }} 
             onMessage={() => setScreen('register')}
             isLoggedIn={isLoggedIn}
+            onNavigate={setScreen}
           />
         );
       }
@@ -5100,6 +5181,7 @@ export default function App() {
               console.log('Forwarding post from public profile:', post);
               setForwardingPost(post);
             }}
+            onNavigate={setScreen}
           />
         ) : (
           <ScreenFeed 

@@ -65,7 +65,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         throw profileError;
       }
-      return data as Creator;
+
+      // Fetch social connections
+      const { data: socialData, error: socialError } = await supabase
+        .from('social_connections')
+        .select('platform, url')
+        .eq('profile_id', userId);
+
+      if (socialError) {
+        console.error('Error fetching social connections:', socialError);
+      }
+
+      const socialLinks = socialData?.reduce((acc: any, curr: any) => {
+        acc[curr.platform] = curr.url;
+        return acc;
+      }, {});
+
+      console.log('Fetched social links for user:', userId, socialLinks);
+
+      return { ...data, social_links: socialLinks } as Creator;
     } catch (err: any) {
       console.error('Error fetching/creating profile:', err);
       return null;
