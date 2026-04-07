@@ -3064,6 +3064,7 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
   const [welcomeAudio, setWelcomeAudio] = useState(creator.welcome_audio || '');
   const [avatar, setAvatar] = useState(creator.avatar);
   const [coverImage, setCoverImage] = useState(creator.cover_image || '');
+  const [isCreator, setIsCreator] = useState(creator.role === 'creator');
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -3172,7 +3173,8 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
         services_bio: servicesBio,
         welcome_audio: welcomeAudio,
         avatar,
-        cover_image: coverImage
+        cover_image: coverImage,
+        role: isCreator ? 'creator' : 'user'
       }).eq('id', user.id);
 
       if (error) throw error;
@@ -3248,6 +3250,17 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
                 required
               />
             </div>
+          </div>
+          <div className="flex items-center gap-3 px-1">
+            <input 
+              type="checkbox" 
+              className="w-4 h-4 rounded border-primary/20 text-primary focus:ring-primary/20" 
+              checked={isCreator}
+              onChange={(e) => setIsCreator(e.target.checked)}
+            />
+            <p className="text-[11px] font-bold text-on-surface/80 leading-relaxed">
+              Sou um <span className="text-primary">Criador de Conteúdo</span>
+            </p>
           </div>
           <div className="space-y-1.5">
             <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Bio Editorial</label>

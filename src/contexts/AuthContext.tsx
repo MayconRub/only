@@ -54,6 +54,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .single();
 
           if (createError) throw createError;
+          
+          // Redirect new users to edit-profile
+          localStorage.setItem('novinha_screen', 'edit-profile');
+          if (typeof (window as any).setScreen === 'function') {
+            (window as any).setScreen('edit-profile');
+          }
+          
           return createdProfile as Creator;
         }
         throw profileError;
