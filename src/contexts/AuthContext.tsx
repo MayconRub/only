@@ -76,7 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('Error fetching social connections:', socialError);
       }
 
-      const socialLinks = socialData?.reduce((acc: any, curr: any) => {
+      const socialLinks = (socialData || []).reduce((acc: any, curr: any) => {
         acc[curr.platform] = curr.url;
         return acc;
       }, {});

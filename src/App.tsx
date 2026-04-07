@@ -3115,13 +3115,13 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
   const [tiktok, setTiktok] = useState(creator.social_links?.tiktok || '');
   const [loading, setLoading] = useState(false);
 
+  // Sincronizar campos quando o objeto creator mudar (ex: após refreshProfile)
   React.useEffect(() => {
-    if (creator.social_links) {
-      setInstagram(creator.social_links.instagram || '');
-      setTwitter(creator.social_links.twitter || '');
-      setTiktok(creator.social_links.tiktok || '');
-    }
-  }, [creator.social_links]);
+    console.log('ScreenEditProfile: Sincronizando links sociais do creator:', creator.social_links);
+    setInstagram(creator.social_links?.instagram || '');
+    setTwitter(creator.social_links?.twitter || '');
+    setTiktok(creator.social_links?.tiktok || '');
+  }, [creator.id, creator.social_links]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cropImage, setCropImage] = useState<{ url: string, bucket: string, aspect: number } | null>(null);
@@ -3242,23 +3242,41 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
         { platform: 'tiktok', url: tiktok }
       ];
 
+      console.log('Iniciando salvamento de redes sociais...', socialLinks);
+
       for (const link of socialLinks) {
-        if (link.url) {
-          const { error: socialError } = await supabase
-            .from('social_connections')
-            .upsert({ profile_id: user.id, platform: link.platform, url: link.url }, { onConflict: 'profile_id, platform' });
-          if (socialError) console.error(`Error saving ${link.platform}:`, socialError);
-        } else {
-          // If URL is empty, delete the connection
-          await supabase
-            .from('social_connections')
-            .delete()
-            .eq('profile_id', user.id)
-            .eq('platform', link.platform);
+        try {
+          if (link.url && link.url.trim() !== '') {
+            const { error: socialError } = await supabase
+              .from('social_connections')
+              .upsert(
+                { profile_id: user.id, platform: link.platform, url: link.url.trim() },
+                { onConflict: 'profile_id, platform' }
+              );
+            
+            if (socialError) {
+              console.error(`Erro ao salvar ${link.platform}:`, socialError);
+              throw new Error(`Falha ao salvar ${link.platform}: ${socialError.message}`);
+            }
+          } else {
+            // Se a URL estiver vazia, removemos a conexão existente
+            const { error: deleteError } = await supabase
+              .from('social_connections')
+              .delete()
+              .eq('profile_id', user.id)
+              .eq('platform', link.platform);
+            
+            if (deleteError) console.warn(`Aviso ao remover ${link.platform}:`, deleteError);
+          }
+        } catch (socialErr: any) {
+          console.error(`Erro no loop de redes sociais (${link.platform}):`, socialErr);
+          // Não interrompemos o salvamento do perfil principal, mas avisamos
         }
       }
 
+      console.log('Salvamento de redes sociais concluído.');
       onProfileUpdated();
+      alert('Perfil e redes sociais salvos com sucesso!');
       onBack();
     } catch (err: any) {
       setError(err.message || 'Erro ao salvar perfil');
