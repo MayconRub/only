@@ -3256,8 +3256,25 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
               .select();
             
             if (socialError) {
-              console.error(`Erro detalhado ao salvar ${link.platform}:`, socialError);
-              alert(`Erro ao salvar ${link.platform}: ${socialError.message}`);
+              console.warn(`Upsert falhou para ${link.platform}, tentando estratégia de fallback:`, socialError.message);
+              
+              // Fallback: Deletar existente e inserir novo
+              await supabase
+                .from('social_connections')
+                .delete()
+                .eq('profile_id', user.id)
+                .eq('platform', link.platform);
+                
+              const { error: insertError } = await supabase
+                .from('social_connections')
+                .insert({ profile_id: user.id, platform: link.platform, url: link.url.trim() });
+                
+              if (insertError) {
+                console.error(`Erro crítico ao salvar ${link.platform}:`, insertError);
+                alert(`Erro ao salvar ${link.platform}: ${insertError.message}`);
+              } else {
+                console.log(`Sucesso ao salvar ${link.platform} via fallback.`);
+              }
             } else {
               console.log(`Sucesso ao salvar ${link.platform}:`, upsertData);
             }
