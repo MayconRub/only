@@ -4311,6 +4311,13 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
 
           <div className="flex items-start gap-3 px-1">
             <input type="checkbox" className="mt-1 w-4 h-4 rounded border-primary/20 text-primary focus:ring-primary/20" required />
+            <p className="text-[11px] font-bold text-on-surface/80 leading-relaxed">
+              Confirmo que tenho <span className="text-primary">18 anos ou mais</span> e sou maior de idade.
+            </p>
+          </div>
+
+          <div className="flex items-start gap-3 px-1">
+            <input type="checkbox" className="mt-1 w-4 h-4 rounded border-primary/20 text-primary focus:ring-primary/20" required />
             <p className="text-[9px] font-bold text-on-surface/60 leading-relaxed">
               Eu aceito os <span className="text-primary underline">Termos de Serviço</span> e a <span className="text-primary underline">Política de Privacidade</span>
             </p>
