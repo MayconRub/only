@@ -3115,13 +3115,8 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
   const [tiktok, setTiktok] = useState(creator.social_links?.tiktok || '');
   const [loading, setLoading] = useState(false);
 
-  // Sincronizar campos quando o objeto creator mudar (ex: após refreshProfile)
-  React.useEffect(() => {
-    console.log('ScreenEditProfile: Sincronizando links sociais do creator:', creator.social_links);
-    setInstagram(creator.social_links?.instagram || '');
-    setTwitter(creator.social_links?.twitter || '');
-    setTiktok(creator.social_links?.tiktok || '');
-  }, [creator.id, creator.social_links]);
+  // Removida a sincronização agressiva que limpava os campos durante a digitação
+  
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cropImage, setCropImage] = useState<{ url: string, bucket: string, aspect: number } | null>(null);
@@ -3369,33 +3364,6 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
             </p>
           </div>
           <div className="space-y-1.5">
-            <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Instagram</label>
-            <input 
-              className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
-              value={instagram}
-              onChange={(e) => setInstagram(e.target.value)}
-              placeholder="https://instagram.com/usuario"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Twitter</label>
-            <input 
-              className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
-              value={twitter}
-              onChange={(e) => setTwitter(e.target.value)}
-              placeholder="https://twitter.com/usuario"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">TikTok</label>
-            <input 
-              className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
-              value={tiktok}
-              onChange={(e) => setTiktok(e.target.value)}
-              placeholder="https://tiktok.com/@usuario"
-            />
-          </div>
-          <div className="space-y-1.5">
             <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Bio Editorial</label>
             <textarea 
               className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm text-sm leading-relaxed min-h-[100px] resize-none font-medium text-on-surface/80" 
@@ -3452,12 +3420,33 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
             <h2 className="font-bold text-base text-on-surface">Conexões Sociais</h2>
           </div>
           <div className="space-y-4">
-            {['Instagram', 'Twitter (X)', 'TikTok'].map(platform => (
-              <div key={platform} className="space-y-1.5">
-                <label className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40 px-1">{platform}</label>
-                <input className="w-full bg-background border border-primary/5 rounded-lg px-4 py-2.5 text-xs focus:ring-2 focus:ring-primary/10 font-medium" placeholder="Adicionar link" />
-              </div>
-            ))}
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40 px-1">Instagram</label>
+              <input 
+                className="w-full bg-background border border-primary/5 rounded-lg px-4 py-2.5 text-xs focus:ring-2 focus:ring-primary/10 font-medium" 
+                placeholder="https://instagram.com/usuario" 
+                value={instagram}
+                onChange={(e) => setInstagram(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40 px-1">Twitter (X)</label>
+              <input 
+                className="w-full bg-background border border-primary/5 rounded-lg px-4 py-2.5 text-xs focus:ring-2 focus:ring-primary/10 font-medium" 
+                placeholder="https://twitter.com/usuario" 
+                value={twitter}
+                onChange={(e) => setTwitter(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40 px-1">TikTok</label>
+              <input 
+                className="w-full bg-background border border-primary/5 rounded-lg px-4 py-2.5 text-xs focus:ring-2 focus:ring-primary/10 font-medium" 
+                placeholder="https://tiktok.com/@usuario" 
+                value={tiktok}
+                onChange={(e) => setTiktok(e.target.value)}
+              />
+            </div>
           </div>
         </section>
 
@@ -4534,15 +4523,14 @@ export default function App() {
       try {
         const { data: userPayments, error: paymentsError } = await supabase
           .from('payments')
-          .select('creator_id, post_id')
+          .select('creator_id') // Removido post_id que está causando erro 400
           .eq('user_id', user.id)
           .eq('status', 'approved');
 
         if (paymentsError) {
-          console.warn('Payments table might be missing or query failed:', paymentsError.message);
+          console.warn('Payments table query failed (expected if schema is old):', paymentsError.message);
         } else {
-          subscribedCreatorIds = new Set(userPayments?.filter(p => !p.post_id).map(p => p.creator_id) || []);
-          purchasedPostIds = new Set(userPayments?.filter(p => p.post_id).map(p => p.post_id) || []);
+          subscribedCreatorIds = new Set(userPayments?.map(p => p.creator_id) || []);
         }
       } catch (err) {
         console.warn('Error fetching payments:', err);
