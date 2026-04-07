@@ -41,7 +41,9 @@ import {
   Mic,
   Trash2,
   Image as ImageIcon,
-  Video as VideoIcon
+  Video as VideoIcon,
+  Settings,
+  Edit2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Cropper from 'react-easy-crop';
@@ -126,6 +128,7 @@ const TopNav = ({
   avatar,
   isMaster = false,
   onMessageClick,
+  onSettingsClick,
   unreadCount = 0
 }: { 
   title?: string, 
@@ -134,6 +137,7 @@ const TopNav = ({
   avatar?: string,
   isMaster?: boolean,
   onMessageClick?: () => void,
+  onSettingsClick?: () => void,
   unreadCount?: number
 }) => (
   <header className="fixed top-0 w-full flex justify-between items-center px-6 py-0 glass-header z-50">
@@ -159,6 +163,11 @@ const TopNav = ({
       </div>
     </div>
     <div className="flex items-center gap-4">
+      {isMaster && onSettingsClick && (
+        <button onClick={onSettingsClick} className="text-on-surface/60 hover:text-primary transition-colors relative">
+          <Settings size={24} />
+        </button>
+      )}
       {isMaster && onMessageClick && (
         <button onClick={onMessageClick} className="text-on-surface/60 hover:text-primary transition-colors relative">
           <MessageCircle size={24} />
@@ -175,6 +184,204 @@ const TopNav = ({
     </div>
   </header>
 );
+
+const ScreenCreatorPlans = ({ onBack, profile }: { onBack: () => void, profile: any }) => {
+  const [plans, setPlans] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<any | null>(null);
+
+  React.useEffect(() => {
+    if (profile) {
+      const existingPlans = profile.stats?.plans || [
+        { id: 'monthly', name: 'Mensal', price: '29.90', description: 'Acesso total por 30 dias' },
+        { id: 'quarterly', name: 'Trimestral', price: '79.90', description: 'Economize 15% - 90 dias', badge: 'Popular' },
+        { id: 'yearly', name: 'Anual', price: '249.90', description: 'Economize 30% - 365 dias', badge: 'Melhor Valor' },
+      ];
+      setPlans(existingPlans);
+      setLoading(false);
+    }
+  }, [profile]);
+
+  const handleSavePlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPlan) return;
+    
+    setSaving(true);
+    try {
+      let updatedPlans;
+      if (editingPlan.isNew) {
+        const { isNew, ...planData } = editingPlan;
+        updatedPlans = [...plans, { ...planData, id: Date.now().toString() }];
+      } else {
+        updatedPlans = plans.map(p => p.id === editingPlan.id ? editingPlan : p);
+      }
+
+      const updatedStats = { ...(profile.stats || {}), plans: updatedPlans };
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({ stats: updatedStats })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+      
+      setPlans(updatedPlans);
+      setEditingPlan(null);
+    } catch (err) {
+      console.error('Error saving plan:', err);
+      alert('Erro ao salvar plano.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeletePlan = async (id: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir este plano?')) return;
+    
+    setSaving(true);
+    try {
+      const updatedPlans = plans.filter(p => p.id !== id);
+      const updatedStats = { ...(profile.stats || {}), plans: updatedPlans };
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({ stats: updatedStats })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+      
+      setPlans(updatedPlans);
+    } catch (err) {
+      console.error('Error deleting plan:', err);
+      alert('Erro ao excluir plano.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto text-center">Carregando...</div>;
+
+  return (
+    <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
+      <section className="mb-8 pt-8 flex justify-between items-center">
+        <div>
+          <h1 className="text-4xl font-extrabold tracking-tight mb-1">Planos</h1>
+          <p className="text-on-surface/60 text-sm font-medium">Gerencie seus planos de assinatura.</p>
+        </div>
+        <button 
+          onClick={() => setEditingPlan({ isNew: true, name: '', price: '', description: '', badge: '' })}
+          className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md"
+        >
+          + Novo Plano
+        </button>
+      </section>
+
+      {editingPlan ? (
+        <div className="bg-white p-6 rounded-3xl border border-primary/10 shadow-sm mb-8">
+          <h2 className="text-xl font-black mb-4">{editingPlan.isNew ? 'Novo Plano' : 'Editar Plano'}</h2>
+          <form onSubmit={handleSavePlan} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-on-surface/60 mb-1">Nome do Plano</label>
+              <input 
+                required
+                value={editingPlan.name}
+                onChange={e => setEditingPlan({...editingPlan, name: e.target.value})}
+                className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
+                placeholder="Ex: Mensal"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-on-surface/60 mb-1">Preço (R$)</label>
+              <input 
+                required
+                type="number"
+                step="0.01"
+                value={editingPlan.price}
+                onChange={e => setEditingPlan({...editingPlan, price: e.target.value})}
+                className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
+                placeholder="Ex: 29.90"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-on-surface/60 mb-1">Descrição</label>
+              <input 
+                required
+                value={editingPlan.description}
+                onChange={e => setEditingPlan({...editingPlan, description: e.target.value})}
+                className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
+                placeholder="Ex: Acesso total por 30 dias"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-on-surface/60 mb-1">Badge (Opcional)</label>
+              <input 
+                value={editingPlan.badge || ''}
+                onChange={e => setEditingPlan({...editingPlan, badge: e.target.value})}
+                className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
+                placeholder="Ex: Popular"
+              />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button 
+                type="button"
+                onClick={() => setEditingPlan(null)}
+                className="flex-1 py-3 rounded-xl font-bold text-on-surface/60 bg-surface hover:bg-surface/80"
+              >
+                Cancelar
+              </button>
+              <button 
+                type="submit"
+                disabled={saving}
+                className="flex-1 py-3 rounded-xl font-bold text-white bg-primary hover:bg-primary/90 disabled:opacity-50"
+              >
+                {saving ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {plans.map((plan) => (
+            <div key={plan.id} className="bg-white p-5 rounded-2xl border border-primary/5 shadow-sm flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-black text-on-surface text-lg uppercase tracking-tight">{plan.name}</h3>
+                  {plan.badge && (
+                    <span className="bg-primary/10 text-primary text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">
+                      {plan.badge}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs font-bold text-on-surface/60">{plan.description}</p>
+                <p className="text-primary font-black mt-2">R$ {parseFloat(plan.price).toFixed(2).replace('.', ',')}</p>
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setEditingPlan(plan)}
+                  className="w-10 h-10 rounded-full bg-surface flex items-center justify-center text-on-surface/60 hover:text-primary transition-colors"
+                >
+                  <Edit2 size={16} />
+                </button>
+                <button 
+                  onClick={() => handleDeletePlan(plan.id)}
+                  className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-500 hover:bg-red-100 transition-colors"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+          {plans.length === 0 && (
+            <div className="text-center py-10 text-on-surface/40 font-bold">
+              Nenhum plano cadastrado.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ScreenSubscriptions = ({ onBack }: { onBack: () => void }) => {
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
@@ -3460,6 +3667,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('+55 ');
+  const [isCreator, setIsCreator] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -3488,9 +3696,10 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
           name: name,
           username: email.split('@')[0] + Math.floor(Math.random() * 1000),
           avatar: `https://picsum.photos/seed/${data.user.id}/400`,
-          bio: 'Novo criador no pedaço!',
+          bio: isCreator ? 'Novo criador no pedaço!' : 'Novo usuário no pedaço!',
           stats: { posts: '0', followers: '0', likes: '0' },
-          phone: phone
+          phone: phone,
+          role: isCreator ? 'creator' : 'user'
         });
         if (profileError) {
           console.error('Error creating profile:', profileError);
@@ -3624,6 +3833,18 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
           {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
 
           <div className="flex items-start gap-3 px-1">
+            <input 
+              type="checkbox" 
+              className="mt-1 w-4 h-4 rounded border-primary/20 text-primary focus:ring-primary/20" 
+              checked={isCreator}
+              onChange={(e) => setIsCreator(e.target.checked)}
+            />
+            <p className="text-[11px] font-bold text-on-surface/80 leading-relaxed">
+              Sou um <span className="text-primary">Criador de Conteúdo</span>
+            </p>
+          </div>
+
+          <div className="flex items-start gap-3 px-1">
             <input type="checkbox" className="mt-1 w-4 h-4 rounded border-primary/20 text-primary focus:ring-primary/20" required />
             <p className="text-[9px] font-bold text-on-surface/60 leading-relaxed">
               Eu aceito os <span className="text-primary underline">Termos de Serviço</span> e a <span className="text-primary underline">Política de Privacidade</span>
@@ -3680,11 +3901,20 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
   const [pixData, setPixData] = useState<{ qrCode: string, qrCodeBase64: string, paymentId: string } | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  const plans = [
-    { id: 'monthly', name: 'Mensal', price: 'R$ 29,90', description: 'Acesso total por 30 dias' },
-    { id: 'quarterly', name: 'Trimestral', price: 'R$ 79,90', description: 'Economize 15% - 90 dias', badge: 'Popular' },
-    { id: 'yearly', name: 'Anual', price: 'R$ 249,90', description: 'Economize 30% - 365 dias', badge: 'Melhor Valor' },
+  const defaultPlans = [
+    { id: 'monthly', name: 'Mensal', price: '29.90', description: 'Acesso total por 30 dias' },
+    { id: 'quarterly', name: 'Trimestral', price: '79.90', description: 'Economize 15% - 90 dias', badge: 'Popular' },
+    { id: 'yearly', name: 'Anual', price: '249.90', description: 'Economize 30% - 365 dias', badge: 'Melhor Valor' },
   ];
+
+  const plans = creator?.stats?.plans || defaultPlans;
+
+  // Ensure selectedPlan is valid
+  React.useEffect(() => {
+    if (plans.length > 0 && !plans.find((p: any) => p.id === selectedPlan)) {
+      setSelectedPlan(plans[0].id);
+    }
+  }, [plans, selectedPlan]);
 
   const postPrice = post?.price || 'R$ 15,00';
 
@@ -3713,8 +3943,8 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
         description = `Compra de Post - ${creator.name}`;
         planId = `post_${post.id}`;
       } else {
-        const selectedPlanData = plans.find(p => p.id === selectedPlan);
-        amount = parseFloat(selectedPlanData?.price.replace('R$ ', '').replace(',', '.') || '0');
+        const selectedPlanData = plans.find((p: any) => p.id === selectedPlan);
+        amount = parseFloat(String(selectedPlanData?.price).replace('R$ ', '').replace(',', '.') || '0');
         description = `Assinatura ${selectedPlanData?.name} - ${creator.name}`;
       }
 
@@ -3837,7 +4067,7 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
 
         {!post ? (
           <div className="space-y-4">
-            {plans.map((plan) => (
+            {plans.map((plan: any) => (
               <div 
                 key={plan.id}
                 onClick={() => {
@@ -3865,7 +4095,7 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="block font-black text-primary text-lg">{plan.price}</span>
+                  <span className="block font-black text-primary text-lg">R$ {parseFloat(String(plan.price).replace('R$ ', '').replace(',', '.')).toFixed(2).replace('.', ',')}</span>
                 </div>
               </div>
             ))}
@@ -4013,7 +4243,7 @@ export default function App() {
   const [forwardingPost, setForwardingPost] = React.useState<Post | null>(null);
   const [editingPost, setEditingPost] = React.useState<Post | null>(null);
 
-  const isMaster = profile?.role === 'master' || profile?.role === 'admin';
+  const isMaster = profile?.role === 'master' || profile?.role === 'admin' || profile?.role === 'creator';
   const isLoggedIn = !!user;
 
   React.useEffect(() => {
@@ -4183,7 +4413,7 @@ export default function App() {
       // Process posts
       const processedPosts = filteredPostsData.map(post => {
         const isOwner = post.creator_id === user.id;
-        const isMasterUser = profile.role === 'master' || profile.role === 'admin';
+        const isMasterUser = profile.role === 'master' || profile.role === 'admin' || profile.role === 'creator';
         
         // Try to get creator profile from the join first, then from the map
         let creatorProfile = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
@@ -4839,6 +5069,7 @@ export default function App() {
       case 'messages': return <ScreenMessages messages={messages} isMaster={isMaster} onMessagesRead={() => setRefreshKey(prev => prev + 1)} />;
       case 'wallet': return <ScreenWallet onBack={() => setScreen('feed')} isMaster={isMaster} />;
       case 'subscriptions': return <ScreenSubscriptions onBack={() => setScreen('feed')} />;
+      case 'creator-plans': return <ScreenCreatorPlans onBack={() => setScreen('feed')} profile={profile} />;
       case 'edit-profile': 
         if (!profile) return null;
         return <ScreenEditProfile onBack={() => setScreen('profile')} creator={profile} onProfileUpdated={() => { refreshProfile(); setRefreshKey(prev => prev + 1); }} />;
@@ -4904,6 +5135,7 @@ export default function App() {
           avatar={isLoggedIn ? profile?.avatar : publicCreator?.avatar}
           isMaster={isMaster}
           onMessageClick={() => setScreen('messages')}
+          onSettingsClick={() => setScreen('creator-plans')}
           unreadCount={unreadMessagesCount}
         />
       )}
