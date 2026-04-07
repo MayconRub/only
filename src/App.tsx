@@ -2344,7 +2344,7 @@ const ChatView = ({ recipient, onBack, onMessagesRead }: { recipient: Creator, o
         
         // Mark received messages as read
         const unreadIds = data
-          .filter(m => m.receiver_id === userId && !m.is_read)
+          .filter(m => m.receiver_id === userId && m.is_read !== true && m.is_read !== 'true')
           .map(m => m.id);
         
         if (unreadIds.length > 0) {
@@ -2409,7 +2409,8 @@ const ChatView = ({ recipient, onBack, onMessagesRead }: { recipient: Creator, o
       receiver_id: recipient.id,
       content: content,
       media_url: mediaUrl,
-      media_type: type
+      media_type: type,
+      is_read: false
     });
 
     if (error) {
@@ -2830,7 +2831,7 @@ const ScreenMessages = ({ messages, isMaster, onMessagesRead }: { messages: Mess
                   ) : msg.lastMessage}
                 </p>
               </div>
-              {msg.unreadCount && (
+              {msg.unreadCount > 0 && (
                 <div className="bg-primary text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">
                   {msg.unreadCount}
                 </div>
@@ -4231,12 +4232,13 @@ export default function App() {
       // Process messages into conversations
       const conversationsMap = new Map<string, any>();
       messagesData.forEach((m: any) => {
-        const otherUser = m.sender_id === user.id ? m.receiver : m.profiles;
+        let otherUser = m.sender_id === user.id ? m.receiver : m.profiles;
+        if (Array.isArray(otherUser)) otherUser = otherUser[0];
         if (!otherUser) return;
         
         const existing = conversationsMap.get(otherUser.id);
         const msgTime = new Date(m.created_at || m.time || 0).getTime();
-        const isUnread = m.receiver_id === user.id && !m.is_read;
+        const isUnread = m.receiver_id === user.id && m.is_read !== true && m.is_read !== 'true';
 
         if (!existing) {
           conversationsMap.set(otherUser.id, {
@@ -4271,7 +4273,7 @@ export default function App() {
       setFetchError(error.message || JSON.stringify(error));
       setDataLoading(false);
     }
-  }, [user, profile, refreshKey, screen]);
+  }, [user, profile, refreshKey]);
 
   // Initial data fetch
   React.useEffect(() => {
@@ -4363,7 +4365,8 @@ export default function App() {
         receiver_id: recipient.id,
         content: `Encaminhou uma publicação de ${creatorName}`,
         media_url: post.image,
-        media_type: post.isVideo ? 'video' : 'image'
+        media_type: post.isVideo ? 'video' : 'image',
+        is_read: false
       });
 
       if (error) {
