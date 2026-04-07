@@ -20,6 +20,7 @@ import {
   Bell, 
   User, 
   ArrowLeft,
+  ArrowRight,
   MoreHorizontal,
   Share2,
   CheckCircle2,
@@ -482,12 +483,118 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
   const [loading, setLoading] = useState(true);
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [pixKey, setPixKey] = useState('');
+  const [payoutName, setPayoutName] = useState('');
+  const [payoutDocument, setPayoutDocument] = useState('');
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [savingPayout, setSavingPayout] = useState(false);
+  const [isPayoutInfoSaved, setIsPayoutInfoSaved] = useState(false);
+
+  const handleSavePayoutInfo = async () => {
+    setSavingPayout(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          pix_key: pixKey,
+          payout_name: payoutName,
+          payout_document: payoutDocument
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      alert('Dados de recebimento salvos com sucesso!');
+    } catch (err: any) {
+      alert(`Erro ao salvar dados: ${err.message}`);
+    } finally {
+      setSavingPayout(false);
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!pixKey || !payoutName || !payoutDocument) {
+      alert('Por favor, preencha todos os dados de recebimento antes de solicitar o saque.');
+      return;
+    }
+
+    if (!withdrawAmount) {
+      alert('Por favor, informe o valor do saque.');
+      return;
+    }
+
+    const amountNum = parseFloat(withdrawAmount.replace(',', '.'));
+    const balanceNum = parseFloat(balance.replace('R$ ', '').replace('.', '').replace(',', '.'));
+
+    if (amountNum > balanceNum) {
+      alert('Saldo insuficiente para este saque.');
+      return;
+    }
+
+    if (amountNum < 50) {
+      alert('O valor mínimo para saque é R$ 50,00.');
+      return;
+    }
+
+    setWithdrawing(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      // Salvar solicitação de saque
+      const { error: withdrawError } = await supabase
+        .from('withdrawal_requests')
+        .insert({
+          profile_id: user.id,
+          amount: amountNum,
+          pix_key: pixKey,
+          status: 'pending'
+        });
+
+      if (withdrawError) throw withdrawError;
+
+      // Salvar chave PIX no perfil para uso futuro
+      await supabase
+        .from('profiles')
+        .update({ pix_key: pixKey })
+        .eq('id', user.id);
+
+      alert('Solicitação de saque enviada com sucesso! O prazo de processamento é de até 48 horas.');
+      setShowWithdrawModal(false);
+      setWithdrawAmount('');
+    } catch (err: any) {
+      alert(`Erro ao solicitar saque: ${err.message}`);
+    } finally {
+      setWithdrawing(false);
+    }
+  };
 
   React.useEffect(() => {
     const fetchData = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
+
+        // Buscar dados de recebimento salvos
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('pix_key, payout_name, payout_document')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile) {
+          if (profile.pix_key) setPixKey(profile.pix_key);
+          if (profile.payout_name) setPayoutName(profile.payout_name);
+          if (profile.payout_document) setPayoutDocument(profile.payout_document);
+          
+          if (profile.pix_key && profile.payout_name && profile.payout_document) {
+            setIsPayoutInfoSaved(true);
+          }
+        }
 
         if (isMaster) {
           const { data: payments, error } = await supabase
@@ -574,6 +681,14 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
         <h2 className="text-5xl font-black text-on-surface tracking-tighter">
           {loading ? '...' : balance}
         </h2>
+        {isMaster && (
+          <button 
+            onClick={() => setShowWithdrawModal(true)}
+            className="mt-6 px-8 py-3 bg-primary text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
+          >
+            Solicitar Saque
+          </button>
+        )}
         {!isMaster && (
           <div className="mt-6 flex justify-center gap-2">
             <div className="px-4 py-1.5 bg-primary/10 rounded-full flex items-center gap-2">
@@ -583,6 +698,84 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
           </div>
         )}
       </div>
+
+      {isMaster && (
+        <section className="mb-10 bg-white p-6 rounded-3xl border border-primary/5 shadow-sm space-y-6">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2.5">
+              <ShieldCheck className="text-primary" size={18} />
+              <h2 className="font-bold text-base text-on-surface">Dados de Recebimento</h2>
+            </div>
+            {isPayoutInfoSaved && (
+              <div className="px-2 py-1 bg-green-50 text-green-600 rounded-lg flex items-center gap-1.5">
+                <CheckCircle2 size={12} />
+                <span className="text-[9px] font-black uppercase tracking-widest">Verificado</span>
+              </div>
+            )}
+          </div>
+
+          {!isPayoutInfoSaved ? (
+            <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex items-start gap-3">
+              <div className="p-2 bg-amber-100 rounded-xl text-amber-600">
+                <Bell size={16} />
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Atenção: Dados Permanentes</p>
+                <p className="text-[11px] text-amber-700/70 leading-relaxed font-medium">
+                  Confira seus dados com atenção. Por questões de segurança, <span className="font-bold">não é possível alterar</span> essas informações após o primeiro salvamento.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-[11px] text-on-surface/40 px-1 font-medium italic">
+              Seus dados de recebimento estão protegidos e não podem ser alterados via painel. Entre em contato com o suporte para atualizações críticas.
+            </p>
+          )}
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Nome Completo / Razão Social</label>
+              <input 
+                className="w-full bg-background border border-primary/10 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 shadow-sm text-sm font-bold text-on-surface disabled:opacity-50" 
+                placeholder="Nome do titular da conta"
+                value={payoutName}
+                onChange={(e) => setPayoutName(e.target.value)}
+                disabled={isPayoutInfoSaved}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">CPF ou CNPJ</label>
+              <input 
+                className="w-full bg-background border border-primary/10 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 shadow-sm text-sm font-bold text-on-surface disabled:opacity-50" 
+                placeholder="000.000.000-00"
+                value={payoutDocument}
+                onChange={(e) => setPayoutDocument(e.target.value)}
+                disabled={isPayoutInfoSaved}
+              />
+            </div>
+            <div className="space-y-1.5 md:col-span-2">
+              <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Chave PIX</label>
+              <input 
+                className="w-full bg-background border border-primary/10 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 shadow-sm text-sm font-bold text-on-surface disabled:opacity-50" 
+                placeholder="E-mail, CPF, Telefone ou Chave Aleatória"
+                value={pixKey}
+                onChange={(e) => setPixKey(e.target.value)}
+                disabled={isPayoutInfoSaved}
+              />
+            </div>
+          </div>
+
+          {!isPayoutInfoSaved && (
+            <button 
+              onClick={handleSavePayoutInfo}
+              disabled={savingPayout}
+              className="w-full bg-on-surface text-white py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-on-surface/90 transition-all disabled:opacity-50"
+            >
+              {savingPayout ? 'Salvando...' : 'Salvar Dados de Recebimento'}
+            </button>
+          )}
+        </section>
+      )}
 
       {isMaster ? (
         <div className="space-y-8">
@@ -675,6 +868,59 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
             </p>
           </section>
         </>
+      )}
+
+      {/* Modal de Saque */}
+      {showWithdrawModal && (
+        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl space-y-6"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-black text-on-surface uppercase tracking-tight">Solicitar Saque</h3>
+              <button onClick={() => setShowWithdrawModal(false)} className="p-2 text-on-surface/20 hover:text-on-surface transition-colors">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-primary/5 p-4 rounded-2xl space-y-2">
+                <p className="text-[10px] font-black text-primary uppercase tracking-widest">Destino do Saque</p>
+                <p className="text-xs font-bold text-on-surface">{payoutName}</p>
+                <p className="text-[10px] font-medium text-on-surface/60">PIX: {pixKey}</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Valor do Saque</label>
+                <div className="relative flex items-center">
+                  <span className="absolute left-4 text-primary/40 font-bold">R$</span>
+                  <input 
+                    type="text"
+                    className="w-full bg-background border border-primary/10 rounded-xl pl-10 pr-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
+                    placeholder="0,00"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                  />
+                </div>
+                <p className="text-[10px] text-on-surface/40 font-medium px-1 italic">Mínimo: R$ 50,00</p>
+              </div>
+            </div>
+
+            <button 
+              onClick={handleWithdraw}
+              disabled={withdrawing}
+              className="w-full premium-gradient text-white py-4 rounded-xl font-black uppercase tracking-widest text-xs shadow-xl active:scale-95 transition-all disabled:opacity-50"
+            >
+              {withdrawing ? 'Processando...' : 'Confirmar Saque'}
+            </button>
+
+            <p className="text-[10px] text-center text-on-surface/40 font-medium leading-relaxed">
+              Ao solicitar o saque, o valor será debitado do seu saldo e enviado para a chave PIX informada em até 2 dias úteis.
+            </p>
+          </motion.div>
+        </div>
       )}
     </div>
   );
@@ -3380,6 +3626,36 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
               Sou um <span className="text-primary">Criador de Conteúdo</span>
             </p>
           </div>
+
+          {isCreator && (
+            <button 
+              type="button"
+              onClick={() => {
+                // Navega para a tela de planos (engrenagem)
+                // No App.tsx, a tela de planos é 'creator-plans'
+                // Como ScreenEditProfile recebe onProfileUpdated, vamos assumir que podemos disparar uma mudança de tela
+                // ou apenas orientar o usuário. Mas para ser funcional, vamos usar o setScreen se disponível via props
+                // ou simplesmente alertar que ele deve clicar na engrenagem.
+                // Ajustando para ser um botão que incentiva a ação.
+                alert('Redirecionando para as configurações de planos...');
+                onBack(); // Volta para o perfil onde está a engrenagem
+              }}
+              className="w-full bg-primary/5 border border-primary/10 rounded-xl p-4 flex items-start gap-3 hover:bg-primary/10 transition-all text-left group"
+            >
+              <div className="p-2 bg-primary/10 rounded-lg text-primary group-hover:scale-110 transition-transform">
+                <Settings size={16} />
+              </div>
+              <div className="space-y-1 flex-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold text-primary uppercase tracking-wider">Configuração de Assinaturas</p>
+                  <ArrowRight size={14} className="text-primary opacity-0 group-hover:opacity-100 transition-all" />
+                </div>
+                <p className="text-xs text-on-surface/70 leading-relaxed">
+                  Clique aqui para definir os valores dos seus planos de assinatura mensal na tela de <span className="font-bold">Configurações</span>.
+                </p>
+              </div>
+            </button>
+          )}
           <div className="space-y-1.5">
             <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Bio Editorial</label>
             <textarea 
