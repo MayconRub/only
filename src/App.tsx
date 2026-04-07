@@ -3359,6 +3359,7 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
   const [instagram, setInstagram] = useState(creator.social_links?.instagram || '');
   const [twitter, setTwitter] = useState(creator.social_links?.twitter || '');
   const [tiktok, setTiktok] = useState(creator.social_links?.tiktok || '');
+  const [birthDate, setBirthDate] = useState(creator.birth_date || '');
   const [loading, setLoading] = useState(false);
 
   // Removida a sincronização agressiva que limpava os campos durante a digitação
@@ -3467,6 +3468,7 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
         name,
         username,
         bio,
+        birth_date: birthDate,
         services_bio: servicesBio,
         welcome_audio: welcomeAudio,
         avatar,
@@ -3602,6 +3604,26 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
               onChange={(e) => setName(e.target.value)}
               required
             />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Data de Nascimento</label>
+            <input 
+              type="date"
+              className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface disabled:opacity-50" 
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
+              disabled={!!creator.birth_date}
+              required
+            />
+            {!creator.birth_date ? (
+              <p className="text-[9px] text-amber-600 font-bold px-1 mt-1 uppercase tracking-wider">
+                ⚠️ Atenção: Esta informação não poderá ser alterada após o salvamento.
+              </p>
+            ) : (
+              <p className="text-[9px] text-on-surface/40 font-bold px-1 mt-1 uppercase tracking-wider">
+                Informação protegida e não editável.
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Nome de Usuário</label>
@@ -4095,6 +4117,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('+55 ');
+  const [birthDate, setBirthDate] = useState('');
   const [isCreator, setIsCreator] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -4127,6 +4150,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
           bio: isCreator ? 'Novo criador no pedaço!' : 'Novo usuário no pedaço!',
           stats: { posts: '0', followers: '0', likes: '0' },
           phone: phone,
+          birth_date: birthDate,
           role: isCreator ? 'creator' : 'user'
         });
         if (profileError) {
@@ -4235,6 +4259,19 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
                 }}
                 required
               />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">Data de Nascimento</label>
+              <input 
+                className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
+                type="date"
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                required
+              />
+              <p className="text-[9px] text-amber-600 font-bold px-1 mt-1 uppercase tracking-wider">
+                ⚠️ Atenção: Esta informação não poderá ser alterada após o cadastro.
+              </p>
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">Senha</label>

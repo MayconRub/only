@@ -21,6 +21,7 @@ export interface Creator {
     twitter?: string;
     tiktok?: string;
   };
+  birth_date?: string;
 }
 
 export interface Comment {
