@@ -199,9 +199,9 @@ const ScreenCreatorPlans = ({ onBack, profile }: { onBack: () => void, profile: 
   React.useEffect(() => {
     if (profile) {
       const existingPlans = profile.stats?.plans || [
-        { id: 'monthly', name: 'Mensal', price: '29.90', description: 'Acesso total por 30 dias', duration: 30 },
-        { id: 'quarterly', name: 'Trimestral', price: '79.90', description: 'Economize 15% - 90 dias', badge: 'Popular', duration: 90 },
-        { id: 'yearly', name: 'Anual', price: '249.90', description: 'Economize 30% - 365 dias', badge: 'Melhor Valor', duration: 365 },
+        { id: 'monthly', name: 'Mensal', price: '29.90', description: 'Acesso total por 30 dias', duration: 30, category: 'Assinaturas' },
+        { id: 'quarterly', name: 'Trimestral', price: '79.90', description: 'Economize 15% - 90 dias', badge: 'Popular', duration: 90, category: 'Promoções' },
+        { id: 'yearly', name: 'Anual', price: '249.90', description: 'Economize 30% - 365 dias', badge: 'Melhor Valor', duration: 365, category: 'Promoções' },
       ];
       setPlans(existingPlans);
       setLoading(false);
@@ -275,7 +275,7 @@ const ScreenCreatorPlans = ({ onBack, profile }: { onBack: () => void, profile: 
           <p className="text-on-surface/60 text-sm font-medium">Gerencie seus planos de assinatura.</p>
         </div>
         <button 
-          onClick={() => setEditingPlan({ isNew: true, name: '', price: '', description: '', badge: '', duration: 30 })}
+          onClick={() => setEditingPlan({ isNew: true, name: '', price: '', description: '', badge: '', duration: 30, category: 'Assinaturas' })}
           className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md"
         >
           + Novo Plano
@@ -338,6 +338,17 @@ const ScreenCreatorPlans = ({ onBack, profile }: { onBack: () => void, profile: 
                 placeholder="Ex: Popular"
               />
             </div>
+            <div>
+              <label className="block text-xs font-bold text-on-surface/60 mb-1">Categoria</label>
+              <select 
+                value={editingPlan.category || 'Assinaturas'}
+                onChange={e => setEditingPlan({...editingPlan, category: e.target.value})}
+                className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
+              >
+                <option value="Assinaturas">Assinaturas</option>
+                <option value="Promoções">Promoções</option>
+              </select>
+            </div>
             <div className="flex gap-3 pt-2">
               <button 
                 type="button"
@@ -370,7 +381,7 @@ const ScreenCreatorPlans = ({ onBack, profile }: { onBack: () => void, profile: 
                   )}
                 </div>
                 <p className="text-xs font-bold text-on-surface/60">{plan.description}</p>
-                <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest mt-1">Duração: {plan.duration || 30} dias</p>
+                <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest mt-1">Duração: {plan.duration || 30} dias | Categoria: {plan.category || 'Assinaturas'}</p>
                 <p className="text-primary font-black mt-2">R$ {parseFloat(plan.price).toFixed(2).replace('.', ',')}</p>
               </div>
               <div className="flex gap-2">
@@ -1849,20 +1860,14 @@ const ScreenFeed = ({
                   </div>
                   <h3 className="text-xl font-black mb-2 text-white drop-shadow-md">Conteúdo VIP</h3>
                   <p className="text-xs text-white/80 mb-8 font-bold uppercase tracking-widest leading-relaxed">
-                    Desbloqueie este post exclusivo do criador.
+                    Assine para ter acesso a este conteúdo exclusivo.
                   </p>
                   <div className="w-full space-y-3">
                     <button 
                       onClick={() => onSubscribe(post.creator)}
                       className="w-full py-4 px-8 premium-gradient text-white font-black rounded-2xl shadow-xl active:scale-95 transition-all text-[10px] uppercase tracking-[0.2em]"
                     >
-                      ASSINAR MENSAL
-                    </button>
-                    <button 
-                      onClick={() => onSubscribe(post.creator, post)}
-                      className="w-full py-4 px-8 bg-white/10 hover:bg-white/20 text-white font-black rounded-2xl border border-white/20 active:scale-95 transition-all text-[10px] uppercase tracking-[0.2em]"
-                    >
-                      COMPRAR POST POR {post.price || 'R$ 15,00'}
+                      ASSINAR AGORA
                     </button>
                   </div>
                 </div>
@@ -2309,7 +2314,7 @@ const ScreenProfile = ({
                         }}
                         className="px-3 py-1.5 bg-primary text-white text-[7px] font-black uppercase tracking-widest rounded-lg shadow-lg active:scale-95 transition-all"
                       >
-                        Comprar Post
+                        ASSINAR
                       </button>
                     </div>
                   )}
@@ -2639,7 +2644,7 @@ const ScreenPublicProfile = ({
                     }}
                     className="px-3 py-1.5 bg-primary text-white text-[7px] font-black uppercase tracking-widest rounded-lg shadow-lg active:scale-95 transition-all"
                   >
-                    Comprar Post
+                    ASSINAR
                   </button>
                 </div>
               )}
@@ -4424,8 +4429,8 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
   );
 };
 
-const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator: Creator | null, post?: Post | null }) => {
-  const [step, setStep] = useState<'select-plan' | 'checkout'>(post ? 'checkout' : 'select-plan');
+const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creator | null }) => {
+  const [step, setStep] = useState<'select-plan' | 'checkout'>('select-plan');
   const [selectedPlan, setSelectedPlan] = useState('monthly');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -4448,8 +4453,6 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
     }
   }, [plans, selectedPlan]);
 
-  const postPrice = post?.price || 'R$ 15,00';
-
   React.useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setCurrentUser(data.user));
   }, []);
@@ -4466,22 +4469,10 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
     if (!currentUser || !creator) return;
     setLoading(true);
     try {
-      let amount = 0;
-      let description = "";
-      let planId = selectedPlan;
-      let duration = 30;
-
-      if (post) {
-        amount = parseFloat(postPrice.replace('R$ ', '').replace(',', '.') || '0');
-        description = `Compra de Post - ${creator.name}`;
-        planId = `post_${post.id}`;
-        duration = 9999; // Lifetime for posts
-      } else {
-        const selectedPlanData = plans.find((p: any) => p.id === selectedPlan);
-        amount = parseFloat(String(selectedPlanData?.price).replace('R$ ', '').replace(',', '.') || '0');
-        description = `Assinatura ${selectedPlanData?.name} - ${creator.name}`;
-        duration = selectedPlanData?.duration || 30;
-      }
+      const selectedPlanData = plans.find((p: any) => p.id === selectedPlan);
+      const amount = parseFloat(String(selectedPlanData?.price).replace('R$ ', '').replace(',', '.') || '0');
+      const description = `Assinatura ${selectedPlanData?.name} - ${creator.name}`;
+      const duration = selectedPlanData?.duration || 30;
 
       const response = await fetch('/api/payments/pix', {
         method: 'POST',
@@ -4492,8 +4483,7 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
           payerEmail: currentUser.email,
           userId: currentUser.id,
           creatorId: creator.id,
-          planId,
-          postId: post?.id,
+          planId: selectedPlan,
           duration
         })
       });
@@ -4599,7 +4589,7 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
               <div className="space-y-4">
                 <h3 className="font-bold text-slate-900 text-sm">Assinaturas</h3>
                 <div className="space-y-3">
-                  {plans.filter((p: any) => p.category !== 'Promoções').map((plan: any) => (
+                  {plans.filter((p: any) => (p.category || 'Assinaturas') === 'Assinaturas').map((plan: any) => (
                     <button
                       key={plan.id}
                       onClick={() => {
@@ -4612,21 +4602,6 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
                       <span className="text-sm">R$ {parseFloat(String(plan.price)).toFixed(2).replace('.', ',')}</span>
                     </button>
                   ))}
-                  {plans.filter((p: any) => p.category !== 'Promoções').length === 0 && (
-                    plans.map((plan: any) => (
-                      <button
-                        key={plan.id}
-                        onClick={() => {
-                          setSelectedPlan(plan.id);
-                          setStep('checkout');
-                        }}
-                        className="w-full bg-[#f9b084] hover:bg-[#f9b084]/90 text-on-surface font-bold py-3.5 px-6 rounded-full flex items-center justify-between transition-all active:scale-[0.98] shadow-sm"
-                      >
-                        <span className="text-sm">{plan.name}</span>
-                        <span className="text-sm">R$ {parseFloat(String(plan.price)).toFixed(2).replace('.', ',')}</span>
-                      </button>
-                    ))
-                  )}
                 </div>
               </div>
 
@@ -4681,7 +4656,7 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
                   <h3 className="font-bold text-slate-900 text-lg">Formas de pagamento</h3>
                   <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Valor</p>
                   <p className="text-2xl font-black text-slate-900">
-                    R$ {post ? postPrice.replace('R$ ', '') : parseFloat(String(plans.find((p: any) => p.id === selectedPlan)?.price || '0')).toFixed(2).replace('.', ',')}
+                    R$ {parseFloat(String(plans.find((p: any) => p.id === selectedPlan)?.price || '0')).toFixed(2).replace('.', ',')}
                   </p>
                 </div>
 
@@ -4701,14 +4676,12 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
                         </>
                       )}
                     </button>
-                    {!post && (
-                      <button 
-                        onClick={() => setStep('select-plan')}
-                        className="w-full py-2 text-on-surface/40 font-bold text-[10px] uppercase tracking-widest hover:text-primary transition-colors"
-                      >
-                        Alterar Plano
-                      </button>
-                    )}
+                    <button 
+                      onClick={() => setStep('select-plan')}
+                      className="w-full py-2 text-on-surface/40 font-bold text-[10px] uppercase tracking-widest hover:text-primary transition-colors"
+                    >
+                      Alterar Plano
+                    </button>
                   </div>
                 ) : (
                   <div className="space-y-6 flex flex-col items-center">
@@ -5001,7 +4974,7 @@ export default function App() {
           isLikedByMe: post.post_likes?.some((l: any) => l.user_id === user.id),
           isLocked: post.is_locked,
           isVideo: post.is_video,
-          hasAccess: isOwner || isMasterUser || subscribedCreatorIds.has(post.creator_id) || purchasedPostIds.has(post.id) || !post.is_locked,
+          hasAccess: isOwner || isMasterUser || subscribedCreatorIds.has(post.creator_id) || !post.is_locked,
           commentList: (post.post_comments || []).map((c: any) => ({
             id: c.id,
             user: c.profiles?.name || 'Usuário',
@@ -5231,9 +5204,9 @@ export default function App() {
     }
   };
 
-  const handleSubscribe = (targetCreator: Creator, post?: Post) => {
+  const handleSubscribe = (targetCreator: Creator) => {
     setPublicCreator(targetCreator);
-    setSelectedPostForPayment(post || null);
+    setSelectedPostForPayment(null);
     if (isLoggedIn) {
       setScreen('payment');
     } else {
@@ -5606,7 +5579,7 @@ export default function App() {
           posts={posts}
           onDeletePost={handleDeletePost}
           onUpdatePost={handleUpdatePost}
-          onSubscribe={(post) => handleSubscribe(profile, post)}
+          onSubscribe={() => handleSubscribe(profile)}
           stories={stories}
           onDeleteStory={handleDeleteStory}
           isMaster={isMaster}
@@ -5628,7 +5601,7 @@ export default function App() {
             creator={publicCreator} 
             posts={publicPosts} 
             stories={stories}
-            onSubscribe={(post) => handleSubscribe(publicCreator, post)} 
+            onSubscribe={() => handleSubscribe(publicCreator)} 
             onLikePost={handleLikePost}
             onCommentPost={handleCommentPost}
             onMessage={(c) => {
@@ -5678,7 +5651,7 @@ export default function App() {
         if (!profile) return null;
         return <ScreenEditProfile onBack={() => setScreen('profile')} creator={profile} onProfileUpdated={() => { refreshProfile(); setRefreshKey(prev => prev + 1); }} />;
       case 'create-post': return <ScreenCreatePost onBack={() => setScreen('feed')} onPostCreated={() => { setRefreshKey(prev => prev + 1); setScreen('feed'); }} />;
-      case 'payment': return <ScreenPayment onBack={() => setScreen('feed')} creator={publicCreator || profile} post={selectedPostForPayment} />;
+      case 'payment': return <ScreenPayment onBack={() => setScreen('feed')} creator={publicCreator || profile} />;
       case 'chat': return selectedRecipient ? <ChatView recipient={selectedRecipient} onBack={() => setScreen('messages')} onMessagesRead={() => setRefreshKey(prev => prev + 1)} /> : null;
       default: return (
         <ScreenFeed 
