@@ -951,17 +951,22 @@ const BottomNav = ({ active, onChange, isMaster, unreadCount }: { active: Screen
       <Home size={24} />
       <span className="text-[10px] font-bold">Início</span>
     </button>
-    <button onClick={() => onChange(isMaster ? 'wallet' : 'subscriptions')} className={`flex flex-col items-center gap-1 transition-all ${(active === 'wallet' || active === 'subscriptions') ? 'text-primary' : 'text-on-surface/40'}`}>
-      <CreditCard size={24} />
-      <span className="text-[10px] font-bold">{isMaster ? 'Carteira' : 'Assinaturas'}</span>
+    <button onClick={() => onChange('search')} className={`flex flex-col items-center gap-1 transition-all ${active === 'search' ? 'text-primary' : 'text-on-surface/40'}`}>
+      <Search size={24} />
+      <span className="text-[10px] font-bold">Pesquisar</span>
     </button>
-    
+
     {isMaster && (
       <button onClick={() => onChange('create-post')} className={`p-2 bg-primary text-white rounded-full shadow-lg shadow-primary/20 transition-transform active:scale-90 ${active === 'create-post' ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
         <PlusCircle size={28} />
       </button>
     )}
 
+    <button onClick={() => onChange(isMaster ? 'wallet' : 'subscriptions')} className={`flex flex-col items-center gap-1 transition-all ${(active === 'wallet' || active === 'subscriptions') ? 'text-primary' : 'text-on-surface/40'}`}>
+      <CreditCard size={24} />
+      <span className="text-[10px] font-bold">{isMaster ? 'Carteira' : 'Assinaturas'}</span>
+    </button>
+    
     <button onClick={() => onChange('activity')} className={`flex flex-col items-center gap-1 transition-all relative ${active === 'activity' ? 'text-primary' : 'text-on-surface/40'}`}>
       <div className="relative">
         {isMaster ? <Bell size={24} /> : <MessageCircle size={24} />}
@@ -1539,6 +1544,97 @@ const ForwardModal = ({
           )}
         </div>
       </div>
+    </div>
+  );
+};
+
+const ScreenSearch = ({ onViewProfile }: { onViewProfile: (creator: any) => void }) => {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    const searchUsers = async () => {
+      if (query.trim().length < 2) {
+        setResults([]);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .or(`name.ilike.%${query}%,username.ilike.%${query}%`)
+          .limit(20);
+
+        if (error) throw error;
+        setResults(data || []);
+      } catch (err) {
+        console.error('Error searching users:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const timeoutId = setTimeout(searchUsers, 500);
+    return () => clearTimeout(timeoutId);
+  }, [query]);
+
+  return (
+    <div className="min-h-screen bg-background pb-24 pt-20 px-4">
+      <div className="relative mb-6">
+        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+          <Search size={18} className="text-on-surface/40" />
+        </div>
+        <input 
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Pesquisar usuários..."
+          className="w-full bg-surface border border-primary/5 rounded-2xl py-4 pl-12 pr-4 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+        />
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <RefreshCw className="animate-spin text-primary" size={24} />
+        </div>
+      ) : results.length > 0 ? (
+        <div className="space-y-4">
+          {results.map((user) => (
+            <button 
+              key={user.id}
+              onClick={() => onViewProfile(user)}
+              className="w-full flex items-center gap-4 p-4 bg-surface rounded-2xl border border-primary/5 active:scale-[0.98] transition-all"
+            >
+              <img 
+                src={user.avatar || `https://i.pravatar.cc/150?u=${user.id}`} 
+                alt={user.name}
+                className="w-12 h-12 rounded-full object-cover border-2 border-primary/10"
+                referrerPolicy="no-referrer"
+              />
+              <div className="flex-1 text-left">
+                <div className="flex items-center gap-1">
+                  <h4 className="font-black text-sm uppercase tracking-tight">{user.name}</h4>
+                  {user.role === 'creator' && <CheckCircle2 size={12} className="text-primary" />}
+                </div>
+                <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">@{user.username}</p>
+              </div>
+              <ChevronRight size={18} className="text-on-surface/20" />
+            </button>
+          ))}
+        </div>
+      ) : query.trim().length >= 2 ? (
+        <div className="text-center py-12">
+          <p className="text-xs font-bold text-on-surface/40 uppercase tracking-widest">Nenhum usuário encontrado</p>
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <Search size={48} className="mx-auto text-on-surface/5 mb-4" />
+          <p className="text-[10px] font-black text-on-surface/20 uppercase tracking-[0.2em]">Encontre novos perfis</p>
+        </div>
+      )}
     </div>
   );
 };
@@ -3378,7 +3474,6 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
   const [instagram, setInstagram] = useState(creator.social_links?.instagram || '');
   const [twitter, setTwitter] = useState(creator.social_links?.twitter || '');
   const [tiktok, setTiktok] = useState(creator.social_links?.tiktok || '');
-  const [birthDate, setBirthDate] = useState(creator.birth_date || '');
   const [loading, setLoading] = useState(false);
 
   // Removida a sincronização agressiva que limpava os campos durante a digitação
@@ -3487,7 +3582,6 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
         name,
         username,
         bio,
-        birth_date: birthDate,
         services_bio: servicesBio,
         welcome_audio: welcomeAudio,
         avatar,
@@ -3623,26 +3717,6 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
               onChange={(e) => setName(e.target.value)}
               required
             />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Data de Nascimento</label>
-            <input 
-              type="date"
-              className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface disabled:opacity-50" 
-              value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
-              disabled={!!creator.birth_date}
-              required
-            />
-            {!creator.birth_date ? (
-              <p className="text-[9px] text-amber-600 font-bold px-1 mt-1 uppercase tracking-wider">
-                ⚠️ Atenção: Esta informação não poderá ser alterada após o salvamento.
-              </p>
-            ) : (
-              <p className="text-[9px] text-on-surface/40 font-bold px-1 mt-1 uppercase tracking-wider">
-                Informação protegida e não editável.
-              </p>
-            )}
           </div>
           <div className="space-y-1.5">
             <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Nome de Usuário</label>
@@ -4135,8 +4209,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('+55 ');
-  const [birthDate, setBirthDate] = useState('');
+  const [phone, setPhone] = useState('');
   const [isCreator, setIsCreator] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -4169,7 +4242,6 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
           bio: isCreator ? 'Novo criador no pedaço!' : 'Novo usuário no pedaço!',
           stats: { posts: '0', followers: '0', likes: '0' },
           phone: phone,
-          birth_date: birthDate,
           role: isCreator ? 'creator' : 'user'
         });
         if (profileError) {
@@ -4214,27 +4286,6 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
               <h1 className="text-4xl font-black tracking-tight leading-none text-on-surface">Criar Conta</h1>
               <p className="text-on-surface/60 text-sm font-bold max-w-[280px] mx-auto">Assine, interaja e conecte-se com acompanhantes e criadores em um clique.</p>
             </div>
-
-            <div className="bg-primary/5 rounded-3xl p-6 space-y-4 border border-primary/10 text-left">
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                  <Check size={14} className="text-primary" />
-                </div>
-                <span className="text-[11px] font-black text-on-surface/80 uppercase tracking-tight">Acesso total ao conteúdo deste usuário</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                  <Check size={14} className="text-primary" />
-                </div>
-                <span className="text-[11px] font-black text-on-surface/80 uppercase tracking-tight">Mensagem direta com este usuário</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                  <Check size={14} className="text-primary" />
-                </div>
-                <span className="text-[11px] font-black text-on-surface/80 uppercase tracking-tight">Cancele sua assinatura a qualquer momento</span>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -4265,32 +4316,27 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
               <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">Telefone</label>
               <input 
                 className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
-                placeholder="+55 (11) 99999-9999" 
+                placeholder="(99) 99999-9999" 
                 type="tel"
                 value={phone}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  if (val.startsWith('+55')) {
-                    setPhone(val);
-                  } else {
-                    setPhone('+55 ' + val.replace(/^\+55\s*/, ''));
+                  let val = e.target.value.replace(/\D/g, '');
+                  if (val.length > 11) val = val.slice(0, 11);
+                  
+                  let formatted = '';
+                  if (val.length > 0) {
+                    formatted = '(' + val.slice(0, 2);
+                    if (val.length > 2) {
+                      formatted += ') ' + val.slice(2, 7);
+                      if (val.length > 7) {
+                        formatted += '-' + val.slice(7);
+                      }
+                    }
                   }
+                  setPhone(formatted);
                 }}
                 required
               />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">Data de Nascimento</label>
-              <input 
-                className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
-                type="date"
-                value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
-                required
-              />
-              <p className="text-[9px] text-amber-600 font-bold px-1 mt-1 uppercase tracking-wider">
-                ⚠️ Atenção: Esta informação não poderá ser alterada após o cadastro.
-              </p>
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">Senha</label>
@@ -4331,14 +4377,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
           <div className="flex items-start gap-3 px-1">
             <input type="checkbox" className="mt-1 w-4 h-4 rounded border-primary/20 text-primary focus:ring-primary/20" required />
             <p className="text-[11px] font-bold text-on-surface/80 leading-relaxed">
-              Confirmo que tenho <span className="text-primary">18 anos ou mais</span> e sou maior de idade.
-            </p>
-          </div>
-
-          <div className="flex items-start gap-3 px-1">
-            <input type="checkbox" className="mt-1 w-4 h-4 rounded border-primary/20 text-primary focus:ring-primary/20" required />
-            <p className="text-[9px] font-bold text-on-surface/60 leading-relaxed">
-              Eu aceito os <span className="text-primary underline">Termos de Serviço</span> e a <span className="text-primary underline">Política de Privacidade</span>
+              Ao se cadastrar na Nudlye, você atesta que leu e concorda com nossos <span className="text-primary underline">Termos e Privacidade</span> e confirma que tem pelo menos <span className="text-primary">18 anos de idade</span>.
             </p>
           </div>
 
@@ -4521,190 +4560,155 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
   }
 
   return (
-    <div className="fixed inset-0 z-[200] bg-background flex flex-col overflow-y-auto no-scrollbar">
-      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md px-6 py-4 flex items-center gap-4 border-b border-primary/5">
-        <button onClick={onBack} className="p-2 -ml-2 text-on-surface/60 hover:text-primary transition-colors">
-          <ArrowLeft size={24} />
+    <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto no-scrollbar">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white w-full max-w-md rounded-[32px] overflow-hidden shadow-2xl relative"
+      >
+        <button 
+          onClick={onBack}
+          className="absolute top-4 right-4 z-20 w-8 h-8 bg-black/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/40 transition-colors"
+        >
+          <X size={20} />
         </button>
-        <h2 className="font-black uppercase tracking-widest text-xs">Pagamento Seguro</h2>
-      </div>
 
-      <div className="p-6 max-w-2xl mx-auto w-full space-y-8 pb-24">
-        <section className="text-center py-4">
-          <div className="relative inline-block mb-4">
-            {post ? (
-              <img src={post.image} className="w-32 h-32 rounded-2xl border-4 border-white shadow-xl object-cover" referrerPolicy="no-referrer" />
-            ) : (
-              <img src={creator?.avatar} className="w-24 h-24 rounded-full border-4 border-white shadow-xl object-cover" referrerPolicy="no-referrer" />
-            )}
-            <div className="absolute -bottom-1 -right-1 bg-primary text-white p-1.5 rounded-full border-2 border-white">
-              <Lock size={14} fill="white" />
+        {/* Header with Cover and Profile */}
+        <div className="relative h-32 bg-primary/10">
+          <img 
+            src={creator?.cover_image || 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=800'} 
+            className="w-full h-full object-cover"
+            referrerPolicy="no-referrer"
+          />
+          <div className="absolute -bottom-6 left-6 flex items-end gap-3">
+            <div className="w-20 h-20 rounded-full border-4 border-white overflow-hidden shadow-lg bg-white">
+              <img src={creator?.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             </div>
-          </div>
-          <h1 className="text-2xl font-black mb-1 uppercase tracking-tight">
-            {post ? 'Desbloquear Conteúdo' : `Assinar ${creator?.name}`}
-          </h1>
-          <p className="text-xs font-bold text-on-surface/40 uppercase tracking-widest">
-            {post ? `Acesso vitalício a este ${post.isVideo ? 'vídeo' : 'post'}` : 'Escolha seu plano de acesso'}
-          </p>
-        </section>
-
-        <div className="flex items-center justify-center gap-4 py-2">
-          <div className="flex items-center gap-1.5 text-[10px] font-bold text-green-600 uppercase tracking-widest bg-green-50 px-3 py-1.5 rounded-full border border-green-100">
-            <ShieldCheck size={14} />
-            100% Seguro
-          </div>
-          <div className="flex items-center gap-1.5 text-[10px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100">
-            <EyeOff size={14} />
-            Pagamento Anônimo
+            <div className="pb-1">
+              <h2 className="font-bold text-on-surface leading-tight">{creator?.name}</h2>
+              <p className="text-xs text-on-surface/60">@{creator?.username}</p>
+            </div>
           </div>
         </div>
 
-        {!post ? (
-          <div className="space-y-4">
-            {plans.map((plan: any) => (
-              <div 
-                key={plan.id}
-                onClick={() => {
-                  setSelectedPlan(plan.id);
-                  setPixData(null); // Reset pix data when changing plans
-                }}
-                className={`relative p-5 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between ${
-                  selectedPlan === plan.id ? 'border-primary bg-primary/5 shadow-lg shadow-primary/5' : 'border-primary/5 bg-white'
-                }`}
-              >
-                {plan.badge && (
-                  <span className="absolute -top-2.5 right-6 bg-primary text-white text-[8px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
-                    {plan.badge}
-                  </span>
-                )}
-                <div className="flex items-center gap-4">
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                    selectedPlan === plan.id ? 'border-primary' : 'border-primary/20'
-                  }`}>
-                    {selectedPlan === plan.id && <div className="w-3 h-3 bg-primary rounded-full" />}
-                  </div>
-                  <div>
-                    <h3 className="font-black text-sm uppercase tracking-tight">{plan.name}</h3>
-                    <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">{plan.description}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="block font-black text-primary text-lg">R$ {parseFloat(String(plan.price).replace('R$ ', '').replace(',', '.')).toFixed(2).replace('.', ',')}</span>
-                </div>
+        <div className="pt-10 px-8 pb-8 space-y-6">
+          {/* Benefits */}
+          <div className="space-y-3">
+            <h3 className="font-bold text-on-surface text-sm">Benefícios exclusivos</h3>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs text-on-surface/80 font-medium">
+                <Check size={16} className="text-[#f9b084]" />
+                <span>Acesso ao conteúdo</span>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="p-6 rounded-3xl bg-white border-2 border-primary shadow-lg shadow-primary/5 flex items-center justify-between">
-            <div>
-              <h3 className="font-black text-lg uppercase tracking-tight">Acesso Único</h3>
-              <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">Este post será desbloqueado para sempre</p>
-            </div>
-            <div className="text-right">
-              <span className="block font-black text-primary text-2xl">{postPrice}</span>
+              <div className="flex items-center gap-2 text-xs text-on-surface/80 font-medium">
+                <Check size={16} className="text-[#f9b084]" />
+                <span>Chat exclusivo com o criador</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-on-surface/80 font-medium">
+                <Check size={16} className="text-[#f9b084]" />
+                <span>Cancele a qualquer hora</span>
+              </div>
             </div>
           </div>
-        )}
 
-        <div className="bg-white p-8 rounded-3xl border border-primary/5 shadow-sm space-y-8 text-center mt-6">
-          <div className="flex flex-col items-center">
-            <h3 className="font-black text-lg uppercase tracking-tight mb-4">Pague com Pix</h3>
-            <button 
-              onClick={generatePix}
-              disabled={loading}
-              className="w-full py-5 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all uppercase tracking-widest text-sm flex items-center justify-center gap-3"
-            >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <ShieldCheck size={20} />
-                  Gerar Código Pix
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-        
-        {pixData && (
-          <div className="fixed inset-0 z-[300] bg-background/95 backdrop-blur-md flex flex-col items-center justify-center p-6">
-            <div className="bg-white p-8 rounded-3xl w-full max-w-md shadow-2xl border border-primary/10 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-2 bg-green-500"></div>
-              <button 
-                onClick={() => setPixData(null)}
-                className="absolute top-4 right-4 text-on-surface/40 hover:text-primary transition-colors"
-              >
-                <X size={24} />
-              </button>
-              
-              <div className="flex flex-col items-center">
-                <div className="flex items-center gap-2 text-green-600 mb-6 bg-green-50 px-4 py-2 rounded-full border border-green-100">
-                  <ShieldCheck size={16} />
-                  <span className="text-[10px] font-black uppercase tracking-widest">Ambiente Seguro e Criptografado</span>
-                </div>
+          <div className="h-px bg-on-surface/5 w-full" />
 
-                <div className="w-48 h-48 bg-white rounded-2xl p-3 mb-6 shadow-lg border border-primary/10 relative">
-                  <div className="absolute -top-3 -right-3 bg-primary text-white p-2 rounded-full shadow-md">
-                    <QrCode size={20} />
+          {/* Payment Info */}
+          <div className="space-y-6">
+            <div className="space-y-1">
+              <h3 className="font-bold text-on-surface text-lg">Formas de pagamento</h3>
+              <p className="text-[10px] uppercase font-black tracking-widest text-on-surface/30">Valor</p>
+              <p className="text-2xl font-black text-on-surface">
+                R$ {post ? postPrice.replace('R$ ', '') : parseFloat(String(plans.find((p: any) => p.id === selectedPlan)?.price || '0')).toFixed(2).replace('.', ',')}
+              </p>
+            </div>
+
+            {!pixData ? (
+              <div className="space-y-4">
+                {!post && (
+                  <div className="grid grid-cols-3 gap-2">
+                    {plans.map((plan: any) => (
+                      <button
+                        key={plan.id}
+                        onClick={() => setSelectedPlan(plan.id)}
+                        className={`p-2 rounded-xl border-2 transition-all text-center ${
+                          selectedPlan === plan.id ? 'border-primary bg-primary/5' : 'border-on-surface/5 bg-white'
+                        }`}
+                      >
+                        <p className="text-[10px] font-black uppercase tracking-tight">{plan.name}</p>
+                        <p className="text-xs font-bold text-primary">R$ {parseFloat(String(plan.price)).toFixed(0)}</p>
+                      </button>
+                    ))}
                   </div>
+                )}
+                
+                <button 
+                  onClick={generatePix}
+                  disabled={loading}
+                  className="w-full py-4 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all uppercase tracking-widest text-sm flex items-center justify-center gap-3"
+                >
+                  {loading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <QrCode size={20} />
+                      Gerar Pix
+                    </>
+                  )}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6 flex flex-col items-center">
+                {/* QR Code */}
+                <div className="w-56 h-56 bg-white rounded-2xl p-4 shadow-lg border border-on-surface/5 relative">
                   <img 
                     src={`data:image/jpeg;base64,${pixData.qrCodeBase64}`} 
                     alt="Pix QR Code" 
                     className="w-full h-full object-contain"
                   />
                 </div>
-                <h3 className="font-black text-xl uppercase tracking-tight mb-2 text-on-surface">Pague com Pix</h3>
-                <p className="text-xs text-on-surface/60 font-medium max-w-[260px] text-center mb-8 leading-relaxed">
-                  Escaneie o QR Code com o app do seu banco ou copie o código abaixo para liberar seu acesso <span className="font-bold text-primary">imediatamente</span>.
-                </p>
-              </div>
 
-              <div className="space-y-3 mb-8 bg-on-surface/5 p-4 rounded-2xl border border-on-surface/10">
-                <label className="text-[10px] uppercase tracking-widest font-black text-on-surface/60 block text-left flex items-center gap-1.5">
-                  <Copy size={12} />
-                  Código Pix Copia e Cola
-                </label>
-                <div className="flex gap-2">
-                  <div className="flex-1 bg-white border border-primary/10 rounded-xl px-4 py-3.5 font-mono text-[10px] break-all text-left overflow-hidden h-12 flex items-center shadow-inner">
-                    {pixData.qrCode.substring(0, 40)}...
+                {/* PIX Key Input */}
+                <div className="w-full space-y-3">
+                  <div className="w-full bg-on-surface/5 border border-on-surface/10 rounded-2xl px-4 py-3 flex items-center gap-2">
+                    <input 
+                      readOnly 
+                      value={pixData.qrCode} 
+                      className="bg-transparent border-none outline-none flex-1 text-[10px] font-medium text-on-surface/60 truncate"
+                    />
                   </div>
+                  
                   <button 
                     onClick={handleCopyPix}
-                    className="bg-primary text-white px-4 rounded-xl flex items-center justify-center active:scale-95 transition-all shadow-md"
+                    className="w-full py-4 bg-[#f9b084] text-on-surface font-bold rounded-2xl shadow-lg active:scale-[0.98] transition-all"
                   >
-                    {copied ? <Check size={18} /> : <Copy size={18} />}
+                    {copied ? 'Copiado!' : 'Copiar chave Pix'}
                   </button>
                 </div>
-                {copied && <p className="text-[10px] text-green-600 font-bold uppercase tracking-widest text-center mt-2">Código copiado com sucesso!</p>}
-              </div>
 
-              <div className="flex flex-col items-center justify-center gap-3">
-                <div className="flex items-center gap-2 text-primary text-sm font-bold animate-pulse bg-primary/5 px-6 py-3 rounded-full">
-                  <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                  Aguardando confirmação...
+                <div className="h-px bg-on-surface/5 w-full" />
+
+                {/* Other Options */}
+                <div className="w-full space-y-3">
+                  <button className="w-full py-3 text-on-surface/60 font-bold text-sm hover:text-on-surface transition-colors">
+                    Pagar com cartão de crédito
+                  </button>
+                  <button className="w-full py-3 flex items-center justify-center gap-2 text-on-surface/60 font-bold text-sm hover:text-on-surface transition-colors">
+                    Pagar com 
+                    <span className="text-[#21c25e] font-black">PicPay</span>
+                  </button>
                 </div>
-                <p className="text-[9px] text-on-surface/40 font-bold uppercase tracking-widest flex items-center gap-1">
-                  <Lock size={10} />
-                  Transação 100% Anônima
-                </p>
+
+                {/* Status Polling */}
+                <div className="flex items-center gap-2 text-primary text-[10px] font-bold uppercase tracking-widest animate-pulse">
+                  <div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                  Aguardando pagamento...
+                </div>
               </div>
-            </div>
-          </div>
-        )}
-        
-        <div className="bg-white p-4 rounded-2xl border border-primary/5 shadow-sm flex items-start gap-4 mt-8">
-          <div className="bg-[#5c0a18] p-3 rounded-xl flex-shrink-0">
-            <ShieldCheck size={24} className="text-white" />
-          </div>
-          <div className="text-left">
-            <h4 className="font-bold text-sm text-on-surface mb-1">TRANSAÇÃO PROTEGIDA</h4>
-            <p className="text-xs text-on-surface/60 leading-relaxed">
-              Esta operação está sendo realizada em um ambiente criptografado de ponta a ponta. Sua identidade e dados bancários permanecem privados.
-            </p>
+            )}
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };
@@ -5624,6 +5628,7 @@ export default function App() {
       case 'messages': return <ScreenMessages messages={messages} isMaster={isMaster} onMessagesRead={() => setRefreshKey(prev => prev + 1)} />;
       case 'wallet': return <ScreenWallet onBack={() => setScreen('feed')} isMaster={isMaster} />;
       case 'subscriptions': return <ScreenSubscriptions onBack={() => setScreen('feed')} />;
+      case 'search': return <ScreenSearch onViewProfile={handleViewProfile} />;
       case 'creator-plans': return <ScreenCreatorPlans onBack={() => setScreen('feed')} profile={profile} />;
       case 'edit-profile': 
         if (!profile) return null;
@@ -5660,6 +5665,7 @@ export default function App() {
     if (screen === 'messages') return 'MENSAGENS';
     if (screen === 'wallet') return 'CARTEIRA';
     if (screen === 'subscriptions') return 'ASSINATURAS';
+    if (screen === 'search') return 'PESQUISAR';
     if (screen === 'edit-profile') return 'EDITAR';
     if (screen === 'create-post') return 'POSTAR';
     if (screen === 'payment') return 'ASSINAR';
