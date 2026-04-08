@@ -4586,9 +4586,9 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
             <div className="w-20 h-20 rounded-full border-4 border-white overflow-hidden shadow-lg bg-white">
               <img src={creator?.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             </div>
-            <div className="pb-1">
-              <h2 className="font-bold text-on-surface leading-tight">{creator?.name}</h2>
-              <p className="text-xs text-on-surface/60">@{creator?.username}</p>
+            <div className="pb-1 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-xl shadow-sm border border-white">
+              <h2 className="font-bold text-slate-900 leading-tight">{creator?.name}</h2>
+              <p className="text-xs text-slate-500 font-medium">@{creator?.username}</p>
             </div>
           </div>
         </div>
@@ -4597,7 +4597,7 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
           {step === 'select-plan' ? (
             <div className="space-y-6">
               <div className="space-y-4">
-                <h3 className="font-bold text-on-surface text-sm">Assinaturas</h3>
+                <h3 className="font-bold text-slate-900 text-sm">Assinaturas</h3>
                 <div className="space-y-3">
                   {plans.filter((p: any) => p.category !== 'Promoções').map((plan: any) => (
                     <button
@@ -4612,12 +4612,27 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
                       <span className="text-sm">R$ {parseFloat(String(plan.price)).toFixed(2).replace('.', ',')}</span>
                     </button>
                   ))}
+                  {plans.filter((p: any) => p.category !== 'Promoções').length === 0 && (
+                    plans.map((plan: any) => (
+                      <button
+                        key={plan.id}
+                        onClick={() => {
+                          setSelectedPlan(plan.id);
+                          setStep('checkout');
+                        }}
+                        className="w-full bg-[#f9b084] hover:bg-[#f9b084]/90 text-on-surface font-bold py-3.5 px-6 rounded-full flex items-center justify-between transition-all active:scale-[0.98] shadow-sm"
+                      >
+                        <span className="text-sm">{plan.name}</span>
+                        <span className="text-sm">R$ {parseFloat(String(plan.price)).toFixed(2).replace('.', ',')}</span>
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-on-surface text-sm">Promoções</h3>
+                  <h3 className="font-bold text-slate-900 text-sm">Promoções</h3>
                   <ChevronDown size={16} className="text-on-surface/40" />
                 </div>
                 <div className="space-y-3">
@@ -4641,7 +4656,7 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
             <>
               {/* Benefits */}
               <div className="space-y-3">
-                <h3 className="font-bold text-on-surface text-sm">Benefícios exclusivos</h3>
+                <h3 className="font-bold text-slate-900 text-sm">Benefícios exclusivos</h3>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-xs text-on-surface/80 font-medium">
                     <Check size={16} className="text-[#f9b084]" />
@@ -4663,9 +4678,9 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
               {/* Payment Info */}
               <div className="space-y-6">
                 <div className="space-y-1">
-                  <h3 className="font-bold text-on-surface text-lg">Formas de pagamento</h3>
-                  <p className="text-[10px] uppercase font-black tracking-widest text-on-surface/30">Valor</p>
-                  <p className="text-2xl font-black text-on-surface">
+                  <h3 className="font-bold text-slate-900 text-lg">Formas de pagamento</h3>
+                  <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Valor</p>
+                  <p className="text-2xl font-black text-slate-900">
                     R$ {post ? postPrice.replace('R$ ', '') : parseFloat(String(plans.find((p: any) => p.id === selectedPlan)?.price || '0')).toFixed(2).replace('.', ',')}
                   </p>
                 </div>
