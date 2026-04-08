@@ -29,6 +29,7 @@ import {
   EyeOff,
   Star,
   ChevronRight,
+  ChevronDown,
   Camera,
   Link as LinkIcon,
   X,
@@ -4424,6 +4425,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
 };
 
 const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator: Creator | null, post?: Post | null }) => {
+  const [step, setStep] = useState<'select-plan' | 'checkout'>(post ? 'checkout' : 'select-plan');
   const [selectedPlan, setSelectedPlan] = useState('monthly');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -4432,9 +4434,9 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   const defaultPlans = [
-    { id: 'monthly', name: 'Mensal', price: '29.90', description: 'Acesso total por 30 dias', duration: 30 },
-    { id: 'quarterly', name: 'Trimestral', price: '79.90', description: 'Economize 15% - 90 dias', badge: 'Popular', duration: 90 },
-    { id: 'yearly', name: 'Anual', price: '249.90', description: 'Economize 30% - 365 dias', badge: 'Melhor Valor', duration: 365 },
+    { id: 'monthly', name: '1 mês', price: '19.90', description: 'Acesso total por 30 dias', duration: 30, category: 'Assinaturas' },
+    { id: 'quarterly', name: '3 meses (50% off)', price: '29.85', description: 'Economize 50% - 90 dias', badge: 'Popular', duration: 90, category: 'Promoções' },
+    { id: 'yearly', name: '6 meses (50% off)', price: '59.70', description: 'Economize 50% - 180 dias', badge: 'Melhor Valor', duration: 180, category: 'Promoções' },
   ];
 
   const plans = creator?.stats?.plans || defaultPlans;
@@ -4592,121 +4594,148 @@ const ScreenPayment = ({ onBack, creator, post }: { onBack: () => void, creator:
         </div>
 
         <div className="pt-10 px-8 pb-8 space-y-6">
-          {/* Benefits */}
-          <div className="space-y-3">
-            <h3 className="font-bold text-on-surface text-sm">Benefícios exclusivos</h3>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs text-on-surface/80 font-medium">
-                <Check size={16} className="text-[#f9b084]" />
-                <span>Acesso ao conteúdo</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-on-surface/80 font-medium">
-                <Check size={16} className="text-[#f9b084]" />
-                <span>Chat exclusivo com o criador</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-on-surface/80 font-medium">
-                <Check size={16} className="text-[#f9b084]" />
-                <span>Cancele a qualquer hora</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="h-px bg-on-surface/5 w-full" />
-
-          {/* Payment Info */}
-          <div className="space-y-6">
-            <div className="space-y-1">
-              <h3 className="font-bold text-on-surface text-lg">Formas de pagamento</h3>
-              <p className="text-[10px] uppercase font-black tracking-widest text-on-surface/30">Valor</p>
-              <p className="text-2xl font-black text-on-surface">
-                R$ {post ? postPrice.replace('R$ ', '') : parseFloat(String(plans.find((p: any) => p.id === selectedPlan)?.price || '0')).toFixed(2).replace('.', ',')}
-              </p>
-            </div>
-
-            {!pixData ? (
+          {step === 'select-plan' ? (
+            <div className="space-y-6">
               <div className="space-y-4">
-                {!post && (
-                  <div className="grid grid-cols-3 gap-2">
-                    {plans.map((plan: any) => (
-                      <button
-                        key={plan.id}
-                        onClick={() => setSelectedPlan(plan.id)}
-                        className={`p-2 rounded-xl border-2 transition-all text-center ${
-                          selectedPlan === plan.id ? 'border-primary bg-primary/5' : 'border-on-surface/5 bg-white'
-                        }`}
+                <h3 className="font-bold text-on-surface text-sm">Assinaturas</h3>
+                <div className="space-y-3">
+                  {plans.filter((p: any) => p.category !== 'Promoções').map((plan: any) => (
+                    <button
+                      key={plan.id}
+                      onClick={() => {
+                        setSelectedPlan(plan.id);
+                        setStep('checkout');
+                      }}
+                      className="w-full bg-[#f9b084] hover:bg-[#f9b084]/90 text-on-surface font-bold py-3.5 px-6 rounded-full flex items-center justify-between transition-all active:scale-[0.98] shadow-sm"
+                    >
+                      <span className="text-sm">{plan.name}</span>
+                      <span className="text-sm">R$ {parseFloat(String(plan.price)).toFixed(2).replace('.', ',')}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-on-surface text-sm">Promoções</h3>
+                  <ChevronDown size={16} className="text-on-surface/40" />
+                </div>
+                <div className="space-y-3">
+                  {plans.filter((p: any) => p.category === 'Promoções').map((plan: any) => (
+                    <button
+                      key={plan.id}
+                      onClick={() => {
+                        setSelectedPlan(plan.id);
+                        setStep('checkout');
+                      }}
+                      className="w-full bg-[#f9b084] hover:bg-[#f9b084]/90 text-on-surface font-bold py-3.5 px-6 rounded-full flex items-center justify-between transition-all active:scale-[0.98] shadow-sm"
+                    >
+                      <span className="text-sm">{plan.name}</span>
+                      <span className="text-sm">R$ {parseFloat(String(plan.price)).toFixed(2).replace('.', ',')}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Benefits */}
+              <div className="space-y-3">
+                <h3 className="font-bold text-on-surface text-sm">Benefícios exclusivos</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs text-on-surface/80 font-medium">
+                    <Check size={16} className="text-[#f9b084]" />
+                    <span>Acesso ao conteúdo</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-on-surface/80 font-medium">
+                    <Check size={16} className="text-[#f9b084]" />
+                    <span>Chat exclusivo com o criador</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-on-surface/80 font-medium">
+                    <Check size={16} className="text-[#f9b084]" />
+                    <span>Cancele a qualquer hora</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="h-px bg-on-surface/5 w-full" />
+
+              {/* Payment Info */}
+              <div className="space-y-6">
+                <div className="space-y-1">
+                  <h3 className="font-bold text-on-surface text-lg">Formas de pagamento</h3>
+                  <p className="text-[10px] uppercase font-black tracking-widest text-on-surface/30">Valor</p>
+                  <p className="text-2xl font-black text-on-surface">
+                    R$ {post ? postPrice.replace('R$ ', '') : parseFloat(String(plans.find((p: any) => p.id === selectedPlan)?.price || '0')).toFixed(2).replace('.', ',')}
+                  </p>
+                </div>
+
+                {!pixData ? (
+                  <div className="space-y-4">
+                    <button 
+                      onClick={generatePix}
+                      disabled={loading}
+                      className="w-full py-4 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all uppercase tracking-widest text-sm flex items-center justify-center gap-3"
+                    >
+                      {loading ? (
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <QrCode size={20} />
+                          Gerar Pix
+                        </>
+                      )}
+                    </button>
+                    {!post && (
+                      <button 
+                        onClick={() => setStep('select-plan')}
+                        className="w-full py-2 text-on-surface/40 font-bold text-[10px] uppercase tracking-widest hover:text-primary transition-colors"
                       >
-                        <p className="text-[10px] font-black uppercase tracking-tight">{plan.name}</p>
-                        <p className="text-xs font-bold text-primary">R$ {parseFloat(String(plan.price)).toFixed(0)}</p>
+                        Alterar Plano
                       </button>
-                    ))}
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-6 flex flex-col items-center">
+                    {/* QR Code */}
+                    <div className="w-56 h-56 bg-white rounded-2xl p-4 shadow-lg border border-on-surface/5 relative">
+                      <img 
+                        src={`data:image/jpeg;base64,${pixData.qrCodeBase64}`} 
+                        alt="Pix QR Code" 
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+
+                    {/* PIX Key Input */}
+                    <div className="w-full space-y-3">
+                      <div className="w-full bg-on-surface/5 border border-on-surface/10 rounded-2xl px-4 py-3 flex items-center gap-2">
+                        <input 
+                          readOnly 
+                          value={pixData.qrCode} 
+                          className="bg-transparent border-none outline-none flex-1 text-[10px] font-medium text-on-surface/60 truncate"
+                        />
+                      </div>
+                      
+                      <button 
+                        onClick={handleCopyPix}
+                        className="w-full py-4 bg-[#f9b084] text-on-surface font-bold rounded-2xl shadow-lg active:scale-[0.98] transition-all"
+                      >
+                        {copied ? 'Copiado!' : 'Copiar chave Pix'}
+                      </button>
+                    </div>
+
+                    <div className="h-px bg-on-surface/5 w-full" />
+
+                    {/* Status Polling */}
+                    <div className="flex items-center gap-2 text-primary text-[10px] font-bold uppercase tracking-widest animate-pulse">
+                      <div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                      Aguardando pagamento...
+                    </div>
                   </div>
                 )}
-                
-                <button 
-                  onClick={generatePix}
-                  disabled={loading}
-                  className="w-full py-4 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all uppercase tracking-widest text-sm flex items-center justify-center gap-3"
-                >
-                  {loading ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <QrCode size={20} />
-                      Gerar Pix
-                    </>
-                  )}
-                </button>
               </div>
-            ) : (
-              <div className="space-y-6 flex flex-col items-center">
-                {/* QR Code */}
-                <div className="w-56 h-56 bg-white rounded-2xl p-4 shadow-lg border border-on-surface/5 relative">
-                  <img 
-                    src={`data:image/jpeg;base64,${pixData.qrCodeBase64}`} 
-                    alt="Pix QR Code" 
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-
-                {/* PIX Key Input */}
-                <div className="w-full space-y-3">
-                  <div className="w-full bg-on-surface/5 border border-on-surface/10 rounded-2xl px-4 py-3 flex items-center gap-2">
-                    <input 
-                      readOnly 
-                      value={pixData.qrCode} 
-                      className="bg-transparent border-none outline-none flex-1 text-[10px] font-medium text-on-surface/60 truncate"
-                    />
-                  </div>
-                  
-                  <button 
-                    onClick={handleCopyPix}
-                    className="w-full py-4 bg-[#f9b084] text-on-surface font-bold rounded-2xl shadow-lg active:scale-[0.98] transition-all"
-                  >
-                    {copied ? 'Copiado!' : 'Copiar chave Pix'}
-                  </button>
-                </div>
-
-                <div className="h-px bg-on-surface/5 w-full" />
-
-                {/* Other Options */}
-                <div className="w-full space-y-3">
-                  <button className="w-full py-3 text-on-surface/60 font-bold text-sm hover:text-on-surface transition-colors">
-                    Pagar com cartão de crédito
-                  </button>
-                  <button className="w-full py-3 flex items-center justify-center gap-2 text-on-surface/60 font-bold text-sm hover:text-on-surface transition-colors">
-                    Pagar com 
-                    <span className="text-[#21c25e] font-black">PicPay</span>
-                  </button>
-                </div>
-
-                {/* Status Polling */}
-                <div className="flex items-center gap-2 text-primary text-[10px] font-bold uppercase tracking-widest animate-pulse">
-                  <div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                  Aguardando pagamento...
-                </div>
-              </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
       </motion.div>
     </div>
