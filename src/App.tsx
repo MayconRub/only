@@ -5530,9 +5530,31 @@ export default function App() {
         );
       }
       if (screen === 'register') {
-        return <ScreenRegister onRegister={() => setScreen('feed')} onNavigateToLogin={() => setScreen('login')} />;
+        return (
+          <ScreenRegister 
+            onRegister={() => {
+              if (publicCreator) {
+                setScreen('payment');
+              } else {
+                setScreen('feed');
+              }
+            }} 
+            onNavigateToLogin={() => setScreen('login')} 
+          />
+        );
       }
-      return <ScreenLogin onLogin={() => setScreen('feed')} onNavigateToRegister={() => setScreen('register')} />;
+      return (
+        <ScreenLogin 
+          onLogin={() => {
+            if (publicCreator) {
+              setScreen('payment');
+            } else {
+              setScreen('feed');
+            }
+          }} 
+          onNavigateToRegister={() => setScreen('register')} 
+        />
+      );
     }
 
     if (!profile || fetchError) {
