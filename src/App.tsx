@@ -4596,7 +4596,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
                         setSelectedPlan(plan.id);
                         setStep('checkout');
                       }}
-                      className="w-full bg-[#f9b084] hover:bg-[#f9b084]/90 text-on-surface font-bold py-3.5 px-6 rounded-full flex items-center justify-between transition-all active:scale-[0.98] shadow-sm"
+                      className="w-full bg-gradient-to-r from-rose-400 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-bold py-3.5 px-6 rounded-full flex items-center justify-between transition-all active:scale-[0.98] shadow-sm"
                     >
                       <span className="text-sm">{plan.name}</span>
                       <span className="text-sm">R$ {parseFloat(String(plan.price)).toFixed(2).replace('.', ',')}</span>
@@ -4618,7 +4618,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
                         setSelectedPlan(plan.id);
                         setStep('checkout');
                       }}
-                      className="w-full bg-[#f9b084] hover:bg-[#f9b084]/90 text-on-surface font-bold py-3.5 px-6 rounded-full flex items-center justify-between transition-all active:scale-[0.98] shadow-sm"
+                      className="w-full bg-gradient-to-r from-rose-400 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-bold py-3.5 px-6 rounded-full flex items-center justify-between transition-all active:scale-[0.98] shadow-sm"
                     >
                       <span className="text-sm">{plan.name}</span>
                       <span className="text-sm">R$ {parseFloat(String(plan.price)).toFixed(2).replace('.', ',')}</span>
@@ -4634,15 +4634,15 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
                 <h3 className="font-bold text-slate-900 text-sm">Benefícios exclusivos</h3>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-xs text-on-surface/80 font-medium">
-                    <Check size={16} className="text-[#f9b084]" />
+                    <Check size={16} className="text-rose-500" />
                     <span>Acesso ao conteúdo</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-on-surface/80 font-medium">
-                    <Check size={16} className="text-[#f9b084]" />
+                    <Check size={16} className="text-rose-500" />
                     <span>Chat exclusivo com o criador</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-on-surface/80 font-medium">
-                    <Check size={16} className="text-[#f9b084]" />
+                    <Check size={16} className="text-rose-500" />
                     <span>Cancele a qualquer hora</span>
                   </div>
                 </div>
