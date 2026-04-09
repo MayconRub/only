@@ -2044,7 +2044,7 @@ const WelcomeAudioPlayer = ({ audioUrl }: { audioUrl: string }) => {
       </button>
       <div className="flex-1">
         <div className="flex justify-between items-center mb-1">
-          <span className="text-[10px] font-black uppercase tracking-widest text-primary">Boas-vindas</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-primary">Ouça minha voz</span>
           <div className="flex items-center gap-2 text-[10px] font-bold text-primary/60">
             <span>{formatTime(currentTime)}</span>
             <span>/</span>
@@ -3795,7 +3795,7 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Áudio de Boas-vindas</label>
+            <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Áudio - Ouça minha voz</label>
             <div className="flex items-center gap-3">
               <label className="flex-1 cursor-pointer bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus-within:ring-2 focus-within:ring-primary/20 shadow-sm flex items-center justify-between group transition-all">
                 <span className="text-sm font-bold text-on-surface/60 group-hover:text-primary transition-colors truncate">
@@ -4706,7 +4706,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
                       
                       <button 
                         onClick={handleCopyPix}
-                        className="w-full py-4 bg-[#f9b084] text-on-surface font-bold rounded-2xl shadow-lg active:scale-[0.98] transition-all"
+                        className="w-full py-4 bg-gradient-to-r from-rose-400 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-bold rounded-2xl shadow-lg active:scale-[0.98] transition-all"
                       >
                         {copied ? 'Copiado!' : 'Copiar chave Pix'}
                       </button>
@@ -5476,10 +5476,18 @@ export default function App() {
     );
   }
 
-  if (authLoading || (isLoggedIn && dataLoading)) {
+  if (authLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center">
-        <div className="text-primary font-black animate-pulse text-xl tracking-widest mb-8">CARREGANDO...</div>
+        <div className="text-primary font-black animate-pulse text-xl tracking-widest mb-8 uppercase">Carregando...</div>
+      </div>
+    );
+  }
+
+  if (isLoggedIn && dataLoading && posts.length === 0) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center">
+        <div className="text-primary font-black animate-pulse text-xl tracking-widest mb-8 uppercase">Carregando...</div>
         
         {showResetButton && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-xs w-full">
