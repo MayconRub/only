@@ -4536,26 +4536,26 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
         </button>
 
         {/* Header with Cover and Profile */}
-        <div className="relative h-32 bg-primary/10">
+        <div className="relative h-28 bg-primary/10">
           <img 
             src={creator?.cover_image || 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=800'} 
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
           />
-          <div className="absolute -bottom-6 left-6 flex items-end gap-3">
-            <div className="w-20 h-20 rounded-full border-4 border-white overflow-hidden shadow-lg bg-white">
+          <div className="absolute -bottom-5 left-6 flex items-end gap-3">
+            <div className="w-16 h-16 rounded-full border-4 border-white overflow-hidden shadow-lg bg-white">
               <img src={creator?.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             </div>
             <div className="pb-1 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-xl shadow-sm border border-white">
-              <h2 className="font-bold text-slate-900 leading-tight">{creator?.name}</h2>
-              <p className="text-xs text-slate-500 font-medium">@{creator?.username}</p>
+              <h2 className="font-bold text-slate-900 leading-tight text-sm">{creator?.name}</h2>
+              <p className="text-[10px] text-slate-500 font-medium">@{creator?.username}</p>
             </div>
           </div>
         </div>
 
-        <div className="pt-10 px-8 pb-8 space-y-6">
+        <div className="pt-6 px-6 pb-8 space-y-5">
           {step === 'select-plan' ? (
-            <div className="space-y-6">
+            <div className="space-y-5">
               <div className="space-y-4">
                 <h3 className="font-bold text-slate-900 text-sm">Assinaturas</h3>
                 <div className="space-y-3">
@@ -4621,7 +4621,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
               <div className="h-px bg-on-surface/5 w-full" />
 
               {/* Payment Info */}
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="space-y-1">
                   <h3 className="font-bold text-slate-900 text-lg">Formas de pagamento</h3>
                   <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Valor</p>
@@ -4654,9 +4654,9 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-6 flex flex-col items-center">
+                  <div className="space-y-4 flex flex-col items-center">
                     {/* QR Code */}
-                    <div className="w-56 h-56 bg-white rounded-2xl p-4 shadow-lg border border-on-surface/5 relative">
+                    <div className="w-44 h-44 bg-white rounded-2xl p-3 shadow-lg border border-on-surface/5 relative">
                       <img 
                         src={`data:image/jpeg;base64,${pixData.qrCodeBase64}`} 
                         alt="Pix QR Code" 
