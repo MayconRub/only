@@ -109,28 +109,41 @@ app.post("/api/webhooks/turbofy", async (req, res) => {
   try {
     console.log("Webhook received:", JSON.stringify(req.body));
     
-    // Turbofy webhook payload structure based on standard event formats
+    // Turbofy/Gawget webhook payload structure
     const body = req.body || {};
-    const event = body.event;
-    const data = body.data;
+    const event = body.event || body.type; // Some platforms use 'type'
+    const data = body.data || body;
 
-    // We only care about when a charge is paid
-    if (event === "charge.paid" && data) {
-      // Turbofy sometimes nests the charge object inside data.charge
-      const charge = data.charge || data;
-      const { id, status, externalRef } = charge;
+    console.log(`Processing event: ${event}`);
 
-      if (id && externalRef) {
+    // We care about paid charges/payments
+    const isPaidEvent = event === "charge.paid" || event === "payment.paid" || event === "order.paid" || event === "payment.succeeded";
+    
+    if (isPaidEvent && data) {
+      // The charge object can be top-level or nested
+      const charge = data.charge || data.object || data;
+      const id = charge.id;
+      const status = charge.status;
+      // Check multiple possible fields for the external reference
+      const externalRef = charge.externalRef || charge.external_reference || (charge.metadata && (charge.metadata.externalRef || charge.metadata.external_reference || charge.metadata.paymentId));
+
+      console.log(`Webhook data - ID: ${id}, Status: ${status}, ExternalRef: ${externalRef}`);
+
+      if (externalRef) {
         // Update payment status in our database
-        // Turbofy uses "PAID" for successful payments
-        const newStatus = status === "PAID" ? "approved" : status.toLowerCase();
+        // Handle different success status strings
+        const isApproved = status === "PAID" || status === "approved" || status === "succeeded" || status === "paid" || status === "completed";
+        const newStatus = isApproved ? "approved" : status.toLowerCase();
         
         console.log(`Updating payment ${externalRef} to status ${newStatus}`);
         const supabase = getSupabase();
         
         const { error: updateError } = await supabase
           .from("payments")
-          .update({ status: newStatus })
+          .update({ 
+            status: newStatus,
+            mp_payment_id: id // Ensure we store the platform's ID
+          })
           .eq("id", externalRef);
 
         if (updateError) {
@@ -138,7 +151,7 @@ app.post("/api/webhooks/turbofy", async (req, res) => {
         }
 
         // If approved, create/update the subscription
-        if (status === "PAID") {
+        if (isApproved) {
           console.log(`Payment ${externalRef} is PAID, creating subscription`);
           const { data: paymentRecord, error: fetchError } = await supabase
             .from("payments")
@@ -188,6 +201,82 @@ app.post("/api/webhooks/turbofy", async (req, res) => {
     // CRITICAL: Always return 200 to Turbofy so the webhook test passes
     // and the webhook doesn't get disabled.
     res.status(200).send("OK");
+  }
+});
+
+// API Route: Sync Payment Status
+app.get("/api/payments/sync/:paymentId", async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    const supabase = getSupabase();
+
+    // Get the payment record
+    const { data: paymentRecord, error: fetchError } = await supabase
+      .from("payments")
+      .select("*")
+      .eq("id", paymentId)
+      .single();
+
+    if (fetchError || !paymentRecord) {
+      return res.status(404).json({ error: "Payment not found." });
+    }
+
+    // If already approved, just return it
+    if (paymentRecord.status === "approved") {
+      return res.json({ status: "approved" });
+    }
+
+    // If we have a platform ID, check with Turbofy
+    if (paymentRecord.mp_payment_id && process.env.TURBOFY_CLIENT_ID && process.env.TURBOFY_CLIENT_SECRET) {
+      const turbofyClient = createTurbofyClient({
+        baseUrl: "https://api.turbofypay.com",
+        credentials: {
+          clientId: process.env.TURBOFY_CLIENT_ID.replace(/^["']|["']$/g, '').trim(),
+          clientSecret: process.env.TURBOFY_CLIENT_SECRET.replace(/^["']|["']$/g, '').trim(),
+        },
+      });
+
+      const charge = await turbofyClient.pix.getCharge(paymentRecord.mp_payment_id);
+      const status = charge.status as string;
+      
+      if (charge && (status === "PAID" || status === "approved" || status === "succeeded")) {
+        // Update to approved
+        await supabase
+          .from("payments")
+          .update({ status: "approved" })
+          .eq("id", paymentId);
+
+        // Create subscription if not exists
+        const { data: existingSub } = await supabase
+          .from("subscriptions")
+          .select("id")
+          .eq("user_id", paymentRecord.user_id)
+          .eq("creator_id", paymentRecord.creator_id)
+          .eq("status", "active")
+          .maybeSingle();
+
+        if (!existingSub) {
+          const duration = paymentRecord.duration || 30;
+          const endDate = new Date();
+          endDate.setDate(endDate.getDate() + duration);
+
+          await supabase.from("subscriptions").insert({
+            user_id: paymentRecord.user_id,
+            creator_id: paymentRecord.creator_id,
+            plan_id: paymentRecord.plan_id,
+            status: "active",
+            end_date: endDate.toISOString(),
+          });
+        }
+
+        return res.json({ status: "approved" });
+      }
+    }
+
+    res.json({ status: paymentRecord.status });
+  } catch (error) {
+    console.error("Error syncing payment:", error);
+    res.status(500).json({ error: "Failed to sync payment." });
   }
 });
 

@@ -4370,6 +4370,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
   const [copied, setCopied] = useState(false);
   const [pixData, setPixData] = useState<{ qrCode: string, qrCodeBase64: string, paymentId: string } | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [checkingStatus, setCheckingStatus] = useState(false);
 
   const defaultPlans = [
     { id: 'monthly', name: '1 mês', price: '19.90', description: 'Acesso total por 30 dias', duration: 30, category: 'Assinaturas' },
@@ -4437,6 +4438,36 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
       alert(`Erro ao gerar Pix: ${error.message}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkPaymentStatus = async () => {
+    if (!pixData?.paymentId || checkingStatus) return;
+    
+    setCheckingStatus(true);
+    try {
+      // First, try to sync with the server (which checks the platform directly)
+      const response = await fetch(`/api/payments/sync/${pixData.paymentId}`);
+      const result = await response.json();
+
+      if (result.status === 'approved') {
+        setSuccess(true);
+      } else {
+        // Fallback: check the database directly just in case
+        const { data } = await supabase
+          .from('payments')
+          .select('status')
+          .eq('id', pixData.paymentId)
+          .single();
+
+        if (data && data.status === 'approved') {
+          setSuccess(true);
+        }
+      }
+    } catch (err) {
+      console.error('Error checking payment status:', err);
+    } finally {
+      setCheckingStatus(false);
     }
   };
 
@@ -4648,9 +4679,20 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
                     <div className="h-px bg-on-surface/5 w-full" />
 
                     {/* Status Polling */}
-                    <div className="flex items-center gap-2 text-primary text-[10px] font-bold uppercase tracking-widest animate-pulse">
-                      <div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                      Aguardando pagamento...
+                    <div className="flex flex-col items-center gap-4 w-full">
+                      <div className="flex items-center gap-2 text-primary text-[10px] font-bold uppercase tracking-widest animate-pulse">
+                        <div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                        Aguardando pagamento...
+                      </div>
+                      
+                      <button 
+                        onClick={checkPaymentStatus}
+                        disabled={checkingStatus}
+                        className="text-[10px] font-black uppercase tracking-widest text-on-surface/40 hover:text-primary transition-colors flex items-center gap-2 disabled:opacity-50"
+                      >
+                        <RefreshCw size={12} className={checkingStatus ? 'animate-spin' : ''} />
+                        {checkingStatus ? 'Verificando...' : 'Já paguei, verificar agora'}
+                      </button>
                     </div>
                   </div>
                 )}
