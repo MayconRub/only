@@ -3476,7 +3476,6 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
   const [welcomeAudio, setWelcomeAudio] = useState(creator.welcome_audio || '');
   const [avatar, setAvatar] = useState(creator.avatar);
   const [coverImage, setCoverImage] = useState(creator.cover_image || '');
-  const [isCreator, setIsCreator] = useState(creator.role === 'creator');
   const [instagram, setInstagram] = useState(creator.social_links?.instagram || '');
   const [twitter, setTwitter] = useState(creator.social_links?.twitter || '');
   const [tiktok, setTiktok] = useState(creator.social_links?.tiktok || '');
@@ -3592,7 +3591,7 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
         welcome_audio: welcomeAudio,
         avatar,
         cover_image: coverImage,
-        role: isCreator ? 'creator' : 'user'
+        role: creator.role
       }).eq('id', user.id);
 
       if (error) {
@@ -3724,59 +3723,6 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
               required
             />
           </div>
-          <div className="space-y-1.5">
-            <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Nome de Usuário</label>
-            <div className="relative flex items-center">
-              <span className="absolute left-4 text-primary/40 font-bold">@</span>
-              <input 
-                className="w-full bg-white border border-primary/10 rounded-xl pl-8 pr-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-3 px-1">
-            <input 
-              type="checkbox" 
-              className="w-4 h-4 rounded border-primary/20 text-primary focus:ring-primary/20" 
-              checked={isCreator}
-              onChange={(e) => setIsCreator(e.target.checked)}
-            />
-            <p className="text-[11px] font-bold text-on-surface/80 leading-relaxed">
-              Sou um <span className="text-primary">Criador de Conteúdo</span>
-            </p>
-          </div>
-
-          {isCreator && (
-            <button 
-              type="button"
-              onClick={() => {
-                // Navega para a tela de planos (engrenagem)
-                // No App.tsx, a tela de planos é 'creator-plans'
-                // Como ScreenEditProfile recebe onProfileUpdated, vamos assumir que podemos disparar uma mudança de tela
-                // ou apenas orientar o usuário. Mas para ser funcional, vamos usar o setScreen se disponível via props
-                // ou simplesmente alertar que ele deve clicar na engrenagem.
-                // Ajustando para ser um botão que incentiva a ação.
-                alert('Redirecionando para as configurações de planos...');
-                onBack(); // Volta para o perfil onde está a engrenagem
-              }}
-              className="w-full bg-primary/5 border border-primary/10 rounded-xl p-4 flex items-start gap-3 hover:bg-primary/10 transition-all text-left group"
-            >
-              <div className="p-2 bg-primary/10 rounded-lg text-primary group-hover:scale-110 transition-transform">
-                <Settings size={16} />
-              </div>
-              <div className="space-y-1 flex-1">
-                <div className="flex items-center justify-between">
-                  <p className="text-[11px] font-bold text-primary uppercase tracking-wider">Configuração de Assinaturas</p>
-                  <ArrowRight size={14} className="text-primary opacity-0 group-hover:opacity-100 transition-all" />
-                </div>
-                <p className="text-xs text-on-surface/70 leading-relaxed">
-                  Clique aqui para definir os valores dos seus planos de assinatura mensal na tela de <span className="font-bold">Configurações</span>.
-                </p>
-              </div>
-            </button>
-          )}
           <div className="space-y-1.5">
             <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Bio Editorial</label>
             <textarea 
@@ -4216,7 +4162,6 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [isCreator, setIsCreator] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -4245,10 +4190,10 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
           name: name,
           username: email.split('@')[0] + Math.floor(Math.random() * 1000),
           avatar: `https://picsum.photos/seed/${data.user.id}/400`,
-          bio: isCreator ? 'Novo criador no pedaço!' : 'Novo usuário no pedaço!',
+          bio: 'Novo usuário no pedaço!',
           stats: { posts: '0', followers: '0', likes: '0' },
           phone: phone,
-          role: isCreator ? 'creator' : 'user'
+          role: 'user'
         });
         if (profileError) {
           console.error('Error creating profile:', profileError);
@@ -4367,18 +4312,6 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
           </div>
           
           {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
-
-          <div className="flex items-start gap-3 px-1">
-            <input 
-              type="checkbox" 
-              className="mt-1 w-4 h-4 rounded border-primary/20 text-primary focus:ring-primary/20" 
-              checked={isCreator}
-              onChange={(e) => setIsCreator(e.target.checked)}
-            />
-            <p className="text-[11px] font-bold text-on-surface/80 leading-relaxed">
-              Sou um <span className="text-primary">Criador de Conteúdo</span>
-            </p>
-          </div>
 
           <div className="flex items-start gap-3 px-1">
             <input type="checkbox" className="mt-1 w-4 h-4 rounded border-primary/20 text-primary focus:ring-primary/20" required />
