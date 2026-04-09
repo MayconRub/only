@@ -4506,7 +4506,13 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
           Parabéns! Agora você tem acesso total ao conteúdo exclusivo de <span className="text-primary font-bold">{creator?.name}</span>.
         </p>
         <button 
-          onClick={onBack}
+          onClick={() => {
+            onBack();
+            // Force a global data refresh to unlock content
+            if ((window as any).refreshAppData) {
+              (window as any).refreshAppData();
+            }
+          }}
           className="w-full py-5 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-95 transition-all uppercase tracking-widest text-sm"
         >
           Começar a Ver
@@ -5078,6 +5084,14 @@ export default function App() {
           fetchData();
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'subscriptions' },
+        () => {
+          console.log('Real-time: Subscription detected, refreshing data');
+          fetchData();
+        }
+      )
       .subscribe();
 
     return () => {
@@ -5410,10 +5424,11 @@ export default function App() {
     }
   }, []);
 
-  // Expose setScreen globally for the VIP button in ScreenProfile
+  // Expose setScreen and refreshData globally
   React.useEffect(() => {
     (window as any).setScreen = setScreen;
-  }, []);
+    (window as any).refreshAppData = fetchData;
+  }, [fetchData]);
 
   // Audio unlocker for iOS
   React.useEffect(() => {
