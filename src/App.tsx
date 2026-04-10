@@ -5175,6 +5175,35 @@ export default function App() {
         }, {});
 
         setPublicCreator({ ...profileData, social_links: socialLinks } as any);
+        
+        // Fetch access data for the current user
+        let subscribedCreatorIds = new Set<string>();
+        let purchasedPostIds = new Set<string>();
+        
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          // Fetch active subscriptions
+          const { data: activeSubs } = await supabase
+            .from('subscriptions')
+            .select('creator_id')
+            .eq('user_id', session.user.id)
+            .eq('status', 'active')
+            .gt('end_date', new Date().toISOString());
+          
+          subscribedCreatorIds = new Set(activeSubs?.map(s => s.creator_id) || []);
+
+          // Fetch purchased posts
+          const { data: userPayments } = await supabase
+            .from('payments')
+            .select('post_id')
+            .eq('user_id', session.user.id)
+            .eq('status', 'approved');
+          
+          userPayments?.forEach(p => {
+            if (p.post_id) purchasedPostIds.add(p.post_id);
+          });
+        }
+
         // Fetch posts for this creator
         const { data: postsData } = await supabase.from('posts').select('*, creator:profiles(*)').eq('creator_id', creatorId);
         if (postsData) {
@@ -5183,7 +5212,17 @@ export default function App() {
             const dateB = new Date(b.created_at || b.time || 0).getTime();
             return dateB - dateA;
           });
-          setPublicPosts(sortedPosts as any);
+          
+          setPublicPosts(sortedPosts.map(p => ({
+            ...p,
+            isLocked: p.is_locked,
+            isVideo: p.is_video,
+            hasAccess: session?.user?.id === p.creator_id || 
+                       subscribedCreatorIds.has(p.creator_id) || 
+                       purchasedPostIds.has(p.id) || 
+                       !p.is_locked ||
+                       isMaster
+          })) as any);
         }
         setScreen('public-profile');
       }
@@ -5393,7 +5432,11 @@ export default function App() {
               setPublicPosts(sortedFallback.map((p: any) => ({
                 ...p,
                 isLocked: p.is_locked,
-                hasAccess: session?.user?.id === p.creator_id ? true : (subscribedCreatorIds.has(p.creator_id) || purchasedPostIds.has(p.id) ? true : !p.is_locked),
+                hasAccess: session?.user?.id === p.creator_id || 
+                           subscribedCreatorIds.has(p.creator_id) || 
+                           purchasedPostIds.has(p.id) || 
+                           !p.is_locked ||
+                           isMaster,
                 isVideo: p.is_video,
                 likesCount: 0,
                 commentsCount: 0,
@@ -5409,7 +5452,11 @@ export default function App() {
             setPublicPosts(sortedPosts.map((p: any) => ({
               ...p,
               isLocked: p.is_locked,
-              hasAccess: session?.user?.id === p.creator_id ? true : (subscribedCreatorIds.has(p.creator_id) || purchasedPostIds.has(p.id) ? true : !p.is_locked),
+              hasAccess: session?.user?.id === p.creator_id || 
+                         subscribedCreatorIds.has(p.creator_id) || 
+                         purchasedPostIds.has(p.id) || 
+                         !p.is_locked ||
+                         isMaster,
               isVideo: p.is_video,
               likesCount: p.post_likes?.length || 0,
               commentsCount: p.post_comments?.length || 0,
