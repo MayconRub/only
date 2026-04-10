@@ -45,6 +45,12 @@ app.post("/api/payments/pix", async (req, res) => {
 
     const supabase = getSupabase();
 
+    // Validate input data
+    if (!userId || !creatorId || isNaN(amount) || amount <= 0) {
+      console.error("Invalid payment data received:", { userId, creatorId, amount, planId });
+      return res.status(400).json({ error: "Dados de pagamento inválidos. Certifique-se de estar logado." });
+    }
+
     // Create a payment record in Supabase first to get an ID
     const { data: paymentRecord, error: dbError } = await supabase
       .from("payments")
@@ -53,15 +59,18 @@ app.post("/api/payments/pix", async (req, res) => {
         creator_id: creatorId,
         amount: amount,
         plan_id: planId,
-        duration: duration,
+        duration: duration || 30,
         status: "pending",
       })
       .select()
       .single();
 
     if (dbError || !paymentRecord) {
-      console.error("Database error:", dbError);
-      return res.status(500).json({ error: "Failed to create payment record." });
+      console.error("Database error creating payment:", JSON.stringify(dbError, null, 2));
+      return res.status(500).json({ 
+        error: "Falha ao registrar pagamento no banco de dados.",
+        details: dbError?.message || "Erro desconhecido"
+      });
     }
 
     // Convert amount to cents for Turbofy (e.g. 29.90 -> 2990)

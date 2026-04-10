@@ -4522,7 +4522,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
   }
 
   return (
-    <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto no-scrollbar">
+    <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 overflow-y-auto no-scrollbar">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -4536,29 +4536,29 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
         </button>
 
         {/* Header with Cover and Profile */}
-        <div className="relative h-28 bg-primary/10">
+        <div className="relative h-24 bg-primary/10">
           <img 
             src={creator?.cover_image || 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=800'} 
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
           />
-          <div className="absolute -bottom-5 left-6 flex items-end gap-3">
-            <div className="w-16 h-16 rounded-full border-4 border-white overflow-hidden shadow-lg bg-white">
+          <div className="absolute -bottom-5 left-6 flex items-end gap-2">
+            <div className="w-14 h-14 rounded-full border-4 border-white overflow-hidden shadow-lg bg-white">
               <img src={creator?.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             </div>
-            <div className="pb-1 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-xl shadow-sm border border-white">
-              <h2 className="font-bold text-slate-900 leading-tight text-sm">{creator?.name}</h2>
-              <p className="text-[10px] text-slate-500 font-medium">@{creator?.username}</p>
+            <div className="pb-0.5 bg-white/80 backdrop-blur-sm px-2 py-0.5 rounded-lg shadow-sm border border-white">
+              <h2 className="font-bold text-slate-900 leading-tight text-xs">{creator?.name}</h2>
+              <p className="text-[8px] text-slate-500 font-medium">@{creator?.username}</p>
             </div>
           </div>
         </div>
 
-        <div className="pt-6 px-6 pb-8 space-y-5">
+        <div className="pt-14 px-6 pb-4 space-y-2">
           {step === 'select-plan' ? (
-            <div className="space-y-5">
-              <div className="space-y-4">
-                <h3 className="font-bold text-slate-900 text-sm">Assinaturas</h3>
-                <div className="space-y-3">
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <h3 className="font-bold text-slate-900 text-xs uppercase tracking-widest">Assinaturas</h3>
+                <div className="space-y-2">
                   {plans.filter((p: any) => (p.category || 'Assinaturas') === 'Assinaturas').map((plan: any) => (
                     <button
                       key={plan.id}
@@ -4575,12 +4575,12 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-slate-900 text-sm">Promoções</h3>
-                  <ChevronDown size={16} className="text-on-surface/40" />
+                  <h3 className="font-bold text-slate-900 text-xs uppercase tracking-widest">Promoções</h3>
+                  <ChevronDown size={14} className="text-on-surface/40" />
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {plans.filter((p: any) => p.category === 'Promoções').map((plan: any) => (
                     <button
                       key={plan.id}
@@ -4600,38 +4600,37 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
           ) : (
             <>
               {/* Benefits */}
-              <div className="space-y-3">
-                <h3 className="font-bold text-slate-900 text-sm">Benefícios exclusivos</h3>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-xs text-on-surface/80 font-medium">
-                    <Check size={16} className="text-rose-500" />
-                    <span>Acesso ao conteúdo</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-on-surface/80 font-medium">
-                    <Check size={16} className="text-rose-500" />
-                    <span>Chat exclusivo com o criador</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-on-surface/80 font-medium">
-                    <Check size={16} className="text-rose-500" />
-                    <span>Cancele a qualquer hora</span>
-                  </div>
+              <div className="flex items-center justify-between py-1">
+                <div className="flex items-center gap-1.5 text-[9px] text-on-surface/60 font-bold uppercase tracking-wider">
+                  <Check size={12} className="text-rose-500" />
+                  <span>Acesso Total</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[9px] text-on-surface/60 font-bold uppercase tracking-wider">
+                  <Check size={12} className="text-rose-500" />
+                  <span>Chat VIP</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[9px] text-on-surface/60 font-bold uppercase tracking-wider">
+                  <Check size={12} className="text-rose-500" />
+                  <span>Exclusivo</span>
                 </div>
               </div>
 
               <div className="h-px bg-on-surface/5 w-full" />
 
               {/* Payment Info */}
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <h3 className="font-bold text-slate-900 text-lg">Formas de pagamento</h3>
-                  <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Valor</p>
-                  <p className="text-2xl font-black text-slate-900">
+              <div className="space-y-2">
+                <div className="flex items-end justify-between">
+                  <div className="space-y-0.5">
+                    {!pixData && <h3 className="font-bold text-slate-900 text-sm">Formas de pagamento</h3>}
+                    <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Valor</p>
+                  </div>
+                  <p className="text-xl font-black text-slate-900">
                     R$ {parseFloat(String(plans.find((p: any) => p.id === selectedPlan)?.price || '0')).toFixed(2).replace('.', ',')}
                   </p>
                 </div>
 
                 {!pixData ? (
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     <button 
                       onClick={generatePix}
                       disabled={loading}
@@ -4654,9 +4653,9 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-4 flex flex-col items-center">
+                  <div className="space-y-2 flex flex-col items-center">
                     {/* QR Code */}
-                    <div className="w-44 h-44 bg-white rounded-2xl p-3 shadow-lg border border-on-surface/5 relative">
+                    <div className="w-36 h-36 bg-white rounded-2xl p-2 shadow-lg border border-on-surface/5 relative">
                       <img 
                         src={`data:image/jpeg;base64,${pixData.qrCodeBase64}`} 
                         alt="Pix QR Code" 
@@ -4665,8 +4664,8 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
                     </div>
 
                     {/* PIX Key Input */}
-                    <div className="w-full space-y-3">
-                      <div className="w-full bg-on-surface/5 border border-on-surface/10 rounded-2xl px-4 py-3 flex items-center gap-2">
+                    <div className="w-full space-y-2">
+                      <div className="w-full bg-on-surface/5 border border-on-surface/10 rounded-2xl px-4 py-2 flex items-center gap-2">
                         <input 
                           readOnly 
                           value={pixData.qrCode} 
@@ -4676,7 +4675,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
                       
                       <button 
                         onClick={handleCopyPix}
-                        className="w-full py-4 bg-gradient-to-r from-rose-400 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-bold rounded-2xl shadow-lg active:scale-[0.98] transition-all"
+                        className="w-full py-3 bg-gradient-to-r from-rose-400 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-bold rounded-2xl shadow-lg active:scale-[0.98] transition-all"
                       >
                         {copied ? 'Copiado!' : 'Copiar chave Pix'}
                       </button>
@@ -4685,7 +4684,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
                     <div className="h-px bg-on-surface/5 w-full" />
 
                     {/* Status Polling */}
-                    <div className="flex flex-col items-center gap-4 w-full">
+                    <div className="flex flex-col items-center gap-1 w-full">
                       <div className="flex items-center gap-2 text-primary text-[10px] font-bold uppercase tracking-widest animate-pulse">
                         <div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
                         Aguardando pagamento...
@@ -4694,10 +4693,10 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
                       <button 
                         onClick={checkPaymentStatus}
                         disabled={checkingStatus}
-                        className="text-[10px] font-black uppercase tracking-widest text-on-surface/40 hover:text-primary transition-colors flex items-center gap-2 disabled:opacity-50"
+                        className="text-[10px] font-black uppercase tracking-widest text-on-surface/40 hover:text-primary transition-colors flex items-center gap-1 disabled:opacity-50"
                       >
-                        <RefreshCw size={12} className={checkingStatus ? 'animate-spin' : ''} />
-                        {checkingStatus ? 'Verificando...' : 'Já paguei, verificar agora'}
+                        <RefreshCw size={10} className={checkingStatus ? 'animate-spin' : ''} />
+                        {checkingStatus ? 'Verificando...' : 'Verificar agora'}
                       </button>
                     </div>
                   </div>
