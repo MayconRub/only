@@ -57,7 +57,8 @@ import {
   Shield,
   PieChart,
   List,
-  AlertCircle
+  AlertCircle,
+  Wallet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Cropper from 'react-easy-crop';
@@ -520,9 +521,11 @@ const ScreenSubscriptions = ({ onBack }: { onBack: () => void }) => {
 
 const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: boolean }) => {
   const [balance, setBalance] = useState('R$ 0,00');
+  const [availableBalance, setAvailableBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [pixKey, setPixKey] = useState('');
   const [payoutName, setPayoutName] = useState('');
@@ -531,6 +534,7 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
   const [withdrawing, setWithdrawing] = useState(false);
   const [savingPayout, setSavingPayout] = useState(false);
   const [isPayoutInfoSaved, setIsPayoutInfoSaved] = useState(false);
+  const [activeTab, setActiveTab] = useState<'extracts' | 'subscribers' | 'sales'>('extracts');
 
   const handleSavePayoutInfo = async () => {
     setSavingPayout(true);
@@ -568,10 +572,9 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
     }
 
     const amountNum = parseFloat(withdrawAmount.replace(',', '.'));
-    const balanceNum = parseFloat(balance.replace('R$ ', '').replace('.', '').replace(',', '.'));
-
-    if (amountNum > balanceNum) {
-      alert('Saldo insuficiente para este saque.');
+    
+    if (amountNum > availableBalance) {
+      alert('Saldo disponível insuficiente para este saque.');
       return;
     }
 
@@ -585,6 +588,9 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
+      // Buscar perfil para pegar o nome do criador
+      const { data: profile } = await supabase.from('profiles').select('name').eq('id', user.id).single();
+
       // Salvar solicitação de saque
       const { error: withdrawError } = await supabase
         .from('withdrawal_requests')
@@ -596,6 +602,23 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
         });
 
       if (withdrawError) throw withdrawError;
+
+      // Notificar Administrador
+      try {
+        const { data: admins } = await supabase.from('profiles').select('id').eq('role', 'admin');
+        if (admins && admins.length > 0) {
+          const notifications = admins.map(admin => ({
+            user_id: admin.id,
+            type: 'withdrawal',
+            content: `solicitou um saque de R$ ${amountNum.toFixed(2)}`,
+            badge: 'SAQUE',
+            created_at: new Date().toISOString()
+          }));
+          await supabase.from('notifications').insert(notifications);
+        }
+      } catch (notifErr) {
+        console.error('Erro ao notificar admin sobre saque:', notifErr);
+      }
 
       // Salvar chave PIX no perfil para uso futuro
       await supabase
@@ -646,10 +669,27 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
 
           if (error) throw error;
 
+          // Buscar saques
+          const { data: withdrawalRequests } = await supabase
+            .from('withdrawal_requests')
+            .select('*')
+            .eq('profile_id', user.id)
+            .order('created_at', { ascending: false });
+          
+          setWithdrawals(withdrawalRequests || []);
+
           if (payments) {
             const total = payments.reduce((acc, p) => acc + (p.amount || 0), 0);
             setBalance(`R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
             
+            // Calcular saldo disponível (Total - Saques Pendentes ou Pagos)
+            const withdrawnTotal = (withdrawalRequests || [])
+              .filter(w => w.status === 'pending' || w.status === 'approved')
+              .reduce((acc, w) => acc + (w.amount || 0), 0);
+            
+            const available = total - withdrawnTotal;
+            setAvailableBalance(available);
+
             const subs = payments
               .filter(p => p.description?.toLowerCase().includes('assinatura'))
               .map(p => ({
@@ -716,18 +756,24 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
           <CreditCard size={120} />
         </div>
         <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-2">
-          {isMaster ? 'Faturamento' : 'Saldo Disponível'}
+          {isMaster ? 'Faturamento Total' : 'Saldo Disponível'}
         </p>
         <h2 className="text-5xl font-black text-on-surface tracking-tighter">
           {loading ? '...' : balance}
         </h2>
         {isMaster && (
-          <button 
-            onClick={() => setShowWithdrawModal(true)}
-            className="mt-6 px-8 py-3 bg-primary text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
-          >
-            Solicitar Saque
-          </button>
+          <div className="mt-6 space-y-4">
+            <div className="flex flex-col items-center">
+              <p className="text-[10px] font-black text-green-500 uppercase tracking-widest mb-1">Disponível para Saque</p>
+              <p className="text-2xl font-black text-on-surface">R$ {availableBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+            </div>
+            <button 
+              onClick={() => setShowWithdrawModal(true)}
+              className="px-8 py-3 bg-primary text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
+            >
+              Solicitar Saque
+            </button>
+          </div>
         )}
         {!isMaster && (
           <div className="mt-6 flex justify-center gap-2">
@@ -819,49 +865,114 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
 
       {isMaster ? (
         <div className="space-y-8">
-          <section className="space-y-4">
-            <h3 className="font-bold text-lg text-on-surface px-1">Assinantes Recentes</h3>
-            {subscribers.length > 0 ? (
-              <div className="bg-white rounded-3xl border border-primary/5 shadow-sm overflow-hidden">
-                {subscribers.map((sub, index) => (
-                  <div key={sub.id} className={`p-4 flex items-center justify-between ${index !== subscribers.length - 1 ? 'border-b border-primary/5' : ''}`}>
-                    <div className="flex items-center gap-3">
-                      <img src={sub?.avatar} alt={sub?.name} className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
-                      <div>
-                        <p className="font-bold text-sm text-on-surface">{sub?.name}</p>
-                        <p className="text-[10px] text-on-surface/60 font-medium">@{sub?.username} • {sub?.plan}</p>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-1 rounded-md">Ativo</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-on-surface/60 px-1">{loading ? 'Carregando...' : 'Nenhum assinante ainda.'}</p>
-            )}
-          </section>
+          {/* Tabs for Wallet */}
+          <div className="flex gap-2 bg-white p-1 rounded-2xl border border-primary/5 shadow-sm">
+            <button 
+              onClick={() => setActiveTab('extracts')}
+              className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'extracts' ? 'bg-primary text-white shadow-md' : 'text-on-surface/40 hover:bg-primary/5'}`}
+            >
+              Extratos
+            </button>
+            <button 
+              onClick={() => setActiveTab('subscribers')}
+              className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'subscribers' ? 'bg-primary text-white shadow-md' : 'text-on-surface/40 hover:bg-primary/5'}`}
+            >
+              Assinantes
+            </button>
+            <button 
+              onClick={() => setActiveTab('sales')}
+              className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'sales' ? 'bg-primary text-white shadow-md' : 'text-on-surface/40 hover:bg-primary/5'}`}
+            >
+              Vendas
+            </button>
+          </div>
 
-          <section className="space-y-4">
-            <h3 className="font-bold text-lg text-on-surface px-1">Vendas de Conteúdo</h3>
-            {purchases.length > 0 ? (
-              <div className="bg-white rounded-3xl border border-primary/5 shadow-sm overflow-hidden">
-                {purchases.map((purchase, index) => (
-                  <div key={purchase.id} className={`p-4 flex items-center justify-between ${index !== purchases.length - 1 ? 'border-b border-primary/5' : ''}`}>
-                    <div className="flex items-center gap-3">
-                      <img src={purchase?.avatar} alt={purchase?.name} className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
-                      <div>
-                        <p className="font-bold text-sm text-on-surface">{purchase?.name}</p>
-                        <p className="text-[10px] text-on-surface/60 font-medium">Comprou: {purchase?.item}</p>
+          {activeTab === 'extracts' && (
+            <section className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+              <h3 className="font-bold text-lg text-on-surface px-1">Histórico de Saques</h3>
+              {withdrawals.length > 0 ? (
+                <div className="bg-white rounded-3xl border border-primary/5 shadow-sm overflow-hidden">
+                  {withdrawals.map((w, index) => (
+                    <div key={w.id} className={`p-4 flex items-center justify-between ${index !== withdrawals.length - 1 ? 'border-b border-primary/5' : ''}`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          w.status === 'pending' ? 'bg-amber-50 text-amber-500' :
+                          w.status === 'approved' ? 'bg-green-50 text-green-500' :
+                          'bg-red-50 text-red-500'
+                        }`}>
+                          <Wallet size={20} />
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm text-on-surface">Saque via PIX</p>
+                          <p className="text-[10px] text-on-surface/60 font-medium">{new Date(w.created_at).toLocaleDateString('pt-BR')}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-black text-on-surface text-sm">R$ {Number(w.amount).toFixed(2)}</p>
+                        <span className={`text-[9px] font-black uppercase tracking-widest ${
+                          w.status === 'pending' ? 'text-amber-500' :
+                          w.status === 'approved' ? 'text-green-500' :
+                          'text-red-500'
+                        }`}>
+                          {w.status === 'pending' ? 'Pendente' : w.status === 'approved' ? 'Pago' : 'Cancelado'}
+                        </span>
                       </div>
                     </div>
-                    <span className="font-black text-primary text-sm">{purchase.price}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-on-surface/60 px-1">{loading ? 'Carregando...' : 'Nenhuma venda ainda.'}</p>
-            )}
-          </section>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-on-surface/60 px-1">Nenhum saque solicitado ainda.</p>
+              )}
+            </section>
+          )}
+
+          {activeTab === 'subscribers' && (
+            <section className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+              <h3 className="font-bold text-lg text-on-surface px-1">Assinantes Recentes</h3>
+              {subscribers.length > 0 ? (
+                <div className="bg-white rounded-3xl border border-primary/5 shadow-sm overflow-hidden">
+                  {subscribers.map((sub, index) => (
+                    <div key={sub.id} className={`p-4 flex items-center justify-between ${index !== subscribers.length - 1 ? 'border-b border-primary/5' : ''}`}>
+                      <div className="flex items-center gap-3">
+                        <img src={sub?.avatar} alt={sub?.name} className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
+                        <div>
+                          <p className="font-bold text-sm text-on-surface">{sub?.name}</p>
+                          <p className="text-[10px] text-on-surface/60 font-medium">@{sub?.username} • {sub?.plan}</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-1 rounded-md">Ativo</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-on-surface/60 px-1">{loading ? 'Carregando...' : 'Nenhum assinante ainda.'}</p>
+              )}
+            </section>
+          )}
+
+          {activeTab === 'sales' && (
+            <section className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+              <h3 className="font-bold text-lg text-on-surface px-1">Vendas de Conteúdo</h3>
+              {purchases.length > 0 ? (
+                <div className="bg-white rounded-3xl border border-primary/5 shadow-sm overflow-hidden">
+                  {purchases.map((purchase, index) => (
+                    <div key={purchase.id} className={`p-4 flex items-center justify-between ${index !== purchases.length - 1 ? 'border-b border-primary/5' : ''}`}>
+                      <div className="flex items-center gap-3">
+                        <img src={purchase?.avatar} alt={purchase?.name} className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
+                        <div>
+                          <p className="font-bold text-sm text-on-surface">{purchase?.name}</p>
+                          <p className="text-[10px] text-on-surface/60 font-medium">Comprou: {purchase?.item}</p>
+                        </div>
+                      </div>
+                      <span className="font-black text-primary text-sm">{purchase.price}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-on-surface/60 px-1">{loading ? 'Carregando...' : 'Nenhuma venda ainda.'}</p>
+              )}
+            </section>
+          )}
         </div>
       ) : (
         <>
@@ -4186,8 +4297,9 @@ const ScreenAdminDashboard = ({ onBack }: { onBack: () => void }) => {
   });
   const [recentSales, setRecentSales] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'sales'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'sales' | 'withdrawals'>('overview');
   const [searchTerm, setSearchTerm] = useState('');
 
   const fetchAdminData = async () => {
@@ -4211,12 +4323,20 @@ const ScreenAdminDashboard = ({ onBack }: { onBack: () => void }) => {
       });
 
       // Fetch recent sales
-      const { data: sales } = await supabase
+      const { data: sales, error: salesError } = await supabase
         .from('payments')
-        .select('*, profiles:user_id (*), creator:creator_id (*)')
+        .select(`
+          *,
+          buyer:profiles!user_id (name, avatar, username),
+          creator:profiles!creator_id (name, avatar, username)
+        `)
         .eq('status', 'approved')
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(100);
+      
+      if (salesError) {
+        console.error('Error fetching sales:', salesError);
+      }
       setRecentSales(sales || []);
 
       // Fetch users
@@ -4227,10 +4347,32 @@ const ScreenAdminDashboard = ({ onBack }: { onBack: () => void }) => {
         .limit(50);
       setUsers(allUsers || []);
 
+      // Fetch withdrawals
+      const { data: allWithdrawals } = await supabase
+        .from('withdrawal_requests')
+        .select('*, profiles:profile_id (*)')
+        .order('created_at', { ascending: false });
+      setWithdrawals(allWithdrawals || []);
+
     } catch (err) {
       console.error('Error fetching admin data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdateWithdrawalStatus = async (id: string, status: 'approved' | 'rejected') => {
+    try {
+      const { error } = await supabase
+        .from('withdrawal_requests')
+        .update({ status })
+        .eq('id', id);
+      
+      if (error) throw error;
+      fetchAdminData();
+      alert(`Saque ${status === 'approved' ? 'pago' : 'cancelado'} com sucesso!`);
+    } catch (err: any) {
+      alert(`Erro ao atualizar saque: ${err.message}`);
     }
   };
 
@@ -4297,6 +4439,13 @@ const ScreenAdminDashboard = ({ onBack }: { onBack: () => void }) => {
             <DollarSign size={16} />
             Vendas
           </button>
+          <button 
+            onClick={() => setActiveTab('withdrawals')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'withdrawals' ? 'bg-primary text-white shadow-lg' : 'text-on-surface/40 hover:bg-primary/5'}`}
+          >
+            <Wallet size={16} />
+            Saques
+          </button>
         </div>
 
         {activeTab === 'overview' && (
@@ -4343,10 +4492,10 @@ const ScreenAdminDashboard = ({ onBack }: { onBack: () => void }) => {
                 {recentSales.map((sale) => (
                   <div key={sale.id} className="px-6 py-4 flex items-center justify-between hover:bg-primary/5 transition-colors">
                     <div className="flex items-center gap-3">
-                      <img src={sale.profiles?.avatar} className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
+                      <img src={sale.buyer?.avatar} className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
                       <div>
-                        <p className="text-sm font-bold">{sale.profiles?.name}</p>
-                        <p className="text-[10px] text-on-surface/40 font-bold uppercase tracking-widest">Comprou de {sale.creator?.name}</p>
+                        <p className="text-sm font-bold">{sale.buyer?.name || 'Usuário'}</p>
+                        <p className="text-[10px] text-on-surface/40 font-bold uppercase tracking-widest">Comprou de {sale.creator?.name || 'Criador'}</p>
                       </div>
                     </div>
                     <div className="text-right">
@@ -4421,6 +4570,18 @@ const ScreenAdminDashboard = ({ onBack }: { onBack: () => void }) => {
 
         {activeTab === 'sales' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+            {/* Search Sales */}
+            <div className="relative">
+              <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-on-surface/40" size={20} />
+              <input 
+                type="text"
+                placeholder="Buscar vendas por comprador, criador ou descrição..."
+                className="w-full bg-white border border-primary/5 rounded-2xl pl-14 pr-6 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
             <div className="bg-white rounded-3xl border border-primary/5 shadow-sm overflow-hidden">
               <table className="w-full text-left border-collapse">
                 <thead>
@@ -4428,29 +4589,44 @@ const ScreenAdminDashboard = ({ onBack }: { onBack: () => void }) => {
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface/40">Data</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface/40">Comprador</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface/40">Criador</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface/40">Descrição</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface/40">Valor</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface/40">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-primary/5">
-                  {recentSales.map((sale) => (
+                  {recentSales.filter(sale => {
+                    const search = searchTerm.toLowerCase();
+                    const buyerName = sale.buyer?.name?.toLowerCase() || '';
+                    const creatorName = sale.creator?.name?.toLowerCase() || '';
+                    const description = sale.description?.toLowerCase() || '';
+                    return buyerName.includes(search) || creatorName.includes(search) || description.includes(search);
+                  }).map((sale) => (
                     <tr key={sale.id} className="hover:bg-primary/5 transition-colors">
                       <td className="px-6 py-4 text-[11px] font-bold">{new Date(sale.created_at).toLocaleDateString('pt-BR')}</td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <img src={sale.profiles?.avatar} className="w-6 h-6 rounded-full object-cover" referrerPolicy="no-referrer" />
-                          <span className="text-xs font-bold">{sale.profiles?.name}</span>
+                          <img src={sale.buyer?.avatar} className="w-6 h-6 rounded-full object-cover" referrerPolicy="no-referrer" />
+                          <span className="text-xs font-bold">{sale.buyer?.name || 'Usuário'}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <img src={sale.creator?.avatar} className="w-6 h-6 rounded-full object-cover" referrerPolicy="no-referrer" />
-                          <span className="text-xs font-bold">{sale.creator?.name}</span>
+                          <span className="text-xs font-bold">{sale.creator?.name || 'Criador'}</span>
                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-[10px] font-medium text-on-surface/60 line-clamp-1">{sale.description || 'Conteúdo'}</p>
                       </td>
                       <td className="px-6 py-4 text-xs font-black text-green-500">R$ {Number(sale.amount).toFixed(2)}</td>
                       <td className="px-6 py-4">
-                        <span className="bg-green-500/10 text-green-500 text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-full">Aprovado</span>
+                        <div className="flex flex-col gap-1">
+                          <span className="bg-green-500/10 text-green-500 text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-full w-fit">Aprovado</span>
+                          {sale.description?.toLowerCase().includes('assinatura') && (
+                            <span className="bg-primary/10 text-primary text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-full w-fit">Assinatura</span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -4459,6 +4635,74 @@ const ScreenAdminDashboard = ({ onBack }: { onBack: () => void }) => {
               {recentSales.length === 0 && (
                 <div className="px-6 py-12 text-center">
                   <p className="text-on-surface/40 font-bold uppercase tracking-widest text-xs">Nenhuma venda registrada</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'withdrawals' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+            <div className="bg-white rounded-3xl border border-primary/5 shadow-sm overflow-hidden">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-primary/5">
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface/40">Data</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface/40">Criador</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface/40">Valor</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface/40">Chave PIX</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface/40">Status</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface/40">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-primary/5">
+                  {withdrawals.map((w) => (
+                    <tr key={w.id} className="hover:bg-primary/5 transition-colors">
+                      <td className="px-6 py-4 text-[11px] font-bold">{new Date(w.created_at).toLocaleDateString('pt-BR')}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <img src={w.profiles?.avatar} className="w-6 h-6 rounded-full object-cover" referrerPolicy="no-referrer" />
+                          <span className="text-xs font-bold">{w.profiles?.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-xs font-black">R$ {Number(w.amount).toFixed(2)}</td>
+                      <td className="px-6 py-4 text-[10px] font-medium">{w.pix_key}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
+                          w.status === 'pending' ? 'bg-amber-50 text-amber-600' :
+                          w.status === 'approved' ? 'bg-green-50 text-green-600' :
+                          'bg-red-50 text-red-600'
+                        }`}>
+                          {w.status === 'pending' ? 'Pendente' : w.status === 'approved' ? 'Pago' : 'Cancelado'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {w.status === 'pending' && (
+                          <div className="flex items-center gap-2">
+                            <button 
+                              onClick={() => handleUpdateWithdrawalStatus(w.id, 'approved')}
+                              className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                              title="Aprovar Pagamento"
+                            >
+                              <Check size={16} />
+                            </button>
+                            <button 
+                              onClick={() => handleUpdateWithdrawalStatus(w.id, 'rejected')}
+                              className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                              title="Rejeitar"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {withdrawals.length === 0 && (
+                <div className="px-6 py-12 text-center">
+                  <p className="text-on-surface/40 font-bold uppercase tracking-widest text-xs">Nenhuma solicitação de saque</p>
                 </div>
               )}
             </div>
