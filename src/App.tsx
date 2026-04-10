@@ -4063,7 +4063,10 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
               }
             }}
           />
-          <div className="text-center w-full">
+          <div className="text-center w-full relative">
+            <div className="absolute -top-4 right-0">
+              <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-1 rounded-full border border-primary/20">18+</span>
+            </div>
             <p className="text-on-surface/60 text-sm font-bold max-w-[280px] mx-auto">Assine, interaja e conecte-se com acompanhantes e criadores em um clique.</p>
           </div>
         </div>
@@ -4232,7 +4235,10 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
               }
             }}
           />
-          <div className="text-center w-full">
+          <div className="text-center w-full relative">
+            <div className="absolute -top-4 right-0">
+              <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-1 rounded-full border border-primary/20">18+</span>
+            </div>
             <div className="space-y-0">
               <h1 className="text-4xl font-black tracking-tight leading-none text-on-surface">Criar Conta</h1>
               <p className="text-on-surface/60 text-sm font-bold max-w-[280px] mx-auto">Assine, interaja e conecte-se com acompanhantes e criadores em um clique.</p>
@@ -4313,11 +4319,30 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
           
           {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
 
-          <div className="flex items-start gap-3 px-1">
-            <input type="checkbox" className="mt-1 w-4 h-4 rounded border-primary/20 text-primary focus:ring-primary/20" required />
-            <p className="text-[11px] font-bold text-on-surface/80 leading-relaxed">
-              Ao se cadastrar na Nudlye, você atesta que leu e concorda com nossos <span className="text-primary underline">Termos e Privacidade</span> e confirma que tem pelo menos <span className="text-primary">18 anos de idade</span>.
-            </p>
+          <div className="space-y-3">
+            <div className="flex items-start gap-4 px-4 py-4 bg-primary/5 rounded-2xl border border-primary/10 hover:bg-primary/10 transition-colors cursor-pointer group" onClick={() => {
+              const cb = document.getElementById('age-check') as HTMLInputElement;
+              if (cb) cb.checked = !cb.checked;
+            }}>
+              <div className="flex items-center h-7">
+                <input 
+                  id="age-check"
+                  type="checkbox" 
+                  className="w-7 h-7 rounded-lg border-primary/30 text-primary focus:ring-primary/20 cursor-pointer accent-primary transition-transform group-active:scale-90" 
+                  required 
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-[13px] font-black text-on-surface leading-tight flex items-center gap-2">
+                  <span className="bg-primary text-white text-[10px] px-1.5 py-0.5 rounded-md">+18 ANOS</span>
+                  Confirmo que sou maior de idade
+                </p>
+                <p className="text-[11px] font-bold text-on-surface/60 leading-relaxed">
+                  Ao marcar, você atesta que tem pelo menos 18 anos e concorda com nossos <span className="text-primary underline">Termos e Privacidade</span>.
+                </p>
+              </div>
+            </div>
           </div>
 
           <button 
