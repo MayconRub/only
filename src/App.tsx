@@ -4063,10 +4063,7 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
               }
             }}
           />
-          <div className="text-center w-full relative">
-            <div className="absolute -top-4 right-0">
-              <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-1 rounded-full border border-primary/20">18+</span>
-            </div>
+          <div className="text-center w-full">
             <p className="text-on-surface/60 text-sm font-bold max-w-[280px] mx-auto">Assine, interaja e conecte-se com acompanhantes e criadores em um clique.</p>
           </div>
         </div>
@@ -4236,11 +4233,8 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
             }}
           />
           <div className="text-center w-full relative">
-            <div className="absolute -top-4 right-0">
-              <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-1 rounded-full border border-primary/20">18+</span>
-            </div>
             <div className="space-y-0">
-              <h1 className="text-4xl font-black tracking-tight leading-none text-on-surface">Criar Conta</h1>
+              <h1 className="text-2xl font-black tracking-tight leading-none text-on-surface">Crie sua conta</h1>
               <p className="text-on-surface/60 text-sm font-bold max-w-[280px] mx-auto">Assine, interaja e conecte-se com acompanhantes e criadores em um clique.</p>
             </div>
           </div>
@@ -4249,20 +4243,18 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
         <form className="space-y-6" onSubmit={handleRegister}>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">Nome Completo</label>
               <input 
                 className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
-                placeholder="Seu nome" 
+                placeholder="Nome de Usuário" 
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">E-mail</label>
               <input 
                 className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
-                placeholder="exemplo@criador.com" 
+                placeholder="E-mail" 
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -4270,10 +4262,9 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">Telefone</label>
               <input 
                 className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
-                placeholder="(99) 99999-9999" 
+                placeholder="Telefone" 
                 type="tel"
                 value={phone}
                 onChange={(e) => {
@@ -4296,11 +4287,10 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">Senha</label>
               <div className="relative flex items-center">
                 <input 
                   className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
-                  placeholder="••••••••" 
+                  placeholder="Senha" 
                   type={showPassword ? "text" : "password"} 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
