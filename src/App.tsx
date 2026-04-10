@@ -4542,7 +4542,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
           />
-          <div className="absolute -bottom-5 left-6 flex items-end gap-2">
+          <div className="absolute -bottom-10 left-6 flex items-end gap-2">
             <div className="w-14 h-14 rounded-full border-4 border-white overflow-hidden shadow-lg bg-white">
               <img src={creator?.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             </div>
@@ -4553,7 +4553,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
           </div>
         </div>
 
-        <div className="pt-14 px-6 pb-4 space-y-2">
+        <div className="pt-16 px-6 pb-4 space-y-2">
           {step === 'select-plan' ? (
             <div className="space-y-3">
               <div className="space-y-2">

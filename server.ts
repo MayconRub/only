@@ -34,7 +34,7 @@ app.post("/api/payments/pix", async (req, res) => {
       return res.status(500).json({ error: "Turbofy credentials not configured." });
     }
 
-    // Initialize Turbofy Client inside the route to prevent boot crashes
+    // Initialize Turbofy/Gawget Client inside the route to prevent boot crashes
     const turbofyClient = createTurbofyClient({
       baseUrl: "https://api.turbofypay.com",
       credentials: {
@@ -76,17 +76,34 @@ app.post("/api/payments/pix", async (req, res) => {
     // Convert amount to cents for Turbofy (e.g. 29.90 -> 2990)
     const amountCents = Math.round(amount * 100);
 
-    // Request to Turbofy
-    const charge = await turbofyClient.pix.createCharge({
-      amountCents: amountCents,
-      description: (description || "Assinatura").substring(0, 100), // Limit length just in case
-      externalRef: paymentRecord.id.replace(/[^a-zA-Z0-9-]/g, ''), // Ensure safe pattern
-      metadata: {
-        userId: userId,
-        creatorId: creatorId,
-        planId: planId
+    // Request to Turbofy/Gawget with retries for network/5xx errors
+    let charge;
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts) {
+      try {
+        charge = await turbofyClient.pix.createCharge({
+          amountCents: amountCents,
+          description: (description || "Assinatura").substring(0, 100),
+          externalRef: paymentRecord.id.replace(/[^a-zA-Z0-9-]/g, ''),
+          metadata: {
+            userId: userId,
+            creatorId: creatorId,
+            planId: planId
+          }
+        });
+        break; // Success
+      } catch (err: any) {
+        attempts++;
+        console.error(`Payment attempt ${attempts} failed:`, err.message);
+        if (attempts >= maxAttempts) throw err;
+        // Exponential backoff
+        await new Promise(resolve => setTimeout(resolve, 1500 * attempts));
       }
-    });
+    }
+
+    if (!charge) throw new Error("Não foi possível gerar a cobrança no serviço de pagamentos.");
 
     // Update the record with the Turbofy payment ID
     await supabase
@@ -103,8 +120,13 @@ app.post("/api/payments/pix", async (req, res) => {
   } catch (error: any) {
     console.error("Error creating Pix payment:", error);
     
-    // Extract detailed validation errors from Turbofy SDK if available
-    let detailedError = error.message || "Internal server error";
+    let detailedError = error.message || "Erro interno no servidor";
+    
+    // Detect HTML response (usually 502/504 from Cloudflare) or fetch failed
+    if (detailedError.includes("<!DOCTYPE html>") || detailedError.includes("<html>") || detailedError.includes("fetch failed")) {
+      detailedError = "O serviço de pagamentos está temporariamente instável ou em manutenção. Por favor, tente novamente em alguns instantes.";
+    }
+    
     if (error.fieldErrors) {
       detailedError += " Detalhes: " + JSON.stringify(error.fieldErrors);
     }
@@ -235,7 +257,7 @@ app.get("/api/payments/sync/:paymentId", async (req, res) => {
       return res.json({ status: "approved" });
     }
 
-    // If we have a platform ID, check with Turbofy
+    // If we have a platform ID, check with the payment service
     if (paymentRecord.mp_payment_id && process.env.TURBOFY_CLIENT_ID && process.env.TURBOFY_CLIENT_SECRET) {
       const turbofyClient = createTurbofyClient({
         baseUrl: "https://api.turbofypay.com",
