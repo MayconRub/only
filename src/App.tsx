@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Menu, 
   Search, 
@@ -48,7 +48,16 @@ import {
   Edit2,
   Instagram,
   Twitter,
-  Music
+  Music,
+  BarChart3,
+  Users,
+  DollarSign,
+  TrendingUp,
+  Activity,
+  Shield,
+  PieChart,
+  List,
+  AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Cropper from 'react-easy-crop';
@@ -2076,7 +2085,8 @@ const ScreenProfile = ({
   onLikePost,
   onCommentPost,
   onMessage,
-  onForwardPost
+  onForwardPost,
+  onNavigateToAdmin
 }: { 
   onEdit: () => void, 
   creator: Creator, 
@@ -2091,7 +2101,8 @@ const ScreenProfile = ({
   onLikePost?: (id: string, isLiked: boolean) => void,
   onCommentPost?: (id: string, content: string) => void,
   onMessage?: (creator: Creator) => void,
-  onForwardPost?: (post: Post) => void
+  onForwardPost?: (post: Post) => void,
+  onNavigateToAdmin?: () => void
 }) => {
   const [activeTab, setActiveTab] = React.useState<'all' | 'exclusive'>('all');
   const myPosts = (posts || []).filter(p => {
@@ -2217,6 +2228,15 @@ const ScreenProfile = ({
         )}
         
         <div className="flex flex-col gap-3 mb-10 max-w-md mx-auto">
+          {creator.role === 'admin' && onNavigateToAdmin && (
+            <button 
+              onClick={onNavigateToAdmin}
+              className="w-full py-4 bg-red-500 text-white font-black rounded-2xl shadow-lg shadow-red-500/20 active:scale-95 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
+            >
+              <Shield size={18} />
+              Painel Administrativo
+            </button>
+          )}
           {isMaster ? (
             <div className="flex flex-col sm:flex-row gap-3">
               <button onClick={onEdit} className="flex-1 py-4 premium-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs">
@@ -4156,6 +4176,299 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
   );
 };
 
+const ScreenAdminDashboard = ({ onBack }: { onBack: () => void }) => {
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    totalCreators: 0,
+    totalRevenue: 0,
+    totalPosts: 0,
+    totalSubscriptions: 0
+  });
+  const [recentSales, setRecentSales] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'sales'>('overview');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const fetchAdminData = async () => {
+    setLoading(true);
+    try {
+      // Fetch stats
+      const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+      const { count: creatorCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'creator');
+      const { count: postCount } = await supabase.from('posts').select('*', { count: 'exact', head: true });
+      const { count: subCount } = await supabase.from('subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'active');
+      
+      const { data: payments } = await supabase.from('payments').select('amount').eq('status', 'approved');
+      const totalRevenue = payments?.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0) || 0;
+
+      setStats({
+        totalUsers: userCount || 0,
+        totalCreators: creatorCount || 0,
+        totalRevenue,
+        totalPosts: postCount || 0,
+        totalSubscriptions: subCount || 0
+      });
+
+      // Fetch recent sales
+      const { data: sales } = await supabase
+        .from('payments')
+        .select('*, profiles:user_id (*), creator:creator_id (*)')
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false })
+        .limit(10);
+      setRecentSales(sales || []);
+
+      // Fetch users
+      const { data: allUsers } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      setUsers(allUsers || []);
+
+    } catch (err) {
+      console.error('Error fetching admin data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAdminData();
+  }, []);
+
+  const filteredUsers = users.filter(u => 
+    u.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    u.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <RefreshCw className="w-10 h-10 text-primary animate-spin mx-auto mb-4" />
+          <p className="text-on-surface/60 font-bold uppercase tracking-widest text-xs">Carregando Painel...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background pb-24">
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-primary/5 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button onClick={onBack} className="p-2 hover:bg-primary/5 rounded-full transition-colors">
+            <ArrowLeft size={24} />
+          </button>
+          <div>
+            <h1 className="text-xl font-black tracking-tight">Painel Administrativo</h1>
+            <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Controle Total</p>
+          </div>
+        </div>
+        <button onClick={fetchAdminData} className="p-2 hover:bg-primary/5 rounded-full transition-colors">
+          <RefreshCw size={20} />
+        </button>
+      </header>
+
+      <div className="max-w-5xl mx-auto px-6 pt-8">
+        {/* Tabs */}
+        <div className="flex gap-2 mb-8 bg-white p-1.5 rounded-2xl border border-primary/5 shadow-sm">
+          <button 
+            onClick={() => setActiveTab('overview')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'overview' ? 'bg-primary text-white shadow-lg' : 'text-on-surface/40 hover:bg-primary/5'}`}
+          >
+            <PieChart size={16} />
+            Visão Geral
+          </button>
+          <button 
+            onClick={() => setActiveTab('users')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'users' ? 'bg-primary text-white shadow-lg' : 'text-on-surface/40 hover:bg-primary/5'}`}
+          >
+            <Users size={16} />
+            Usuários
+          </button>
+          <button 
+            onClick={() => setActiveTab('sales')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'sales' ? 'bg-primary text-white shadow-lg' : 'text-on-surface/40 hover:bg-primary/5'}`}
+          >
+            <DollarSign size={16} />
+            Vendas
+          </button>
+        </div>
+
+        {activeTab === 'overview' && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white p-6 rounded-3xl border border-primary/5 shadow-sm">
+                <div className="w-10 h-10 bg-blue-500/10 text-blue-500 rounded-xl flex items-center justify-center mb-4">
+                  <Users size={20} />
+                </div>
+                <p className="text-2xl font-black">{stats.totalUsers}</p>
+                <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">Usuários</p>
+              </div>
+              <div className="bg-white p-6 rounded-3xl border border-primary/5 shadow-sm">
+                <div className="w-10 h-10 bg-purple-500/10 text-purple-500 rounded-xl flex items-center justify-center mb-4">
+                  <Crown size={20} />
+                </div>
+                <p className="text-2xl font-black">{stats.totalCreators}</p>
+                <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">Criadores</p>
+              </div>
+              <div className="bg-white p-6 rounded-3xl border border-primary/5 shadow-sm">
+                <div className="w-10 h-10 bg-green-500/10 text-green-500 rounded-xl flex items-center justify-center mb-4">
+                  <DollarSign size={20} />
+                </div>
+                <p className="text-2xl font-black">R$ {stats.totalRevenue.toFixed(2)}</p>
+                <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">Vendas Totais</p>
+              </div>
+              <div className="bg-white p-6 rounded-3xl border border-primary/5 shadow-sm">
+                <div className="w-10 h-10 bg-orange-500/10 text-orange-500 rounded-xl flex items-center justify-center mb-4">
+                  <ImageIcon size={20} />
+                </div>
+                <p className="text-2xl font-black">{stats.totalPosts}</p>
+                <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">Postagens</p>
+              </div>
+            </div>
+
+            {/* Recent Sales Preview */}
+            <div className="bg-white rounded-3xl border border-primary/5 shadow-sm overflow-hidden">
+              <div className="px-6 py-5 border-b border-primary/5 flex items-center justify-between">
+                <h3 className="font-black text-sm uppercase tracking-widest">Vendas Recentes</h3>
+                <button onClick={() => setActiveTab('sales')} className="text-primary text-[10px] font-black uppercase tracking-widest">Ver Todas</button>
+              </div>
+              <div className="divide-y divide-primary/5">
+                {recentSales.map((sale) => (
+                  <div key={sale.id} className="px-6 py-4 flex items-center justify-between hover:bg-primary/5 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <img src={sale.profiles?.avatar} className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
+                      <div>
+                        <p className="text-sm font-bold">{sale.profiles?.name}</p>
+                        <p className="text-[10px] text-on-surface/40 font-bold uppercase tracking-widest">Comprou de {sale.creator?.name}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-black text-green-500">R$ {Number(sale.amount).toFixed(2)}</p>
+                      <p className="text-[10px] text-on-surface/40 font-bold uppercase tracking-widest">{new Date(sale.created_at).toLocaleDateString('pt-BR')}</p>
+                    </div>
+                  </div>
+                ))}
+                {recentSales.length === 0 && (
+                  <div className="px-6 py-12 text-center">
+                    <p className="text-on-surface/40 font-bold uppercase tracking-widest text-xs">Nenhuma venda registrada</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'users' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-on-surface/40" size={20} />
+              <input 
+                type="text"
+                placeholder="Buscar usuários por nome, username ou e-mail..."
+                className="w-full bg-white border border-primary/5 rounded-2xl pl-14 pr-6 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            <div className="bg-white rounded-3xl border border-primary/5 shadow-sm overflow-hidden">
+              <div className="divide-y divide-primary/5">
+                {filteredUsers.map((u) => (
+                  <div key={u.id} className="px-6 py-4 flex items-center justify-between hover:bg-primary/5 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <img src={u.avatar} className="w-12 h-12 rounded-full object-cover" referrerPolicy="no-referrer" />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-black">{u.name}</p>
+                          <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md ${
+                            u.role === 'admin' ? 'bg-red-500 text-white' : 
+                            u.role === 'creator' ? 'bg-primary text-white' : 
+                            'bg-on-surface/10 text-on-surface/60'
+                          }`}>
+                            {u.role || 'user'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-on-surface/40 font-bold uppercase tracking-widest">@{u.username}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button className="p-2 hover:bg-primary/10 rounded-xl text-primary transition-colors">
+                        <Edit2 size={18} />
+                      </button>
+                      <button className="p-2 hover:bg-red-500/10 rounded-xl text-red-500 transition-colors">
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {filteredUsers.length === 0 && (
+                  <div className="px-6 py-12 text-center">
+                    <p className="text-on-surface/40 font-bold uppercase tracking-widest text-xs">Nenhum usuário encontrado</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'sales' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+            <div className="bg-white rounded-3xl border border-primary/5 shadow-sm overflow-hidden">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-primary/5">
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface/40">Data</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface/40">Comprador</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface/40">Criador</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface/40">Valor</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface/40">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-primary/5">
+                  {recentSales.map((sale) => (
+                    <tr key={sale.id} className="hover:bg-primary/5 transition-colors">
+                      <td className="px-6 py-4 text-[11px] font-bold">{new Date(sale.created_at).toLocaleDateString('pt-BR')}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <img src={sale.profiles?.avatar} className="w-6 h-6 rounded-full object-cover" referrerPolicy="no-referrer" />
+                          <span className="text-xs font-bold">{sale.profiles?.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <img src={sale.creator?.avatar} className="w-6 h-6 rounded-full object-cover" referrerPolicy="no-referrer" />
+                          <span className="text-xs font-bold">{sale.creator?.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-xs font-black text-green-500">R$ {Number(sale.amount).toFixed(2)}</td>
+                      <td className="px-6 py-4">
+                        <span className="bg-green-500/10 text-green-500 text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-full">Aprovado</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {recentSales.length === 0 && (
+                <div className="px-6 py-12 text-center">
+                  <p className="text-on-surface/40 font-bold uppercase tracking-widest text-xs">Nenhuma venda registrada</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => void, onNavigateToLogin: () => void }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -5674,6 +5987,7 @@ export default function App() {
             console.log('Forwarding post from profile:', post);
             setForwardingPost(post);
           }}
+          onNavigateToAdmin={() => setScreen('admin-dashboard')}
         />
       );
       case 'public-profile': 
@@ -5732,6 +6046,7 @@ export default function App() {
         if (!profile) return null;
         return <ScreenEditProfile onBack={() => setScreen('profile')} creator={profile} onProfileUpdated={() => { refreshProfile(); setRefreshKey(prev => prev + 1); }} />;
       case 'create-post': return <ScreenCreatePost onBack={() => setScreen('feed')} onPostCreated={() => { setRefreshKey(prev => prev + 1); setScreen('feed'); }} />;
+      case 'admin-dashboard': return <ScreenAdminDashboard onBack={() => setScreen('profile')} />;
       case 'payment': return <ScreenPayment onBack={() => setScreen('feed')} creator={publicCreator || profile} />;
       case 'chat': return selectedRecipient ? <ChatView recipient={selectedRecipient} onBack={() => setScreen('messages')} onMessagesRead={() => setRefreshKey(prev => prev + 1)} /> : null;
       default: return (
@@ -5766,6 +6081,7 @@ export default function App() {
     if (screen === 'search') return 'PESQUISAR';
     if (screen === 'edit-profile') return 'EDITAR';
     if (screen === 'create-post') return 'POSTAR';
+    if (screen === 'admin-dashboard') return 'ADMIN';
     if (screen === 'payment') return 'ASSINAR';
     return 'Novinha do JOB MOC';
   };
