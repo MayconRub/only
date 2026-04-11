@@ -119,6 +119,112 @@ const FormattedText = ({ text, className }: { text: string, className?: string }
   );
 };
 
+const SecureMedia = ({ 
+  mediaPath,
+  isVideo = false,
+  className, 
+  controls = false, 
+  autoPlay = false, 
+  muted = false, 
+  playsInline = false,
+  previewUrl = null,
+  bucket = 'posts',
+  alt = ""
+}: { 
+  mediaPath: string | null,
+  isVideo?: boolean,
+  className?: string, 
+  controls?: boolean, 
+  autoPlay?: boolean, 
+  muted?: boolean, 
+  playsInline?: boolean,
+  previewUrl?: string | null,
+  bucket?: string,
+  alt?: string
+}) => {
+  const [url, setUrl] = useState<string | null>(previewUrl);
+  const [loading, setLoading] = useState(!previewUrl && !!mediaPath);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (previewUrl) {
+      setUrl(previewUrl);
+      setLoading(false);
+      return;
+    }
+
+    const fetchUrl = async () => {
+      if (!mediaPath) {
+        setLoading(false);
+        return;
+      }
+
+      // If it's a full URL (legacy), use it directly
+      if (mediaPath.startsWith('http')) {
+        setUrl(mediaPath);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const { data, error: signedError } = await supabase.storage
+          .from(bucket)
+          .createSignedUrl(mediaPath, 3600); // 1 hour for chat/posts
+
+        if (signedError) throw signedError;
+        setUrl(data.signedUrl);
+      } catch (err) {
+        console.error('Error fetching signed URL:', err);
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUrl();
+  }, [mediaPath, previewUrl, bucket]);
+
+  if (loading) {
+    return (
+      <div className={`${className} bg-on-surface/5 flex items-center justify-center`}>
+        <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error || !url) {
+    return (
+      <div className={`${className} bg-on-surface/5 flex flex-col items-center justify-center p-4 text-center`}>
+        <Lock size={24} className="text-on-surface/20 mb-2" />
+        <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">Conteúdo Protegido</p>
+      </div>
+    );
+  }
+
+  if (isVideo) {
+    return (
+      <video 
+        src={`${url}${url.includes('?') ? '&' : '?'}t=0.001`} 
+        className={className} 
+        controls={controls}
+        autoPlay={autoPlay}
+        muted={muted}
+        playsInline={playsInline}
+        preload="metadata"
+      />
+    );
+  }
+
+  return (
+    <img 
+      src={url} 
+      className={className} 
+      referrerPolicy="no-referrer" 
+      alt={alt}
+    />
+  );
+};
+
 const GoogleLoginButton = ({ onClick, loading }: { onClick: () => void, loading?: boolean }) => (
   <button 
     type="button"
@@ -1227,19 +1333,34 @@ const FullScreenPostModal = ({
           </div>
           
           <div className={`w-full h-full flex items-center justify-center p-4 transition-all ${showComments ? 'md:w-2/3' : 'w-full'}`}>
-            {post.isVideo ? (
-              <video 
-                src={`${post.image}#t=0.001`} 
+            {!post.hasAccess ? (
+              <div className="flex flex-col items-center justify-center text-center p-12 bg-white/5 backdrop-blur-3xl rounded-[3rem] border border-white/10 max-w-md mx-auto shadow-2xl">
+                <div className="w-24 h-24 bg-primary/20 rounded-full flex items-center justify-center mb-8 ring-8 ring-primary/5">
+                  <Lock className="text-primary" size={48} />
+                </div>
+                <h2 className="text-3xl font-black text-white mb-4 tracking-tight">CONTEÚDO EXCLUSIVO</h2>
+                <p className="text-white/60 text-sm font-bold uppercase tracking-[0.2em] mb-10 leading-relaxed">
+                  Este conteúdo é reservado para assinantes VIP.
+                </p>
+                <button 
+                  onClick={() => {
+                    // We don't have onSubscribe here, but we can close and let the parent handle it
+                    // Or we can just show that it's locked.
+                    onClose();
+                  }}
+                  className="w-full py-5 premium-gradient text-white font-black rounded-2xl shadow-2xl shadow-primary/30 active:scale-95 transition-all text-xs uppercase tracking-[0.3em]"
+                >
+                  VOLTAR E ASSINAR
+                </button>
+              </div>
+            ) : (
+              <SecureMedia 
+                mediaPath={post.image}
+                isVideo={post.isVideo}
                 className="max-w-full max-h-full rounded-lg shadow-2xl" 
                 controls 
                 autoPlay 
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <img 
-                src={post.image} 
-                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" 
-                referrerPolicy="no-referrer"
+                alt={post.caption}
               />
             )}
           </div>
@@ -1516,7 +1637,7 @@ const EditPostModal = ({ post, onSave, onClose }: { post: Post, onSave: (id: str
         </div>
         <div className="p-6 space-y-6">
           <div className="aspect-square rounded-2xl overflow-hidden bg-on-surface/5">
-            <img src={post.image} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            <SecureMedia mediaPath={post.image} isVideo={post.isVideo} className="w-full h-full object-cover" />
           </div>
           <div>
             <label className="block text-[10px] font-black uppercase tracking-widest text-on-surface/40 mb-2">Legenda</label>
@@ -1793,7 +1914,7 @@ const ScreenFeed = ({
   onDeletePost: (id: string) => void,
   onUpdatePost: (id: string, caption: string, isLocked: boolean) => void,
   onDeleteStory: (id: string) => void,
-  onSubscribe: (creator: Creator, post?: Post) => void,
+  onSubscribe: (creator: Creator) => void,
   isMaster: boolean,
   onLikePost?: (id: string, isLiked: boolean) => void,
   onCommentPost?: (id: string, content: string) => void,
@@ -1954,24 +2075,11 @@ const ScreenFeed = ({
               }
             }}
           >
-            {post.isVideo ? (
-              <video 
-                src={`${post.image}#t=0.001`} 
-                className={`w-full h-full object-cover transition-all duration-700 ${!post.hasAccess ? 'blur-[60px] scale-110 opacity-50' : 'hover:scale-105'}`} 
-                preload="metadata"
-                playsInline
-                muted
-              />
-            ) : (
-              <img 
-                src={post.image} 
-                className={`w-full h-full object-cover transition-all duration-700 ${!post.hasAccess ? 'blur-[60px] scale-110 opacity-50' : 'hover:scale-105'}`} 
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1633078654544-61b3455b9161?q=80&w=400&auto=format&fit=crop'; // Fallback image
-                }}
-              />
-            )}
+            <SecureMedia 
+              mediaPath={post.image}
+              isVideo={post.isVideo}
+              className={`w-full h-full object-cover transition-all duration-700 ${!post.hasAccess ? 'blur-[60px] scale-110 opacity-50' : 'hover:scale-105'}`} 
+            />
             {!post.hasAccess && (
               <div className="absolute inset-0 flex items-center justify-center p-6 bg-black/20">
                 <div className="bg-white/10 backdrop-blur-2xl p-8 rounded-[2.5rem] flex flex-col items-center text-center shadow-2xl border border-white/20 w-full max-w-[280px]">
@@ -2416,24 +2524,11 @@ const ScreenProfile = ({
                     }
                   }}
                 >
-                  {post.isVideo ? (
-                    <video 
-                      src={`${post.image}#t=0.001`} 
-                      className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${!post.hasAccess ? 'blur-2xl scale-125 opacity-40' : ''}`} 
-                      preload="metadata"
-                      playsInline
-                      muted
-                    />
-                  ) : (
-                    <img 
-                      src={post.image} 
-                      className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${!post.hasAccess ? 'blur-2xl scale-125 opacity-40' : ''}`} 
-                      referrerPolicy="no-referrer" 
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1633078654544-61b3455b9161?q=80&w=400&auto=format&fit=crop';
-                      }}
-                    />
-                  )}
+                  <SecureMedia 
+                    mediaPath={post.image}
+                    isVideo={post.isVideo}
+                    className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${!post.hasAccess ? 'blur-2xl scale-125 opacity-40' : ''}`} 
+                  />
                   {!post.hasAccess && (
                     <div className="absolute inset-0 bg-primary/10 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center text-white p-2 text-center">
                       <Lock size={20} fill="white" className="drop-shadow-lg mb-1" />
@@ -2506,7 +2601,7 @@ const ScreenPublicProfile = ({
 }: { 
   creator: Creator, 
   posts: Post[], 
-  onSubscribe: (post?: Post) => void, 
+  onSubscribe: () => void, 
   stories: any[], 
   onLikePost?: (id: string, isLiked: boolean) => void, 
   onCommentPost?: (id: string, content: string) => void,
@@ -2742,28 +2837,18 @@ const ScreenPublicProfile = ({
               key={post.id} 
               className="relative aspect-square overflow-hidden rounded-2xl bg-on-surface/5 shadow-sm group cursor-pointer"
               onClick={() => {
-                if (!post.hasAccess) onSubscribe(post);
+                if (!post.hasAccess) onSubscribe();
                 else {
                   setSelectedPost(post);
                   setOpenComments(false);
                 }
               }}
             >
-              {post.isVideo ? (
-                <video 
-                  src={`${post.image}#t=0.001`} 
-                  className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${!post.hasAccess ? 'blur-2xl scale-125 opacity-40' : ''}`} 
-                  preload="metadata"
-                  playsInline
-                  muted
-                />
-              ) : (
-                <img 
-                  src={post.image} 
-                  className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${!post.hasAccess ? 'blur-2xl scale-125 opacity-40' : ''}`} 
-                  referrerPolicy="no-referrer" 
-                />
-              )}
+              <SecureMedia 
+                mediaPath={post.image}
+                isVideo={post.isVideo}
+                className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${!post.hasAccess ? 'blur-2xl scale-125 opacity-40' : ''}`} 
+              />
               {!post.hasAccess && (
                 <div className="absolute inset-0 bg-primary/10 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center text-white p-2 text-center">
                   <Lock size={20} fill="white" className="drop-shadow-lg mb-1" />
@@ -2771,7 +2856,7 @@ const ScreenPublicProfile = ({
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      onSubscribe(post);
+                      onSubscribe();
                     }}
                     className="px-3 py-1.5 bg-primary text-white text-[7px] font-black uppercase tracking-widest rounded-lg shadow-lg active:scale-95 transition-all"
                   >
@@ -3239,13 +3324,11 @@ const ChatView = ({ recipient, onBack, onMessagesRead }: { recipient: Creator, o
 
       if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage.from('posts').getPublicUrl(filePath);
-      
       let type: 'image' | 'video' | 'audio' = 'image';
       if (fileType.startsWith('video/')) type = 'video';
       else if (fileType.startsWith('audio/')) type = 'audio';
 
-      await handleSendMessage(data.publicUrl, type);
+      await handleSendMessage(filePath, type);
     } catch (err: any) {
       alert(`Erro no upload: ${err.message}`);
     } finally {
@@ -3361,10 +3444,10 @@ const ChatView = ({ recipient, onBack, onMessagesRead }: { recipient: Creator, o
                   {msg.media_url && (
                     <div className="mb-2 rounded-xl overflow-hidden bg-black/5">
                       {msg.media_type === 'image' && (
-                        <img src={msg.media_url} className="w-full max-h-64 object-cover" referrerPolicy="no-referrer" />
+                        <SecureMedia mediaPath={msg.media_url} isVideo={false} className="w-full max-h-64 object-cover" />
                       )}
                       {msg.media_type === 'video' && (
-                        <video src={msg.media_url} controls className="w-full max-h-64" />
+                        <SecureMedia mediaPath={msg.media_url} isVideo={true} controls className="w-full max-h-64" />
                       )}
                       {msg.media_type === 'audio' && (
                         <AudioPlayer src={msg.media_url} isMe={isMe} />
@@ -3961,8 +4044,8 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
 
 const ScreenCreatePost = ({ onBack, onPostCreated }: { onBack: () => void, onPostCreated: () => void }) => {
   const [image, setImage] = useState('');
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
-  const [price, setPrice] = useState('');
   const [isLocked, setIsLocked] = useState(false);
   const [isVideo, setIsVideo] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -3989,8 +4072,8 @@ const ScreenCreatePost = ({ onBack, onPostCreated }: { onBack: () => void, onPos
 
       if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage.from('posts').getPublicUrl(filePath);
-      setImage(data.publicUrl);
+      setImage(filePath);
+      setPreviewUrl(URL.createObjectURL(file));
       setIsVideo(file.type.startsWith('video/'));
     } catch (err: any) {
       setError(`Erro no upload: ${err.message}`);
@@ -4015,7 +4098,6 @@ const ScreenCreatePost = ({ onBack, onPostCreated }: { onBack: () => void, onPos
         creator_id: user.id,
         image,
         caption,
-        price: isLocked ? price : null,
         is_locked: isLocked,
         is_video: isVideo,
         time: ''
@@ -4042,11 +4124,11 @@ const ScreenCreatePost = ({ onBack, onPostCreated }: { onBack: () => void, onPos
           <div className="space-y-1.5">
             <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">Mídia (Foto ou Vídeo)</label>
             <div className="relative group aspect-video bg-white border-2 border-dashed border-primary/10 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-primary/30 transition-all overflow-hidden">
-              {image ? (
+              {previewUrl ? (
                 isVideo ? (
-                  <video src={`${image}#t=0.001`} className="w-full h-full object-cover" controls />
+                  <video src={`${previewUrl}#t=0.001`} className="w-full h-full object-cover" controls />
                 ) : (
-                  <img src={image} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  <img src={previewUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 )
               ) : (
                 <>
@@ -4096,19 +4178,6 @@ const ScreenCreatePost = ({ onBack, onPostCreated }: { onBack: () => void, onPos
               <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all ${isLocked ? 'right-1' : 'left-1'}`}></div>
             </button>
           </div>
-
-          {isLocked && (
-            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
-              <label className="text-[10px] font-black text-on-surface/40 uppercase tracking-widest px-1">Preço para Desbloquear</label>
-              <input 
-                className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
-                placeholder="R$ 15,00" 
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                required={isLocked}
-              />
-            </div>
-          )}
         </div>
 
         {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
@@ -5306,12 +5375,12 @@ export default function App() {
   const [dataLoading, setDataLoading] = React.useState(true);
   const [showResetButton, setShowResetButton] = React.useState(false);
   const [refreshKey, setRefreshKey] = React.useState(0);
-  const [selectedPostForPayment, setSelectedPostForPayment] = React.useState<Post | null>(null);
   const [selectedRecipient, setSelectedRecipient] = React.useState<Creator | null>(null);
   const [forwardingPost, setForwardingPost] = React.useState<Post | null>(null);
   const [editingPost, setEditingPost] = React.useState<Post | null>(null);
 
   const isMaster = profile?.role === 'master' || profile?.role === 'admin' || profile?.role === 'creator';
+  const isGlobalAdmin = profile?.role === 'master' || profile?.role === 'admin';
   const isLoggedIn = !!user;
 
   React.useEffect(() => {
@@ -5328,6 +5397,18 @@ export default function App() {
     sessionStorage.clear();
     signOut().catch(console.error);
     window.location.href = '/';
+  };
+
+  const checkAccess = (post: any, currentUserId: string | undefined, userProfile: Creator | null, subscribedIds: Set<string>) => {
+    if (!post) return false;
+    const isOwner = currentUserId && post.creator_id === currentUserId;
+    const isGlobalAdmin = userProfile?.role === 'admin' || userProfile?.role === 'master';
+    const isUnlocked = post.is_locked === false;
+    const isSubscribed = subscribedIds.has(post.creator_id);
+
+    const access = !!(isOwner || isGlobalAdmin || isUnlocked || isSubscribed);
+    
+    return access;
   };
 
   const fetchData = React.useCallback(async () => {
@@ -5362,7 +5443,7 @@ export default function App() {
 
       try {
         const { data, error } = await supabase
-          .from('posts')
+          .from('secure_posts')
           .select(`
             *,
             profiles:creator_id (*),
@@ -5375,7 +5456,7 @@ export default function App() {
       } catch (err: any) {
         console.warn('Full posts query failed, trying simpler query:', err.message);
         const { data, error } = await supabase
-          .from('posts')
+          .from('secure_posts')
           .select('*');
         
         if (error) {
@@ -5393,12 +5474,12 @@ export default function App() {
       });
 
       // Filter posts:
-      // 1. If user is the master, show ALL posts.
+      // 1. If user is a global admin, show ALL posts.
       // 2. If no masterId is found, show all posts.
       // 3. Always show user's OWN posts.
       // 4. Otherwise, show only master's posts.
       const filteredPostsData = postsData.filter((p: any) => {
-        if (isMaster) return true;
+        if (isGlobalAdmin) return true;
         if (p.creator_id === user.id) return true;
         if (!masterId) return true;
         return p.creator_id === masterId;
@@ -5428,7 +5509,7 @@ export default function App() {
       });
 
       const filteredStoriesData = storiesData.filter((s: any) => {
-        if (isMaster) return true;
+        if (isGlobalAdmin) return true;
         if (s.creator_id === user.id) return true;
         if (!masterId) return true;
         return s.creator_id === masterId;
@@ -5449,9 +5530,8 @@ export default function App() {
         return dateB - dateA;
       });
 
-      // Fetch user payments for access control
+      // Fetch user subscriptions for access control
       let subscribedCreatorIds = new Set<string>();
-      let purchasedPostIds = new Set<string>();
       
       try {
         // Fetch active subscriptions
@@ -5463,21 +5543,6 @@ export default function App() {
           .gt('end_date', new Date().toISOString());
         
         subscribedCreatorIds = new Set(activeSubs?.map(s => s.creator_id) || []);
-
-        // Fetch purchased posts
-        const { data: userPayments, error: paymentsError } = await supabase
-          .from('payments')
-          .select('creator_id, post_id')
-          .eq('user_id', user.id)
-          .eq('status', 'approved');
-
-        if (paymentsError) {
-          console.warn('Payments table query failed:', paymentsError.message);
-        } else {
-          userPayments?.forEach(p => {
-            if (p.post_id) purchasedPostIds.add(p.post_id);
-          });
-        }
       } catch (err) {
         console.warn('Error fetching access data:', err);
       }
@@ -5504,7 +5569,7 @@ export default function App() {
       // Process posts
       const processedPosts = filteredPostsData.map(post => {
         const isOwner = post.creator_id === user.id;
-        const isMasterUser = profile.role === 'master' || profile.role === 'admin' || profile.role === 'creator';
+        const isGlobalAdmin = profile.role === 'master' || profile.role === 'admin';
         
         // Try to get creator profile from the join first, then from the map
         let creatorProfile = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
@@ -5526,7 +5591,7 @@ export default function App() {
           isLikedByMe: post.post_likes?.some((l: any) => l.user_id === user.id),
           isLocked: post.is_locked,
           isVideo: post.is_video,
-          hasAccess: isOwner || isMasterUser || subscribedCreatorIds.has(post.creator_id) || !post.is_locked,
+          hasAccess: checkAccess(post, user.id, profile, subscribedCreatorIds),
           commentList: (post.post_comments || []).map((c: any) => ({
             id: c.id,
             user: c.profiles?.name || 'Usuário',
@@ -5778,6 +5843,9 @@ export default function App() {
 
         // Fetch posts for this creator
         const { data: postsData } = await supabase.from('posts').select('*, creator:profiles(*)').eq('creator_id', creatorId);
+        
+        const isGlobalAdmin = profile?.role === 'admin' || profile?.role === 'master';
+
         if (postsData) {
           const sortedPosts = [...postsData].sort((a, b) => {
             const dateA = new Date(a.created_at || a.time || 0).getTime();
@@ -5789,11 +5857,7 @@ export default function App() {
             ...p,
             isLocked: p.is_locked,
             isVideo: p.is_video,
-            hasAccess: session?.user?.id === p.creator_id || 
-                       subscribedCreatorIds.has(p.creator_id) || 
-                       purchasedPostIds.has(p.id) || 
-                       !p.is_locked ||
-                       isMaster
+            hasAccess: checkAccess(p, session?.user?.id, profile, subscribedCreatorIds)
           })) as any);
         }
         setScreen('public-profile');
@@ -5805,7 +5869,6 @@ export default function App() {
 
   const handleSubscribe = (targetCreator: Creator) => {
     setPublicCreator(targetCreator);
-    setSelectedPostForPayment(null);
     if (isLoggedIn) {
       setScreen('payment');
     } else {
@@ -5944,22 +6007,21 @@ export default function App() {
     
     if (username) {
       const fetchPublicProfile = async () => {
-        const { data: profile } = await supabase.from('profiles').select('*').eq('username', username).single();
-        if (profile) {
+        const { data: targetProfile } = await supabase.from('profiles').select('*').eq('username', username).single();
+        if (targetProfile) {
           // Fetch social connections
           const { data: socialData } = await supabase
             .from('social_connections')
             .select('platform, url')
-            .eq('profile_id', profile.id);
+            .eq('profile_id', targetProfile.id);
 
           const socialLinks = socialData?.reduce((acc: any, curr: any) => {
             acc[curr.platform] = curr.url;
             return acc;
           }, {});
 
-          setPublicCreator({ ...profile, social_links: socialLinks } as any);
-          let subscribedCreatorIds = new Set();
-          let purchasedPostIds = new Set();
+          setPublicCreator({ ...targetProfile, social_links: socialLinks } as any);
+          let subscribedCreatorIds = new Set<string>();
           const { data: { session }, error: sessionError } = await supabase.auth.getSession();
           if (sessionError) {
             console.error('Public profile session check error:', sessionError);
@@ -5977,24 +6039,15 @@ export default function App() {
                .gt('end_date', new Date().toISOString());
              
              subscribedCreatorIds = new Set(activeSubs?.map(s => s.creator_id) || []);
-
-             // Fetch purchased posts
-             const { data: userPayments } = await supabase
-              .from('payments')
-              .select('creator_id, post_id')
-              .eq('user_id', session.user.id)
-              .eq('status', 'approved');
-             
-             userPayments?.forEach((p: any) => {
-               if (p.post_id) purchasedPostIds.add(p.post_id);
-             });
           }
 
-          const { data: posts, error: postsError } = await supabase.from('posts').select('*, creator:profiles(*), post_likes(user_id), post_comments(id)').eq('creator_id', profile.id);
+          const { data: posts, error: postsError } = await supabase.from('secure_posts').select('*, creator:profiles(*), post_likes(user_id), post_comments(id)').eq('creator_id', targetProfile.id);
           
+          const isGlobalAdmin = profile?.role === 'admin' || profile?.role === 'master';
+
           if (postsError) {
             console.error('Error fetching public posts with likes/comments:', postsError);
-            const { data: fallbackPosts } = await supabase.from('posts').select('*, creator:profiles(*)').eq('creator_id', profile.id);
+            const { data: fallbackPosts } = await supabase.from('secure_posts').select('*, creator:profiles(*)').eq('creator_id', targetProfile.id);
             if (fallbackPosts) {
               const sortedFallback = [...fallbackPosts].sort((a, b) => {
                 const dateA = new Date(a.created_at || a.time || 0).getTime();
@@ -6004,11 +6057,7 @@ export default function App() {
               setPublicPosts(sortedFallback.map((p: any) => ({
                 ...p,
                 isLocked: p.is_locked,
-                hasAccess: session?.user?.id === p.creator_id || 
-                           subscribedCreatorIds.has(p.creator_id) || 
-                           purchasedPostIds.has(p.id) || 
-                           !p.is_locked ||
-                           isMaster,
+                hasAccess: checkAccess(p, session?.user?.id, profile, subscribedCreatorIds),
                 isVideo: p.is_video,
                 likesCount: 0,
                 commentsCount: 0,
@@ -6024,11 +6073,7 @@ export default function App() {
             setPublicPosts(sortedPosts.map((p: any) => ({
               ...p,
               isLocked: p.is_locked,
-              hasAccess: session?.user?.id === p.creator_id || 
-                         subscribedCreatorIds.has(p.creator_id) || 
-                         purchasedPostIds.has(p.id) || 
-                         !p.is_locked ||
-                         isMaster,
+              hasAccess: checkAccess(p, session?.user?.id, profile, subscribedCreatorIds),
               isVideo: p.is_video,
               likesCount: p.post_likes?.length || 0,
               commentsCount: p.post_comments?.length || 0,
@@ -6040,7 +6085,7 @@ export default function App() {
       };
       fetchPublicProfile();
     }
-  }, []);
+  }, [user, profile]);
 
   // Expose setScreen and refreshData globally
   React.useEffect(() => {

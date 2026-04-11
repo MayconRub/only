@@ -42,7 +42,6 @@ export interface Post {
   isLocked?: boolean;
   hasAccess?: boolean;
   isVideo?: boolean;
-  price?: string;
   likesCount?: number;
   commentsCount?: number;
   isLikedByMe?: boolean;
