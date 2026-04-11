@@ -1871,7 +1871,7 @@ const ScreenSearch = ({ onViewProfile }: { onViewProfile: (creator: any) => void
               <div className="flex-1 text-left">
                 <div className="flex items-center gap-1">
                   <h4 className="font-black text-sm uppercase tracking-tight">{user.name}</h4>
-                  {user.role === 'creator' && <CheckCircle2 size={12} className="text-primary" />}
+                  {user.verificada && <CheckCircle2 size={12} className="text-primary" />}
                 </div>
                 <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">@{user.username}</p>
               </div>
@@ -2015,7 +2015,7 @@ const ScreenFeed = ({
                 <div>
                   <div className="flex items-center gap-1">
                     <p className="font-bold text-sm hover:text-primary transition-colors">{post.creator?.name}</p>
-                    <CheckCircle2 size={12} className="text-primary fill-primary/10" />
+                    {post.creator?.verificada && <CheckCircle2 size={12} className="text-primary fill-primary/10" />}
                   </div>
                 </div>
               </div>
@@ -2243,7 +2243,7 @@ const WelcomeAudioPlayer = ({ audioUrl }: { audioUrl: string }) => {
   };
 
   return (
-    <div className="w-full max-w-md mx-auto mb-8 bg-primary/5 border border-primary/10 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
+    <div className="w-full max-w-[280px] mx-auto mb-8 bg-primary/5 border border-primary/10 rounded-2xl p-3 flex items-center gap-3 shadow-sm">
       <audio 
         ref={audioRef} 
         src={audioUrl} 
@@ -2261,26 +2261,26 @@ const WelcomeAudioPlayer = ({ audioUrl }: { audioUrl: string }) => {
       <button 
         onClick={togglePlay}
         disabled={isBuffering && !isPlaying}
-        className="w-12 h-12 flex-shrink-0 bg-primary text-white rounded-full flex items-center justify-center shadow-md shadow-primary/20 active:scale-95 transition-all disabled:opacity-70"
+        className="w-10 h-10 flex-shrink-0 bg-primary text-white rounded-full flex items-center justify-center shadow-md shadow-primary/20 active:scale-95 transition-all disabled:opacity-70"
       >
         {isBuffering && !isPlaying ? (
-          <RefreshCw size={20} className="animate-spin" />
+          <RefreshCw size={18} className="animate-spin" />
         ) : isPlaying ? (
-          <Pause size={20} fill="currentColor" />
+          <Pause size={18} fill="currentColor" />
         ) : (
-          <Play size={20} fill="currentColor" className="ml-1" />
+          <Play size={18} fill="currentColor" className="ml-0.5" />
         )}
       </button>
       <div className="flex-1">
         <div className="flex justify-between items-center mb-1">
-          <span className="text-[10px] font-black uppercase tracking-widest text-primary">Ouça minha voz</span>
-          <div className="flex items-center gap-2 text-[10px] font-bold text-primary/60">
+          <span className="text-[9px] font-black uppercase tracking-widest text-primary">Ouça minha voz</span>
+          <div className="flex items-center gap-1 text-[9px] font-bold text-primary/60">
             <span>{formatTime(currentTime)}</span>
             <span>/</span>
             <span>{formatTime(duration)}</span>
           </div>
         </div>
-        <div className="h-2 bg-primary/10 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-primary/10 rounded-full overflow-hidden">
           <div 
             className="h-full bg-primary transition-all duration-100 ease-linear"
             style={{ width: `${progress}%` }}
@@ -2385,10 +2385,6 @@ const ScreenProfile = ({
               {myStories.length > 0 && (
                 <div className="absolute inset-0 rounded-full border-4 border-primary animate-pulse pointer-events-none"></div>
               )}
-              {/* Meta-style Verified Badge */}
-              <div className="absolute bottom-1 right-1 bg-[#0095f6] p-1 rounded-full border-2 border-white shadow-lg">
-                <Check size={12} className="text-white" strokeWidth={4} />
-              </div>
             </div>
           </div>
 
@@ -2412,32 +2408,48 @@ const ScreenProfile = ({
           </div>
         </div>
 
-        <div className="mb-6">
-          <h1 className="text-3xl font-black tracking-tight uppercase">{creator?.name}</h1>
-          <p className="text-sm text-on-surface/60 font-medium">@{creator?.username || creator?.name?.toLowerCase().replace(/\s+/g, '')}</p>
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <div className="flex-1">
+            <h1 className="text-3xl font-black tracking-tight uppercase flex items-center gap-2">
+              {creator?.name}
+              {creator?.verificada && (
+                <div className="bg-[#0095f6] p-0.5 rounded-full flex items-center justify-center">
+                  <Check size={10} className="text-white" strokeWidth={4} />
+                </div>
+              )}
+            </h1>
+            <div className="flex items-center gap-3 flex-wrap">
+              <p className="text-sm text-on-surface/60 font-medium">@{creator?.username || creator?.name?.toLowerCase().replace(/\s+/g, '')}</p>
+              {creator?.cidade && (
+                <div className="flex items-center gap-1 text-on-surface/40">
+                  <MapPin size={10} className="text-primary/60" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">{creator.cidade}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          {creator.social_links && (
+            <div className="flex gap-3">
+              {creator.social_links.instagram && (
+                <a href={creator.social_links.instagram} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
+                  <Instagram size={24} />
+                </a>
+              )}
+              {creator.social_links.twitter && (
+                <a href={creator.social_links.twitter} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
+                  <Twitter size={24} />
+                </a>
+              )}
+              {creator.social_links.tiktok && (
+                <a href={creator.social_links.tiktok} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
+                  <Music size={24} />
+                </a>
+              )}
+            </div>
+          )}
         </div>
 
         <p className="text-sm text-on-surface/80 font-medium mb-6 max-w-xl leading-relaxed">{creator?.bio}</p>
-
-        {creator.social_links && (
-          <div className="flex justify-start gap-4 mb-4">
-            {creator.social_links.instagram && (
-              <a href={creator.social_links.instagram} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
-                <Instagram size={24} />
-              </a>
-            )}
-            {creator.social_links.twitter && (
-              <a href={creator.social_links.twitter} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
-                <Twitter size={24} />
-              </a>
-            )}
-            {creator.social_links.tiktok && (
-              <a href={creator.social_links.tiktok} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
-                <Music size={24} />
-              </a>
-            )}
-          </div>
-        )}
 
         {creator.welcome_audio && (
           <WelcomeAudioPlayer audioUrl={creator.welcome_audio} />
@@ -2455,13 +2467,6 @@ const ScreenProfile = ({
               text={creator?.services_bio} 
               className="text-sm text-black leading-relaxed whitespace-pre-wrap"
             />
-            
-            <div className="mt-6 pt-6 border-t border-primary/5 flex items-center gap-3 text-on-surface/60">
-              <div className="bg-on-surface/5 p-2 rounded-xl">
-                <MapPin size={18} className="text-primary" />
-              </div>
-              <span className="text-xs font-bold uppercase tracking-widest">Montes Claros - Minas Gerais</span>
-            </div>
           </div>
         )}
 
@@ -2753,10 +2758,6 @@ const ScreenPublicProfile = ({
               {myStories.length > 0 && (
                 <div className="absolute inset-0 rounded-full border-4 border-primary animate-pulse pointer-events-none"></div>
               )}
-              {/* Meta-style Verified Badge */}
-              <div className="absolute bottom-1 right-1 bg-[#0095f6] p-1 rounded-full border-2 border-white shadow-lg">
-                <Check size={12} className="text-white" strokeWidth={4} />
-              </div>
             </div>
           </div>
 
@@ -2782,32 +2783,48 @@ const ScreenPublicProfile = ({
           </div>
         </div>
 
-        <div className="mb-6">
-          <h1 className="text-3xl font-black tracking-tight uppercase">{creator?.name}</h1>
-          <p className="text-sm text-on-surface/60 font-medium">@{creator?.username || creator?.name?.toLowerCase().replace(/\s+/g, '')}</p>
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <div className="flex-1">
+            <h1 className="text-3xl font-black tracking-tight uppercase flex items-center gap-2">
+              {creator?.name}
+              {creator?.verificada && (
+                <div className="bg-[#0095f6] p-0.5 rounded-full flex items-center justify-center">
+                  <Check size={10} className="text-white" strokeWidth={4} />
+                </div>
+              )}
+            </h1>
+            <div className="flex items-center gap-3 flex-wrap">
+              <p className="text-sm text-on-surface/60 font-medium">@{creator?.username || creator?.name?.toLowerCase().replace(/\s+/g, '')}</p>
+              {creator?.cidade && (
+                <div className="flex items-center gap-1 text-on-surface/40">
+                  <MapPin size={10} className="text-primary/60" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">{creator.cidade}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          {creator.social_links && (
+            <div className="flex gap-3">
+              {creator.social_links.instagram && (
+                <a href={creator.social_links.instagram} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
+                  <Instagram size={24} />
+                </a>
+              )}
+              {creator.social_links.twitter && (
+                <a href={creator.social_links.twitter} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
+                  <Twitter size={24} />
+                </a>
+              )}
+              {creator.social_links.tiktok && (
+                <a href={creator.social_links.tiktok} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
+                  <Music size={24} />
+                </a>
+              )}
+            </div>
+          )}
         </div>
 
         <p className="text-sm text-on-surface/80 font-medium mb-6 max-w-xl leading-relaxed">{creator?.bio}</p>
-
-        {creator.social_links && (
-          <div className="flex justify-start gap-4 mb-4">
-            {creator.social_links.instagram && (
-              <a href={creator.social_links.instagram} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
-                <Instagram size={24} />
-              </a>
-            )}
-            {creator.social_links.twitter && (
-              <a href={creator.social_links.twitter} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
-                <Twitter size={24} />
-              </a>
-            )}
-            {creator.social_links.tiktok && (
-              <a href={creator.social_links.tiktok} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
-                <Music size={24} />
-              </a>
-            )}
-          </div>
-        )}
 
         {creator.welcome_audio && (
           <WelcomeAudioPlayer audioUrl={creator.welcome_audio} />
@@ -2825,13 +2842,6 @@ const ScreenPublicProfile = ({
               text={creator?.services_bio} 
               className="text-sm text-black leading-relaxed whitespace-pre-wrap"
             />
-            
-            <div className="mt-6 pt-6 border-t border-primary/5 flex items-center gap-3 text-on-surface/60">
-              <div className="bg-on-surface/5 p-2 rounded-xl">
-                <MapPin size={18} className="text-primary" />
-              </div>
-              <span className="text-xs font-bold uppercase tracking-widest">Montes Claros - Minas Gerais</span>
-            </div>
           </div>
         )}
 
@@ -3770,6 +3780,7 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
   const [instagram, setInstagram] = useState(creator.social_links?.instagram || '');
   const [twitter, setTwitter] = useState(creator.social_links?.twitter || '');
   const [tiktok, setTiktok] = useState(creator.social_links?.tiktok || '');
+  const [cidade, setCidade] = useState(creator.cidade || '');
   const [loading, setLoading] = useState(false);
 
   // Removida a sincronização agressiva que limpava os campos durante a digitação
@@ -3882,7 +3893,8 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
         welcome_audio: welcomeAudio,
         avatar,
         cover_image: coverImage,
-        role: creator.role
+        role: creator.role,
+        cidade
       }).eq('id', user.id);
 
       if (error) {
@@ -4029,6 +4041,15 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
               placeholder="Use **texto** para negrito. Ex: **Video Chamada** R$ 50,00"
               value={servicesBio}
               onChange={(e) => setServicesBio(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Cidade</label>
+            <input 
+              className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
+              placeholder="Ex: Montes Claros - Minas Gerais"
+              value={cidade}
+              onChange={(e) => setCidade(e.target.value)}
             />
           </div>
           <div className="space-y-1.5">

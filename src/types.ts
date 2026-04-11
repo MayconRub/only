@@ -22,6 +22,8 @@ export interface Creator {
     tiktok?: string;
   };
   birth_date?: string;
+  cidade?: string;
+  verificada?: boolean;
 }
 
 export interface Comment {
