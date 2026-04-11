@@ -2420,12 +2420,6 @@ const ScreenProfile = ({
             </h1>
             <div className="flex items-center gap-3 flex-wrap">
               <p className="text-sm text-on-surface/60 font-medium">@{creator?.username || creator?.name?.toLowerCase().replace(/\s+/g, '')}</p>
-              {creator?.cidade && (
-                <div className="flex items-center gap-1 text-on-surface/40">
-                  <MapPin size={10} className="text-primary/60" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider">{creator.cidade}</span>
-                </div>
-              )}
             </div>
           </div>
           {creator.social_links && (
@@ -2449,42 +2443,59 @@ const ScreenProfile = ({
           )}
         </div>
 
-        <p className="text-sm text-on-surface/80 font-medium mb-6 max-w-xl leading-relaxed">{creator?.bio}</p>
+        <p className="text-sm text-on-surface/80 font-medium mb-2 max-w-xl leading-relaxed">{creator?.bio}</p>
+
+        {creator?.cidade && (
+          <div className="flex items-center gap-1.5 text-on-surface/40 mb-6">
+            <MapPin size={12} className="text-primary/60" />
+            <span className="text-[11px] font-bold uppercase tracking-widest">{creator.cidade}</span>
+          </div>
+        )}
 
         {creator.welcome_audio && (
           <WelcomeAudioPlayer audioUrl={creator.welcome_audio} />
         )}
 
         {creator?.services_bio && (
-          <div className="bg-white p-6 rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5 mb-8 text-left">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="bg-primary/10 p-2 rounded-xl">
-                <Star size={20} className="text-primary" fill="currentColor" />
+          <div className="bg-gradient-to-br from-white to-primary/5 p-6 rounded-[2rem] shadow-sm max-w-md mx-auto border border-primary/10 mb-8 text-left relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110 duration-500"></div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary p-2 rounded-xl shadow-lg shadow-primary/20">
+                    <Star size={18} className="text-white" fill="currentColor" />
+                  </div>
+                  <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-primary">Serviços & Preços</h4>
+                </div>
+                <div className="bg-primary/10 px-3 py-1 rounded-full">
+                  <span className="text-[9px] font-black uppercase text-primary tracking-wider">Premium</span>
+                </div>
               </div>
-              <h4 className="font-black text-xs uppercase tracking-widest text-primary">Serviços & Preços</h4>
+              <div className="bg-white/50 backdrop-blur-sm rounded-2xl p-4 border border-primary/5">
+                <FormattedText 
+                  text={creator?.services_bio} 
+                  className="text-sm text-on-surface/80 leading-relaxed whitespace-pre-wrap font-medium"
+                />
+              </div>
             </div>
-            <FormattedText 
-              text={creator?.services_bio} 
-              className="text-sm text-black leading-relaxed whitespace-pre-wrap"
-            />
           </div>
         )}
 
         {isMaster && (
-          <div className="flex justify-start items-center gap-4 sm:gap-10 mb-10 py-6 px-4 sm:px-8 bg-white rounded-3xl shadow-sm max-w-md border border-primary/5 overflow-hidden">
-            <div className="text-center min-w-[60px]">
-              <span className="block text-xl font-bold">{myPosts.length}</span>
-              <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
+          <div className="flex justify-center items-center gap-4 sm:gap-8 mb-8 py-4 px-4 bg-white rounded-2xl shadow-sm max-w-[280px] border border-primary/5 overflow-hidden">
+            <div className="text-center min-w-[50px]">
+              <span className="block text-lg font-bold">{myPosts.length}</span>
+              <span className="text-[9px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
             </div>
-            <div className="w-px h-8 bg-primary/10 flex-shrink-0"></div>
-            <div className="text-center min-w-[60px]">
-              <span className="block text-xl font-bold">{creator.stats?.followers || '0'}</span>
-              <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Seguidores</span>
+            <div className="w-px h-6 bg-primary/10 flex-shrink-0"></div>
+            <div className="text-center min-w-[50px]">
+              <span className="block text-lg font-bold">{creator.stats?.followers || '0'}</span>
+              <span className="text-[9px] uppercase tracking-widest font-bold text-on-surface/40">Seguidores</span>
             </div>
-            <div className="w-px h-8 bg-primary/10 flex-shrink-0"></div>
-            <div className="text-center min-w-[60px]">
-              <span className="block text-xl font-bold">{creator.stats?.likes || '0'}</span>
-              <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Curtidas</span>
+            <div className="w-px h-6 bg-primary/10 flex-shrink-0"></div>
+            <div className="text-center min-w-[50px]">
+              <span className="block text-lg font-bold">{creator.stats?.likes || '0'}</span>
+              <span className="text-[9px] uppercase tracking-widest font-bold text-on-surface/40">Curtidas</span>
             </div>
           </div>
         )}
@@ -2537,7 +2548,7 @@ const ScreenProfile = ({
               onClick={() => setActiveTab('all')}
               className={`py-4 border-b-2 font-bold text-xs uppercase tracking-widest ${activeTab === 'all' ? 'border-primary text-primary' : 'border-transparent text-on-surface/40'}`}
             >
-              Criações
+              POST
             </button>
             <button 
               onClick={() => setActiveTab('exclusive')}
@@ -2795,12 +2806,6 @@ const ScreenPublicProfile = ({
             </h1>
             <div className="flex items-center gap-3 flex-wrap">
               <p className="text-sm text-on-surface/60 font-medium">@{creator?.username || creator?.name?.toLowerCase().replace(/\s+/g, '')}</p>
-              {creator?.cidade && (
-                <div className="flex items-center gap-1 text-on-surface/40">
-                  <MapPin size={10} className="text-primary/60" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider">{creator.cidade}</span>
-                </div>
-              )}
             </div>
           </div>
           {creator.social_links && (
@@ -2824,54 +2829,64 @@ const ScreenPublicProfile = ({
           )}
         </div>
 
-        <p className="text-sm text-on-surface/80 font-medium mb-6 max-w-xl leading-relaxed">{creator?.bio}</p>
+        <p className="text-sm text-on-surface/80 font-medium mb-2 max-w-xl leading-relaxed">{creator?.bio}</p>
+
+        {creator?.cidade && (
+          <div className="flex items-center gap-1.5 text-on-surface/40 mb-6">
+            <MapPin size={12} className="text-primary/60" />
+            <span className="text-[11px] font-bold uppercase tracking-widest">{creator.cidade}</span>
+          </div>
+        )}
 
         {creator.welcome_audio && (
           <WelcomeAudioPlayer audioUrl={creator.welcome_audio} />
         )}
 
         {creator?.services_bio && (
-          <div className="bg-white p-6 rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5 mb-8 text-left">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="bg-primary/10 p-2 rounded-xl">
-                <Star size={20} className="text-primary" fill="currentColor" />
+          <div className="bg-gradient-to-br from-white to-primary/5 p-6 rounded-[2rem] shadow-sm max-w-md mx-auto border border-primary/10 mb-8 text-left relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110 duration-500"></div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary p-2 rounded-xl shadow-lg shadow-primary/20">
+                    <Star size={18} className="text-white" fill="currentColor" />
+                  </div>
+                  <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-primary">Serviços & Preços</h4>
+                </div>
+                <div className="bg-primary/10 px-3 py-1 rounded-full">
+                  <span className="text-[9px] font-black uppercase text-primary tracking-wider">Premium</span>
+                </div>
               </div>
-              <h4 className="font-black text-xs uppercase tracking-widest text-primary">Serviços & Preços</h4>
+              <div className="bg-white/50 backdrop-blur-sm rounded-2xl p-4 border border-primary/5">
+                <FormattedText 
+                  text={creator?.services_bio} 
+                  className="text-sm text-on-surface/80 leading-relaxed whitespace-pre-wrap font-medium"
+                />
+              </div>
             </div>
-            <FormattedText 
-              text={creator?.services_bio} 
-              className="text-sm text-black leading-relaxed whitespace-pre-wrap"
-            />
           </div>
         )}
 
-        <div className="flex justify-start items-center gap-4 sm:gap-10 mb-10 py-6 px-4 sm:px-8 bg-white rounded-3xl shadow-sm max-w-md border border-primary/5 overflow-hidden">
-          <div className="text-center min-w-[60px]">
-            <span className="block text-xl font-bold">{myPosts.length}</span>
-            <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
+        <div className="flex justify-center items-center gap-4 sm:gap-8 mb-8 py-4 px-4 bg-white rounded-2xl shadow-sm max-w-[280px] border border-primary/5 overflow-hidden">
+          <div className="text-center min-w-[50px]">
+            <span className="block text-lg font-bold">{myPosts.length}</span>
+            <span className="text-[9px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
           </div>
-          <div className="w-px h-8 bg-primary/10 flex-shrink-0"></div>
-          <div className="text-center min-w-[60px]">
-            <span className="block text-xl font-bold">{followerCount}</span>
-            <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Seguidores</span>
+          <div className="w-px h-6 bg-primary/10 flex-shrink-0"></div>
+          <div className="text-center min-w-[50px]">
+            <span className="block text-lg font-bold">{followerCount}</span>
+            <span className="text-[9px] uppercase tracking-widest font-bold text-on-surface/40">Seguidores</span>
           </div>
-          <div className="w-px h-8 bg-primary/10 flex-shrink-0"></div>
-          <div className="text-center min-w-[60px]">
-            <span className="block text-xl font-bold">{likesCount}</span>
-            <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Curtidas</span>
+          <div className="w-px h-6 bg-primary/10 flex-shrink-0"></div>
+          <div className="text-center min-w-[50px]">
+            <span className="block text-lg font-bold">{likesCount}</span>
+            <span className="text-[9px] uppercase tracking-widest font-bold text-on-surface/40">Curtidas</span>
           </div>
         </div>
 
         <div className="max-w-md space-y-3 mb-12">
           <div className="flex flex-col gap-3">
             <div className="flex gap-3">
-              <button 
-                onClick={onSubscribe}
-                className="flex-[2] py-4 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-95 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
-              >
-                <Crown size={18} fill="white" />
-                Assinar VIP
-              </button>
               <button 
                 onClick={handleFollow}
                 className={`flex-1 py-4 font-bold rounded-2xl transition-all uppercase tracking-widest text-[10px] border ${
@@ -2882,21 +2897,30 @@ const ScreenPublicProfile = ({
               >
                 {isFollowing ? 'Seguindo' : 'Seguir'}
               </button>
+              {onMessage && (
+                <button 
+                  onClick={() => onMessage(creator)}
+                  className="flex-1 py-4 bg-white border border-primary/20 text-primary font-black rounded-2xl shadow-sm active:scale-95 transition-all uppercase tracking-widest text-[10px] flex items-center justify-center gap-2"
+                >
+                  <MessageCircle size={16} />
+                  Mensagem
+                </button>
+              )}
             </div>
             
-            {onMessage && (
+            <div className="flex flex-col gap-2 mt-2">
               <button 
-                onClick={() => onMessage(creator)}
-                className="w-full py-4 bg-white border border-primary/20 text-primary font-black rounded-2xl shadow-sm active:scale-95 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
+                onClick={onSubscribe}
+                className="w-full py-4 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-95 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
               >
-                <MessageCircle size={18} />
-                Enviar Mensagem
+                <Crown size={18} fill="white" />
+                Assinar VIP
               </button>
-            )}
+              <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest text-center">
+                Acesso imediato a todo o conteúdo exclusivo
+              </p>
+            </div>
           </div>
-          <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">
-            Acesso imediato a todo o conteúdo exclusivo
-          </p>
         </div>
       </section>
 
@@ -2906,7 +2930,7 @@ const ScreenPublicProfile = ({
             onClick={() => setActiveTab('all')}
             className={`py-4 border-b-2 font-bold text-xs uppercase tracking-widest ${activeTab === 'all' ? 'border-primary text-primary' : 'border-transparent text-on-surface/40'}`}
           >
-            Criações
+            POST
           </button>
           <button 
             onClick={() => setActiveTab('exclusive')}
