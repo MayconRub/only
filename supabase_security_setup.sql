@@ -1,13 +1,31 @@
 -- PASSO 1: ATIVAR RLS
 ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
 
--- PASSO 2: POLICY DE ACESSO (POSTS)
+-- PASSO 2: POLICIES DE ACESSO (POSTS)
 -- Permitimos que todos vejam que o post existe (para mostrar o feed com blur)
--- A segurança real dos dados sensíveis (imagem/vídeo) será feita via View e Storage.
 DROP POLICY IF EXISTS "Allow authenticated users to view posts" ON posts;
 CREATE POLICY "Allow authenticated users to view posts" ON posts
 FOR SELECT TO authenticated
 USING (true);
+
+-- Permitir que criadores criem seus próprios posts
+DROP POLICY IF EXISTS "Allow users to insert their own posts" ON posts;
+CREATE POLICY "Allow users to insert their own posts" ON posts
+FOR INSERT TO authenticated
+WITH CHECK (auth.uid() = creator_id);
+
+-- Permitir que criadores atualizem seus próprios posts
+DROP POLICY IF EXISTS "Allow users to update their own posts" ON posts;
+CREATE POLICY "Allow users to update their own posts" ON posts
+FOR UPDATE TO authenticated
+USING (auth.uid() = creator_id)
+WITH CHECK (auth.uid() = creator_id);
+
+-- Permitir que criadores excluam seus próprios posts
+DROP POLICY IF EXISTS "Allow users to delete their own posts" ON posts;
+CREATE POLICY "Allow users to delete their own posts" ON posts
+FOR DELETE TO authenticated
+USING (auth.uid() = creator_id);
 
 -- PASSO 3 & 4: POLICY NO STORAGE (BUCKET 'posts')
 -- Certifique-se de que o bucket 'posts' está configurado como PRIVADO no painel do Supabase.

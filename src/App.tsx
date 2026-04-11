@@ -5403,7 +5403,8 @@ export default function App() {
     if (!post) return false;
     const isOwner = currentUserId && post.creator_id === currentUserId;
     const isGlobalAdmin = userProfile?.role === 'admin' || userProfile?.role === 'master';
-    const isUnlocked = post.is_locked === false;
+    const isLocked = post.is_locked === true || post.isLocked === true;
+    const isUnlocked = !isLocked;
     const isSubscribed = subscribedIds.has(post.creator_id);
 
     const access = !!(isOwner || isGlobalAdmin || isUnlocked || isSubscribed);
@@ -5842,7 +5843,7 @@ export default function App() {
         }
 
         // Fetch posts for this creator
-        const { data: postsData } = await supabase.from('posts').select('*, creator:profiles(*)').eq('creator_id', creatorId);
+        const { data: postsData } = await supabase.from('secure_posts').select('*, creator:profiles(*)').eq('creator_id', creatorId);
         
         const isGlobalAdmin = profile?.role === 'admin' || profile?.role === 'master';
 
@@ -5892,7 +5893,11 @@ export default function App() {
     try {
       const { error } = await supabase.from('posts').update({ caption: newCaption, is_locked: isLocked }).eq('id', postId);
       if (error) throw error;
-      setPosts(prev => prev.map(p => p.id === postId ? { ...p, caption: newCaption, isLocked, hasAccess: p.hasAccess } : p));
+      
+      const updateFn = (p: Post) => p.id === postId ? { ...p, caption: newCaption, isLocked, hasAccess: p.hasAccess } : p;
+      
+      setPosts(prev => prev.map(updateFn));
+      setPublicPosts(prev => prev.map(updateFn));
       setEditingPost(null);
     } catch (err) {
       console.error('Error updating post:', err);
