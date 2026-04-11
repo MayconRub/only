@@ -48,6 +48,7 @@ import {
   Edit2,
   Instagram,
   Twitter,
+  MapPin,
   Music,
   BarChart3,
   Users,
@@ -2373,23 +2374,53 @@ const ScreenProfile = ({
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-background"></div>
       </div>
 
-      <section className="max-w-4xl mx-auto px-6 text-center -mt-20 relative z-10">
-        <div className="relative inline-block mb-6">
-          <div 
-            className="relative w-40 h-40 md:w-48 md:h-48 rounded-full p-[4px] story-ring bg-background shadow-2xl cursor-pointer"
-            onClick={() => myStories.length > 0 && setActiveStoryIndex(0)}
-          >
-            <img src={creator?.avatar} className="w-full h-full object-cover rounded-full border-4 border-white" referrerPolicy="no-referrer" />
-            {myStories.length > 0 && (
-              <div className="absolute inset-0 rounded-full border-4 border-primary animate-pulse pointer-events-none"></div>
-            )}
+      <section className="max-w-4xl mx-auto px-6 text-left -mt-20 relative z-10">
+        <div className="flex justify-between items-end mb-6">
+          <div className="relative">
+            <div 
+              className="relative w-32 h-32 md:w-40 md:h-40 rounded-full p-[3px] story-ring bg-background shadow-2xl cursor-pointer"
+              onClick={() => myStories.length > 0 && setActiveStoryIndex(0)}
+            >
+              <img src={creator?.avatar} className="w-full h-full object-cover rounded-full border-4 border-white" referrerPolicy="no-referrer" />
+              {myStories.length > 0 && (
+                <div className="absolute inset-0 rounded-full border-4 border-primary animate-pulse pointer-events-none"></div>
+              )}
+              {/* Meta-style Verified Badge */}
+              <div className="absolute bottom-1 right-1 bg-[#0095f6] p-1 rounded-full border-2 border-white shadow-lg">
+                <Check size={12} className="text-white" strokeWidth={4} />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3 mb-4">
+            <button 
+              onClick={() => {
+                const url = `${window.location.origin}/?u=${creator.username}`;
+                navigator.clipboard.writeText(url);
+                alert('Link do perfil copiado!');
+              }}
+              className="w-12 h-12 rounded-full border border-on-surface/10 bg-white/80 backdrop-blur-md flex items-center justify-center text-on-surface hover:bg-on-surface/5 transition-all active:scale-95 shadow-sm"
+            >
+              <Share2 size={20} />
+            </button>
+            <button 
+              onClick={onEdit}
+              className="w-12 h-12 rounded-full border border-on-surface/10 bg-white/80 backdrop-blur-md flex items-center justify-center text-on-surface hover:bg-on-surface/5 transition-all active:scale-95 shadow-sm"
+            >
+              <Edit2 size={20} />
+            </button>
           </div>
         </div>
-        <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator?.name}</h1>
-        <p className="text-sm text-primary font-bold mb-2">{creator?.bio}</p>
+
+        <div className="mb-6">
+          <h1 className="text-3xl font-black tracking-tight uppercase">{creator?.name}</h1>
+          <p className="text-sm text-on-surface/60 font-medium">@{creator?.username || creator?.name?.toLowerCase().replace(/\s+/g, '')}</p>
+        </div>
+
+        <p className="text-sm text-on-surface/80 font-medium mb-6 max-w-xl leading-relaxed">{creator?.bio}</p>
 
         {creator.social_links && (
-          <div className="flex justify-center gap-4 mb-4">
+          <div className="flex justify-start gap-4 mb-4">
             {creator.social_links.instagram && (
               <a href={creator.social_links.instagram} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
                 <Instagram size={24} />
@@ -2424,11 +2455,18 @@ const ScreenProfile = ({
               text={creator?.services_bio} 
               className="text-sm text-black leading-relaxed whitespace-pre-wrap"
             />
+            
+            <div className="mt-6 pt-6 border-t border-primary/5 flex items-center gap-3 text-on-surface/60">
+              <div className="bg-on-surface/5 p-2 rounded-xl">
+                <MapPin size={18} className="text-primary" />
+              </div>
+              <span className="text-xs font-bold uppercase tracking-widest">Montes Claros - Minas Gerais</span>
+            </div>
           </div>
         )}
 
         {isMaster && (
-          <div className="flex justify-center items-center gap-4 sm:gap-10 mb-10 py-6 px-4 sm:px-8 bg-white rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5 overflow-hidden">
+          <div className="flex justify-start items-center gap-4 sm:gap-10 mb-10 py-6 px-4 sm:px-8 bg-white rounded-3xl shadow-sm max-w-md border border-primary/5 overflow-hidden">
             <div className="text-center min-w-[60px]">
               <span className="block text-xl font-bold">{myPosts.length}</span>
               <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
@@ -2446,7 +2484,7 @@ const ScreenProfile = ({
           </div>
         )}
         
-        <div className="flex flex-col gap-3 mb-10 max-w-md mx-auto">
+        <div className="flex flex-col gap-3 mb-10 max-w-md">
           {creator.role === 'admin' && onNavigateToAdmin && (
             <button 
               onClick={onNavigateToAdmin}
@@ -2704,23 +2742,55 @@ const ScreenPublicProfile = ({
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-background"></div>
       </div>
 
-      <section className="max-w-4xl mx-auto px-6 text-center -mt-20 relative z-10">
-        <div className="relative inline-block mb-6">
-          <div 
-            className="relative w-40 h-40 md:w-48 md:h-48 rounded-full p-[4px] story-ring bg-background shadow-2xl cursor-pointer"
-            onClick={() => myStories.length > 0 && setActiveStoryIndex(0)}
-          >
-            <img src={creator?.avatar} className="w-full h-full object-cover rounded-full border-4 border-white" referrerPolicy="no-referrer" />
-            {myStories.length > 0 && (
-              <div className="absolute inset-0 rounded-full border-4 border-primary animate-pulse pointer-events-none"></div>
+      <section className="max-w-4xl mx-auto px-6 text-left -mt-20 relative z-10">
+        <div className="flex justify-between items-end mb-6">
+          <div className="relative">
+            <div 
+              className="relative w-32 h-32 md:w-40 md:h-40 rounded-full p-[3px] story-ring bg-background shadow-2xl cursor-pointer"
+              onClick={() => myStories.length > 0 && setActiveStoryIndex(0)}
+            >
+              <img src={creator?.avatar} className="w-full h-full object-cover rounded-full border-4 border-white" referrerPolicy="no-referrer" />
+              {myStories.length > 0 && (
+                <div className="absolute inset-0 rounded-full border-4 border-primary animate-pulse pointer-events-none"></div>
+              )}
+              {/* Meta-style Verified Badge */}
+              <div className="absolute bottom-1 right-1 bg-[#0095f6] p-1 rounded-full border-2 border-white shadow-lg">
+                <Check size={12} className="text-white" strokeWidth={4} />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3 mb-4">
+            {onMessage && (
+              <button 
+                onClick={() => onMessage(creator)}
+                className="w-12 h-12 rounded-full border border-on-surface/10 bg-white/80 backdrop-blur-md flex items-center justify-center text-on-surface hover:bg-on-surface/5 transition-all active:scale-95 shadow-sm"
+              >
+                <MessageCircle size={22} />
+              </button>
             )}
+            <button 
+              onClick={handleFollow}
+              className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all active:scale-95 shadow-sm ${
+                isFollowing 
+                ? 'bg-primary border-primary text-white' 
+                : 'bg-white/80 backdrop-blur-md border-on-surface/10 text-on-surface hover:bg-on-surface/5'
+              }`}
+            >
+              <Star size={22} fill={isFollowing ? "currentColor" : "none"} />
+            </button>
           </div>
         </div>
-        <h1 className="text-4xl font-extrabold tracking-tight mb-2">{creator?.name}</h1>
-        <p className="text-sm text-primary font-bold mb-2">{creator?.bio}</p>
+
+        <div className="mb-6">
+          <h1 className="text-3xl font-black tracking-tight uppercase">{creator?.name}</h1>
+          <p className="text-sm text-on-surface/60 font-medium">@{creator?.username || creator?.name?.toLowerCase().replace(/\s+/g, '')}</p>
+        </div>
+
+        <p className="text-sm text-on-surface/80 font-medium mb-6 max-w-xl leading-relaxed">{creator?.bio}</p>
 
         {creator.social_links && (
-          <div className="flex justify-center gap-4 mb-4">
+          <div className="flex justify-start gap-4 mb-4">
             {creator.social_links.instagram && (
               <a href={creator.social_links.instagram} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
                 <Instagram size={24} />
@@ -2755,10 +2825,17 @@ const ScreenPublicProfile = ({
               text={creator?.services_bio} 
               className="text-sm text-black leading-relaxed whitespace-pre-wrap"
             />
+            
+            <div className="mt-6 pt-6 border-t border-primary/5 flex items-center gap-3 text-on-surface/60">
+              <div className="bg-on-surface/5 p-2 rounded-xl">
+                <MapPin size={18} className="text-primary" />
+              </div>
+              <span className="text-xs font-bold uppercase tracking-widest">Montes Claros - Minas Gerais</span>
+            </div>
           </div>
         )}
 
-        <div className="flex justify-center items-center gap-4 sm:gap-10 mb-10 py-6 px-4 sm:px-8 bg-white rounded-3xl shadow-sm max-w-md mx-auto border border-primary/5 overflow-hidden">
+        <div className="flex justify-start items-center gap-4 sm:gap-10 mb-10 py-6 px-4 sm:px-8 bg-white rounded-3xl shadow-sm max-w-md border border-primary/5 overflow-hidden">
           <div className="text-center min-w-[60px]">
             <span className="block text-xl font-bold">{myPosts.length}</span>
             <span className="text-[10px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
@@ -2775,7 +2852,7 @@ const ScreenPublicProfile = ({
           </div>
         </div>
 
-        <div className="max-w-md mx-auto space-y-3 mb-12">
+        <div className="max-w-md space-y-3 mb-12">
           <div className="flex flex-col gap-3">
             <div className="flex gap-3">
               <button 
