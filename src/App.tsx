@@ -2928,6 +2928,7 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
   const [step, setStep] = React.useState<'select' | 'pix'>('select');
   const [loading, setLoading] = React.useState(false);
   const [pixData, setPixData] = React.useState<{ qrCode: string, qrCodeBase64: string, paymentId: string } | null>(null);
+  const [paymentId, setPaymentId] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
 
@@ -2937,19 +2938,20 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
       setAmount(null);
       setCustomAmount('');
       setPixData(null);
+      setPaymentId(null);
       setSuccess(false);
     }
   }, [isOpen]);
 
   // Polling for payment status
   React.useEffect(() => {
-    if (!pixData?.paymentId || success) return;
+    if (!paymentId || success) return;
 
     const interval = setInterval(async () => {
       const { data } = await supabase
         .from('payments')
         .select('status')
-        .eq('id', pixData.paymentId)
+        .eq('id', paymentId)
         .single();
 
       if (data && data.status === 'approved') {
@@ -2959,7 +2961,7 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [pixData?.paymentId, success]);
+  }, [paymentId, success]);
 
   if (!isOpen) return null;
 
@@ -2985,18 +2987,28 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
           userId: user.id,
           creatorId: creator.id,
           planId: 'mimo',
-          duration: 0
+          duration: 0,
+          paymentId: paymentId // Reuse existing ID
         })
       });
 
       const data = await response.json();
-      if (data.error) throw new Error(data.error);
+      if (data.error) {
+        if (data.paymentId) setPaymentId(data.paymentId);
+        throw new Error(data.error);
+      }
       
       setPixData(data);
+      setPaymentId(data.paymentId);
       setStep('pix');
     } catch (error: any) {
       console.error("Erro ao gerar Pix para Mimo:", error);
-      alert(`Erro ao gerar Pix: ${error.message}`);
+      // If we have a paymentId, we can stay in a "waiting" state even if generation failed
+      if (paymentId) {
+        setStep('pix');
+      } else {
+        alert(`Erro ao gerar Pix: ${error.message}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -3091,36 +3103,61 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
                     {pixData?.qrCodeBase64 ? (
                       <img src={`data:image/png;base64,${pixData.qrCodeBase64}`} className="w-48 h-48" alt="QR Code PIX" />
                     ) : (
-                      <div className="w-48 h-48 bg-on-surface/5 animate-pulse rounded-xl" />
+                      <div className="w-48 h-48 bg-on-surface/5 flex flex-col items-center justify-center p-6 text-center gap-3">
+                        <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                        <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">
+                          Gerando QR Code...
+                        </p>
+                      </div>
                     )}
                   </div>
                   <p className="text-sm font-bold text-on-surface/80">
                     Valor: R$ {(amount || parseFloat(customAmount)).toFixed(2)}
                   </p>
-                  <p className="text-xs text-on-surface/60 mb-4">
-                    Escaneie o QR Code ou copie a chave PIX abaixo para enviar seu mimo.
-                  </p>
-                  <button
-                    onClick={handleCopyPix}
-                    className={`w-full py-4 font-black rounded-xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2 ${
-                      copied ? 'bg-green-500 text-white' : 'bg-on-surface text-white'
-                    }`}
-                  >
-                    {copied ? (
-                      <>
-                        <Check size={16} />
-                        Copiado!
-                      </>
-                    ) : (
-                      <>
-                        <QrCode size={16} />
-                        Copiar Chave PIX
-                      </>
-                    )}
-                  </button>
+                  
+                  {pixData ? (
+                    <>
+                      <p className="text-xs text-on-surface/60 mb-4">
+                        Escaneie o QR Code ou copie a chave PIX abaixo para enviar seu mimo.
+                      </p>
+                      <button
+                        onClick={handleCopyPix}
+                        className={`w-full py-4 font-black rounded-xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2 ${
+                          copied ? 'bg-green-500 text-white' : 'bg-on-surface text-white'
+                        }`}
+                      >
+                        {copied ? (
+                          <>
+                            <Check size={16} />
+                            Copiado!
+                          </>
+                        ) : (
+                          <>
+                            <QrCode size={16} />
+                            Copiar Chave PIX
+                          </>
+                        )}
+                      </button>
+                    </>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-xs text-amber-600 bg-amber-50 p-4 rounded-xl font-medium leading-relaxed">
+                        O Turbofy está processando seu pedido, mas a conexão falhou. <br/>
+                        <span className="font-bold">Verifique se o PIX já apareceu no seu banco</span> ou clique no botão abaixo para tentar recuperar o QR Code.
+                      </p>
+                      <button
+                        onClick={handleContinue}
+                        disabled={loading}
+                        className="w-full py-4 bg-on-surface text-white font-black rounded-xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
+                      >
+                        {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Recuperar QR Code'}
+                      </button>
+                    </div>
+                  )}
+                  
                   <div className="flex items-center justify-center gap-2 text-[10px] text-on-surface/40 font-bold uppercase tracking-widest">
                     <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
-                    Aguardando pagamento...
+                    Aguardando confirmação...
                   </div>
                 </div>
               )}
@@ -5621,6 +5658,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
   const [success, setSuccess] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pixData, setPixData] = useState<{ qrCode: string, qrCodeBase64: string, paymentId: string } | null>(null);
+  const [paymentId, setPaymentId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [checkingStatus, setCheckingStatus] = useState(false);
 
@@ -5665,6 +5703,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
       const description = `Assinatura ${selectedPlanData?.name} - ${creator.name}`;
       const duration = selectedPlanData?.duration || 30;
 
+      // Check if we already have a paymentId in state to reuse it
       const response = await fetch('/api/payments/pix', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -5675,7 +5714,8 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
           userId: currentUser.id,
           creatorId: creator.id,
           planId: selectedPlan,
-          duration
+          duration,
+          paymentId: paymentId
         })
       });
 
@@ -5685,26 +5725,37 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
         data = await response.json();
       } else {
         const text = await response.text();
-        throw new Error(`Erro do servidor Vercel: ${text.substring(0, 100)}`);
+        throw new Error(`Erro do servidor: ${text.substring(0, 100)}`);
       }
 
-      if (data.error) throw new Error(data.error);
+      if (data.error) {
+        if (data.paymentId) setPaymentId(data.paymentId);
+        throw new Error(data.error);
+      }
+      
       setPixData(data);
+      setPaymentId(data.paymentId);
     } catch (error: any) {
       console.error("Erro ao gerar Pix:", error);
-      alert(`Erro ao gerar Pix: ${error.message}`);
+      // If we have a paymentId, we can show the "waiting" UI even if generation failed
+      if (paymentId) {
+        // We don't have pixData yet, but we have an ID to poll
+      } else {
+        alert(`Erro ao gerar Pix: ${error.message}`);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const checkPaymentStatus = async () => {
-    if (!pixData?.paymentId || checkingStatus) return;
+    const currentPaymentId = pixData?.paymentId || paymentId;
+    if (!currentPaymentId || checkingStatus) return;
     
     setCheckingStatus(true);
     try {
       // First, try to sync with the server (which checks the platform directly)
-      const response = await fetch(`/api/payments/sync/${pixData.paymentId}`);
+      const response = await fetch(`/api/payments/sync/${currentPaymentId}`);
       const result = await response.json();
 
       if (result.status === 'approved') {
@@ -5730,13 +5781,16 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
 
   // Polling for payment status
   React.useEffect(() => {
-    if (!pixData?.paymentId) return;
+    if (!paymentId && !pixData?.paymentId) return;
 
     const interval = setInterval(async () => {
+      const currentId = pixData?.paymentId || paymentId;
+      if (!currentId) return;
+
       const { data } = await supabase
         .from('payments')
         .select('status')
-        .eq('id', pixData.paymentId)
+        .eq('id', currentId)
         .single();
 
       if (data && data.status === 'approved') {
@@ -5746,7 +5800,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
     }, 5000); // Check every 5 seconds
 
     return () => clearInterval(interval);
-  }, [pixData?.paymentId]);
+  }, [pixData?.paymentId, paymentId]);
 
   if (success) {
     return (
@@ -5910,41 +5964,68 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-2 flex flex-col items-center">
+                  <div className="space-y-4 flex flex-col items-center">
                     {/* QR Code */}
-                    <div className="w-36 h-36 bg-white rounded-2xl p-2 shadow-lg border border-on-surface/5 relative">
-                      <img 
-                        src={`data:image/jpeg;base64,${pixData.qrCodeBase64}`} 
-                        alt="Pix QR Code" 
-                        className="w-full h-full object-contain"
-                      />
+                    <div className="w-48 h-48 bg-white rounded-2xl p-3 shadow-lg border border-on-surface/5 relative flex items-center justify-center">
+                      {pixData?.qrCodeBase64 ? (
+                        <img 
+                          src={`data:image/jpeg;base64,${pixData.qrCodeBase64}`} 
+                          alt="Pix QR Code" 
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center gap-3 text-center p-4">
+                          <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                          <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest leading-tight">
+                            Processando no Turbofy...
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     {/* PIX Key Input */}
-                    <div className="w-full space-y-2">
-                      <div className="w-full bg-on-surface/5 border border-on-surface/10 rounded-2xl px-4 py-2 flex items-center gap-2">
-                        <input 
-                          readOnly 
-                          value={pixData.qrCode} 
-                          className="bg-transparent border-none outline-none flex-1 text-[10px] font-medium text-on-surface/60 truncate"
-                        />
-                      </div>
-                      
-                      <button 
-                        onClick={handleCopyPix}
-                        className="w-full py-3 bg-gradient-to-r from-rose-400 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-bold rounded-2xl shadow-lg active:scale-[0.98] transition-all"
-                      >
-                        {copied ? 'Copiado!' : 'Copiar chave Pix'}
-                      </button>
+                    <div className="w-full space-y-3">
+                      {pixData ? (
+                        <>
+                          <div className="w-full bg-on-surface/5 border border-on-surface/10 rounded-2xl px-4 py-3 flex items-center gap-2">
+                            <input 
+                              readOnly 
+                              value={pixData.qrCode} 
+                              className="bg-transparent border-none outline-none flex-1 text-[10px] font-medium text-on-surface/60 truncate"
+                            />
+                          </div>
+                          
+                          <button 
+                            onClick={handleCopyPix}
+                            className="w-full py-4 bg-gradient-to-r from-rose-400 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-black rounded-2xl shadow-lg active:scale-[0.98] transition-all uppercase tracking-widest text-xs"
+                          >
+                            {copied ? 'Copiado!' : 'Copiar chave Pix'}
+                          </button>
+                        </>
+                      ) : (
+                        <div className="space-y-3">
+                          <p className="text-[10px] text-amber-600 bg-amber-50 p-3 rounded-xl font-bold uppercase tracking-tight leading-relaxed text-center">
+                            O Turbofy está demorando. <br/>
+                            Se você já pagou, aguarde aqui.
+                          </p>
+                          <button 
+                            onClick={generatePix}
+                            disabled={loading}
+                            className="w-full py-4 bg-on-surface text-white font-black rounded-2xl shadow-lg active:scale-[0.98] transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
+                          >
+                            {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Tentar Recuperar QR Code'}
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="h-px bg-on-surface/5 w-full" />
 
                     {/* Status Polling */}
-                    <div className="flex flex-col items-center gap-1 w-full">
+                    <div className="flex flex-col items-center gap-2 w-full">
                       <div className="flex items-center gap-2 text-primary text-[10px] font-bold uppercase tracking-widest animate-pulse">
                         <div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                        Aguardando pagamento...
+                        Aguardando confirmação...
                       </div>
                       
                       <button 

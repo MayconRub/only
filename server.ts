@@ -28,90 +28,144 @@ function getSupabase() {
 app.post("/api/payments/pix", async (req, res) => {
   try {
     const body = req.body || {};
-    const { amount, description, payerEmail, userId, creatorId, planId, duration } = body;
+    const { amount, description, payerEmail, userId, creatorId, planId, duration, paymentId } = body;
 
     if (!process.env.TURBOFY_CLIENT_ID || !process.env.TURBOFY_CLIENT_SECRET) {
       return res.status(500).json({ error: "Turbofy credentials not configured." });
     }
 
-    // Initialize Turbofy/Gawget Client inside the route to prevent boot crashes
     const turbofyClient = createTurbofyClient({
       baseUrl: "https://api.turbofypay.com",
       credentials: {
         clientId: process.env.TURBOFY_CLIENT_ID.replace(/^["']|["']$/g, '').trim(),
         clientSecret: process.env.TURBOFY_CLIENT_SECRET.replace(/^["']|["']$/g, '').trim(),
       },
+      timeoutMs: 60000, // Increase timeout to 60s
     });
 
     const supabase = getSupabase();
 
-    // Validate input data
     if (!userId || !creatorId || isNaN(amount) || amount <= 0) {
-      console.error("Invalid payment data received:", { userId, creatorId, amount, planId });
-      return res.status(400).json({ error: "Dados de pagamento inválidos. Certifique-se de estar logado." });
+      return res.status(400).json({ error: "Dados de pagamento inválidos." });
     }
 
-    // Create a payment record in Supabase first to get an ID
-    const { data: paymentRecord, error: dbError } = await supabase
-      .from("payments")
-      .insert({
-        user_id: userId,
-        creator_id: creatorId,
-        amount: amount,
-        plan_id: planId,
-        duration: duration || 30,
-        status: "pending",
-      })
-      .select()
-      .single();
-
-    if (dbError || !paymentRecord) {
-      console.error("Database error creating payment:", JSON.stringify(dbError, null, 2));
-      return res.status(500).json({ 
-        error: "Falha ao registrar pagamento no banco de dados.",
-        details: dbError?.message || "Erro desconhecido"
-      });
-    }
-
-    // Convert amount to cents for Turbofy (e.g. 29.90 -> 2990)
-    const amountCents = Math.round(amount * 100);
-
-    // Request to Turbofy/Gawget with retries for network/5xx errors
-    let charge;
-    let attempts = 0;
-    const maxAttempts = 3;
+    let paymentRecord;
     
-    while (attempts < maxAttempts) {
-      try {
-        charge = await turbofyClient.pix.createCharge({
-          amountCents: amountCents,
-          description: (description || "Assinatura").substring(0, 100),
-          externalRef: paymentRecord.id.replace(/[^a-zA-Z0-9-]/g, ''),
-          metadata: {
-            userId: userId,
-            creatorId: creatorId,
-            planId: planId
-          }
-        });
-        break; // Success
-      } catch (err: any) {
-        attempts++;
-        console.error(`Payment attempt ${attempts} failed:`, err.message);
-        if (attempts >= maxAttempts) throw err;
-        // Exponential backoff
-        await new Promise(resolve => setTimeout(resolve, 1500 * attempts));
+    // SURGICAL IDEMPOTENCY: Check for existing pending payment first
+    // We check for user, creator, amount and plan to avoid creating duplicates
+    const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    
+    if (paymentId) {
+      const { data: existing } = await supabase
+        .from("payments")
+        .select("*")
+        .eq("id", paymentId)
+        .single();
+      paymentRecord = existing;
+    }
+
+    if (!paymentRecord) {
+      const { data: recentPending } = await supabase
+        .from("payments")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("creator_id", creatorId)
+        .eq("amount", amount)
+        .eq("plan_id", planId)
+        .eq("status", "pending")
+        .gt("created_at", fiveMinsAgo)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (recentPending) {
+        console.log("[PIX] Reusing recent pending payment:", recentPending.id);
+        paymentRecord = recentPending;
       }
     }
 
-    if (!charge) throw new Error("Não foi possível gerar a cobrança no serviço de pagamentos.");
+    if (!paymentRecord) {
+      const { data: newRecord, error: dbError } = await supabase
+        .from("payments")
+        .insert({
+          user_id: userId,
+          creator_id: creatorId,
+          amount: amount,
+          plan_id: planId,
+          duration: duration || 30,
+          status: "pending",
+        })
+        .select()
+        .single();
 
-    // Update the record with the Turbofy payment ID
+      if (dbError || !newRecord) throw new Error("Falha ao registrar pagamento no banco de dados.");
+      paymentRecord = newRecord;
+    }
+
+    // If we already have a platform ID, try to recover it immediately
+    if (paymentRecord.mp_payment_id) {
+      try {
+        // @ts-ignore
+        const charge = await turbofyClient.pix.getCharge({ id: paymentRecord.mp_payment_id });
+        if (charge && charge.pix) {
+          return res.json({
+            paymentId: paymentRecord.id,
+            qrCodeBase64: charge.pix.qrCode,
+            qrCode: charge.pix.copyPaste,
+          });
+        }
+      } catch (e) {
+        console.log("[PIX] Platform ID exists but fetch failed, proceeding to createCharge.");
+      }
+    }
+
+    const amountCents = Math.round(amount * 100);
+    let charge;
+    let attempts = 0;
+    const maxAttempts = 3; // Increase to 3 attempts
+    
+    while (attempts < maxAttempts) {
+      try {
+        console.log(`[PIX] Creating charge for ${paymentRecord.id} (Attempt ${attempts + 1})`);
+        charge = await turbofyClient.pix.createCharge({
+          amountCents: amountCents,
+          description: (description || "Pagamento").substring(0, 100),
+          externalRef: paymentRecord.id,
+          metadata: { userId, creatorId, planId }
+        });
+        break;
+      } catch (err: any) {
+        attempts++;
+        const errorMessage = err.message || "Unknown error";
+        let statusCode = err.status || (err.response && err.response.status);
+        
+        // Manual detection for Cloudflare errors if status is missing
+        if (!statusCode) {
+          if (errorMessage.includes("502")) statusCode = 502;
+          if (errorMessage.includes("504")) statusCode = 504;
+        }
+
+        console.error(`[PIX] Attempt ${attempts} failed (Status ${statusCode}):`, errorMessage.substring(0, 200));
+        
+        // If it's a conflict (409), it means it was created but we didn't get the ID
+        // Since we can't search by externalRef in the SDK, we are in a tough spot
+        // but we'll try to wait and retry createCharge - maybe it returns the existing one?
+        // (The user's screenshot suggests it doesn't, but we'll try)
+
+        if (attempts >= maxAttempts) throw err;
+        // Exponential backoff
+        await new Promise(resolve => setTimeout(resolve, 2000 * attempts));
+      }
+    }
+
+    if (!charge) throw new Error("Serviço de pagamentos indisponível.");
+
+    // Update record with platform ID
     await supabase
       .from("payments")
       .update({ mp_payment_id: charge.id })
       .eq("id", paymentRecord.id);
 
-    // Return the Pix data to the frontend
     res.json({
       paymentId: paymentRecord.id,
       qrCodeBase64: charge.pix.qrCode,
@@ -122,16 +176,21 @@ app.post("/api/payments/pix", async (req, res) => {
     
     let detailedError = error.message || "Erro interno no servidor";
     
-    // Detect HTML response (usually 502/504 from Cloudflare) or fetch failed
-    if (detailedError.includes("<!DOCTYPE html>") || detailedError.includes("<html>") || detailedError.includes("fetch failed")) {
-      detailedError = "O serviço de pagamentos está temporariamente instável ou em manutenção. Por favor, tente novamente em alguns instantes.";
+    const isNetworkError = detailedError.includes("fetch failed") || 
+                          detailedError.includes("ECONNRESET") || 
+                          detailedError.includes("ETIMEDOUT") ||
+                          detailedError.includes("socket hang up");
+
+    const isHtmlError = detailedError.includes("<!DOCTYPE html>") || detailedError.includes("<html>");
+
+    if (isNetworkError || isHtmlError) {
+      detailedError = "O serviço de pagamentos está demorando a responder. Como o PIX foi gerado no Turbofy, tente aguardar um momento ou clique em continuar novamente.";
     }
     
-    if (error.fieldErrors) {
-      detailedError += " Detalhes: " + JSON.stringify(error.fieldErrors);
-    }
-    
-    res.status(500).json({ error: detailedError });
+    res.status(500).json({ 
+      error: detailedError,
+      paymentId: (error as any).paymentId 
+    });
   }
 });
 
