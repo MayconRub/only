@@ -33,7 +33,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (profileError) {
         if (profileError.code === 'PGRST116') {
           // Profile doesn't exist, create it
-          const { data: userData } = await supabase.auth.getUser();
+          const { data: userData, error: userError } = await supabase.auth.getUser();
+          if (userError && (userError.message?.includes('Refresh Token Not Found') || userError.message?.includes('Invalid Refresh Token'))) {
+            supabase.auth.signOut();
+            return null;
+          }
           if (!userData.user) return null;
 
           const newProfile = {
@@ -141,10 +145,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, 15000);
 
     // Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error('Initial session fetch error:', error);
+        if (error.message?.includes('Refresh Token Not Found') || error.message?.includes('Invalid Refresh Token')) {
+          supabase.auth.signOut();
+        }
+      }
       handleAuthStateChange(session);
     }).catch(err => {
-      console.error('Initial session fetch error:', err);
+      console.error('Initial session fetch exception:', err);
       if (isMounted) {
         setLoading(false);
         setError('Erro ao conectar ao servidor de autenticação.');

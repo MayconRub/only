@@ -183,35 +183,60 @@ app.post("/api/webhooks/turbofy", async (req, res) => {
 
         // If approved, create/update the subscription
         if (isApproved) {
-          console.log(`Payment ${externalRef} is PAID, creating subscription`);
+          console.log(`Payment ${externalRef} is PAID, checking if it's a subscription or mimo`);
           const { data: paymentRecord, error: fetchError } = await supabase
             .from("payments")
             .select("*")
             .eq("id", externalRef)
             .single();
 
-          if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+          if (fetchError && fetchError.code !== 'PGRST116') {
             console.error("Error fetching payment record:", fetchError);
           }
 
           if (paymentRecord) {
-            // Create subscription
-            const duration = paymentRecord.duration || 30;
-            const endDate = new Date();
-            endDate.setDate(endDate.getDate() + duration);
+            // Only create subscription if it's NOT a mimo
+            if (paymentRecord.plan_id !== 'mimo') {
+              const duration = paymentRecord.duration || 30;
+              const endDate = new Date();
+              endDate.setDate(endDate.getDate() + duration);
 
-            const { error: subError } = await supabase.from("subscriptions").insert({
-              user_id: paymentRecord.user_id,
-              creator_id: paymentRecord.creator_id,
-              plan_id: paymentRecord.plan_id,
-              status: "active",
-              end_date: endDate.toISOString(),
-            });
+              const { error: subError } = await supabase.from("subscriptions").insert({
+                user_id: paymentRecord.user_id,
+                creator_id: paymentRecord.creator_id,
+                plan_id: paymentRecord.plan_id,
+                status: "active",
+                end_date: endDate.toISOString(),
+              });
 
-            if (subError) {
-              console.error("Error creating subscription:", subError);
+              if (subError) {
+                console.error("Error creating subscription:", subError);
+              } else {
+                console.log(`Subscription created for user ${paymentRecord.user_id}`);
+              }
             } else {
-              console.log(`Subscription created for user ${paymentRecord.user_id}`);
+              console.log(`Mimo payment ${externalRef} approved, recording in mimos table.`);
+              
+              // Create record in mimos table for better organization
+              const { error: mimoError } = await supabase.from("mimos").insert({
+                user_id: paymentRecord.user_id,
+                creator_id: paymentRecord.creator_id,
+                amount: paymentRecord.amount,
+                payment_id: paymentRecord.id,
+                status: "completed"
+              });
+
+              if (mimoError) {
+                console.error("Error creating mimo record:", mimoError);
+              }
+
+              // Create a notification for the creator
+              await supabase.from("notifications").insert({
+                user_id: paymentRecord.creator_id,
+                type: "mimo",
+                content: `Você recebeu um mimo de R$ ${paymentRecord.amount}!`,
+                metadata: { amount: paymentRecord.amount, sender_id: paymentRecord.user_id }
+              });
             }
           } else {
             console.warn(`Payment record not found for externalRef: ${externalRef}`);
@@ -297,6 +322,38 @@ app.get("/api/payments/sync/:paymentId", async (req, res) => {
             plan_id: paymentRecord.plan_id,
             status: "active",
             end_date: endDate.toISOString(),
+          });
+        }
+
+        return res.json({ status: "approved" });
+      } else if (charge && (status === "PAID" || status === "approved" || status === "succeeded") && paymentRecord.plan_id === 'mimo') {
+        // Update to approved
+        await supabase
+          .from("payments")
+          .update({ status: "approved" })
+          .eq("id", paymentId);
+
+        // Check if already recorded in mimos
+        const { data: existingMimo } = await supabase
+          .from("mimos")
+          .select("id")
+          .eq("payment_id", paymentId)
+          .maybeSingle();
+
+        if (!existingMimo) {
+          await supabase.from("mimos").insert({
+            user_id: paymentRecord.user_id,
+            creator_id: paymentRecord.creator_id,
+            amount: paymentRecord.amount,
+            payment_id: paymentRecord.id,
+            status: "completed"
+          });
+
+          await supabase.from("notifications").insert({
+            user_id: paymentRecord.creator_id,
+            type: "mimo",
+            content: `Você recebeu um mimo de R$ ${paymentRecord.amount}!`,
+            metadata: { amount: paymentRecord.amount, sender_id: paymentRecord.user_id }
           });
         }
 

@@ -819,6 +819,7 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
+  const [mimos, setMimos] = useState<any[]>([]);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [pixKey, setPixKey] = useState('');
   const [payoutName, setPayoutName] = useState('');
@@ -827,7 +828,7 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
   const [withdrawing, setWithdrawing] = useState(false);
   const [savingPayout, setSavingPayout] = useState(false);
   const [isPayoutInfoSaved, setIsPayoutInfoSaved] = useState(false);
-  const [activeTab, setActiveTab] = useState<'extracts' | 'subscribers' | 'sales'>('extracts');
+  const [activeTab, setActiveTab] = useState<'extracts' | 'subscribers' | 'sales' | 'mimos'>('extracts');
 
   const handleSavePayoutInfo = async () => {
     setSavingPayout(true);
@@ -1008,6 +1009,15 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
               }));
             setPurchases(sales);
           }
+
+          // Buscar mimos
+          const { data: mimosData } = await supabase
+            .from('mimos')
+            .select('*, profiles:user_id(name, username, avatar)')
+            .eq('creator_id', user.id)
+            .order('created_at', { ascending: false });
+          
+          setMimos(mimosData || []);
         } else {
           // Para assinantes, poderíamos mostrar histórico de gastos ou créditos
           setBalance('R$ 0,00');
@@ -1178,6 +1188,12 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
             >
               Vendas
             </button>
+            <button 
+              onClick={() => setActiveTab('mimos')}
+              className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'mimos' ? 'bg-primary text-white shadow-md' : 'text-on-surface/40 hover:bg-primary/5'}`}
+            >
+              Mimos
+            </button>
           </div>
 
           {activeTab === 'extracts' && (
@@ -1263,6 +1279,46 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
                 </div>
               ) : (
                 <p className="text-sm text-on-surface/60 px-1">{loading ? 'Carregando...' : 'Nenhuma venda ainda.'}</p>
+              )}
+            </section>
+          )}
+
+          {activeTab === 'mimos' && (
+            <section className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+              <div className="flex items-center justify-between px-1">
+                <h3 className="font-bold text-lg text-on-surface">Mimos Recebidos</h3>
+                <div className="bg-pink-50 text-pink-600 px-3 py-1 rounded-full flex items-center gap-1.5">
+                  <Gift size={12} />
+                  <span className="text-[10px] font-black uppercase tracking-widest">
+                    Total: R$ {mimos.reduce((acc, m) => acc + (m.amount || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+              {mimos.length > 0 ? (
+                <div className="bg-white rounded-3xl border border-primary/5 shadow-sm overflow-hidden">
+                  {mimos.map((mimo, index) => (
+                    <div key={mimo.id} className={`p-4 flex items-center justify-between ${index !== mimos.length - 1 ? 'border-b border-primary/5' : ''}`}>
+                      <div className="flex items-center gap-3">
+                        <img src={mimo.profiles?.avatar} alt={mimo.profiles?.name} className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
+                        <div>
+                          <p className="font-bold text-sm text-on-surface">{mimo.profiles?.name || 'Usuário'}</p>
+                          <p className="text-[10px] text-on-surface/60 font-medium">@{mimo.profiles?.username || 'usuario'} • {new Date(mimo.created_at).toLocaleDateString('pt-BR')}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-black text-pink-500 text-sm">R$ {Number(mimo.amount).toFixed(2)}</p>
+                        <span className="text-[9px] font-black text-on-surface/40 uppercase tracking-widest">Presente</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-white rounded-3xl border border-primary/5 shadow-sm p-10 text-center">
+                  <div className="w-16 h-16 bg-pink-50 text-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Gift size={32} />
+                  </div>
+                  <p className="text-sm text-on-surface/60 font-medium">Você ainda não recebeu nenhum mimo.</p>
+                </div>
               )}
             </section>
           )}
@@ -2866,17 +2922,91 @@ const ScreenProfile = ({
 };
 
 const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () => void, creator: Creator }) => {
+  const { user } = useAuth();
   const [amount, setAmount] = React.useState<number | null>(null);
   const [customAmount, setCustomAmount] = React.useState('');
   const [step, setStep] = React.useState<'select' | 'pix'>('select');
+  const [loading, setLoading] = React.useState(false);
+  const [pixData, setPixData] = React.useState<{ qrCode: string, qrCodeBase64: string, paymentId: string } | null>(null);
+  const [success, setSuccess] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      setStep('select');
+      setAmount(null);
+      setCustomAmount('');
+      setPixData(null);
+      setSuccess(false);
+    }
+  }, [isOpen]);
+
+  // Polling for payment status
+  React.useEffect(() => {
+    if (!pixData?.paymentId || success) return;
+
+    const interval = setInterval(async () => {
+      const { data } = await supabase
+        .from('payments')
+        .select('status')
+        .eq('id', pixData.paymentId)
+        .single();
+
+      if (data && data.status === 'approved') {
+        setSuccess(true);
+        clearInterval(interval);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [pixData?.paymentId, success]);
 
   if (!isOpen) return null;
 
   const predefinedAmounts = [5, 10, 20, 50];
 
-  const handleContinue = () => {
-    if (amount || customAmount) {
+  const handleContinue = async () => {
+    const finalAmount = amount || parseFloat(customAmount);
+    if (!finalAmount || finalAmount <= 0) return;
+    if (!user) {
+      alert('Você precisa estar logado para enviar um mimo.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch('/api/payments/pix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: finalAmount,
+          description: `Mimo para ${creator.name}`,
+          payerEmail: user.email,
+          userId: user.id,
+          creatorId: creator.id,
+          planId: 'mimo',
+          duration: 0
+        })
+      });
+
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      
+      setPixData(data);
       setStep('pix');
+    } catch (error: any) {
+      console.error("Erro ao gerar Pix para Mimo:", error);
+      alert(`Erro ao gerar Pix: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCopyPix = () => {
+    if (pixData?.qrCode) {
+      navigator.clipboard.writeText(pixData.qrCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -2888,72 +3018,113 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
             <X size={20} />
           </button>
           
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full border-4 border-pink-100 overflow-hidden">
-            <img src={creator?.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-          </div>
-          <h3 className="font-black text-lg mb-1">Enviar Mimo</h3>
-          <p className="text-xs text-on-surface/60 font-medium mb-6">Para {creator?.name}</p>
-
-          {step === 'select' ? (
-            <>
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                {predefinedAmounts.map(val => (
-                  <button
-                    key={val}
-                    onClick={() => { setAmount(val); setCustomAmount(''); }}
-                    className={`py-3 rounded-xl font-bold text-sm transition-all border ${
-                      amount === val 
-                      ? 'bg-pink-500 text-white border-pink-500' 
-                      : 'bg-on-surface/5 text-on-surface/80 border-transparent hover:bg-on-surface/10'
-                    }`}
-                  >
-                    R$ {val},00
-                  </button>
-                ))}
+          {success ? (
+            <div className="py-8 animate-in fade-in zoom-in-95">
+              <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center text-white mx-auto mb-6 shadow-xl shadow-green-100">
+                <Check size={40} strokeWidth={3} />
               </div>
-              
-              <div className="relative mb-6">
-                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                  <span className="text-on-surface/40 font-bold">R$</span>
-                </div>
-                <input
-                  type="number"
-                  placeholder="Outro valor"
-                  value={customAmount}
-                  onChange={(e) => { setCustomAmount(e.target.value); setAmount(null); }}
-                  className="w-full bg-on-surface/5 border border-transparent rounded-xl py-3 pl-12 pr-4 font-bold text-on-surface focus:outline-none focus:border-pink-500/30 focus:bg-white transition-all"
-                />
-              </div>
-
-              <button
-                onClick={handleContinue}
-                disabled={!amount && !customAmount}
-                className="w-full py-4 bg-pink-500 text-white font-black rounded-xl shadow-lg shadow-pink-500/20 active:scale-95 transition-all uppercase tracking-widest text-xs disabled:opacity-50 disabled:active:scale-100"
-              >
-                Continuar
-              </button>
-            </>
-          ) : (
-            <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
-              <div className="bg-on-surface/5 p-4 rounded-xl flex items-center justify-center mb-4">
-                <QrCode size={120} className="text-on-surface/20" />
-              </div>
-              <p className="text-sm font-bold text-on-surface/80">
-                Valor: R$ {amount || customAmount}
-              </p>
-              <p className="text-xs text-on-surface/60 mb-4">
-                Escaneie o QR Code ou copie a chave PIX abaixo para enviar seu mimo.
+              <h3 className="font-black text-xl mb-2">Mimo Enviado!</h3>
+              <p className="text-sm text-on-surface/60 font-medium mb-8">
+                Seu presente foi enviado com sucesso para <span className="text-primary font-bold">{creator?.name}</span>.
               </p>
               <button
-                onClick={() => {
-                  alert('Chave PIX copiada!');
-                  onClose();
-                }}
+                onClick={onClose}
                 className="w-full py-4 bg-on-surface text-white font-black rounded-xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs"
               >
-                Copiar Chave PIX
+                Fechar
               </button>
             </div>
+          ) : (
+            <>
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full border-4 border-pink-100 overflow-hidden">
+                <img src={creator?.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              </div>
+              <h3 className="font-black text-lg mb-1">Enviar Mimo</h3>
+              <p className="text-xs text-on-surface/60 font-medium mb-6">Para {creator?.name}</p>
+
+              {step === 'select' ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    {predefinedAmounts.map(val => (
+                      <button
+                        key={val}
+                        onClick={() => { setAmount(val); setCustomAmount(''); }}
+                        className={`py-3 rounded-xl font-bold text-sm transition-all border ${
+                          amount === val 
+                          ? 'bg-pink-500 text-white border-pink-500' 
+                          : 'bg-on-surface/5 text-on-surface/80 border-transparent hover:bg-on-surface/10'
+                        }`}
+                      >
+                        R$ {val},00
+                      </button>
+                    ))}
+                  </div>
+                  
+                  <div className="relative mb-6">
+                    <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                      <span className="text-on-surface/40 font-bold">R$</span>
+                    </div>
+                    <input
+                      type="number"
+                      placeholder="Outro valor"
+                      value={customAmount}
+                      onChange={(e) => { setCustomAmount(e.target.value); setAmount(null); }}
+                      className="w-full bg-on-surface/5 border border-transparent rounded-xl py-3 pl-12 pr-4 font-bold text-on-surface focus:outline-none focus:border-pink-500/30 focus:bg-white transition-all"
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleContinue}
+                    disabled={(!amount && !customAmount) || loading}
+                    className="w-full py-4 bg-pink-500 text-white font-black rounded-xl shadow-lg shadow-pink-500/20 active:scale-95 transition-all uppercase tracking-widest text-xs disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
+                  >
+                    {loading ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      'Continuar'
+                    )}
+                  </button>
+                </>
+              ) : (
+                <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+                  <div className="bg-white p-4 rounded-2xl border-2 border-primary/5 flex items-center justify-center mb-4 shadow-inner">
+                    {pixData?.qrCodeBase64 ? (
+                      <img src={`data:image/png;base64,${pixData.qrCodeBase64}`} className="w-48 h-48" alt="QR Code PIX" />
+                    ) : (
+                      <div className="w-48 h-48 bg-on-surface/5 animate-pulse rounded-xl" />
+                    )}
+                  </div>
+                  <p className="text-sm font-bold text-on-surface/80">
+                    Valor: R$ {(amount || parseFloat(customAmount)).toFixed(2)}
+                  </p>
+                  <p className="text-xs text-on-surface/60 mb-4">
+                    Escaneie o QR Code ou copie a chave PIX abaixo para enviar seu mimo.
+                  </p>
+                  <button
+                    onClick={handleCopyPix}
+                    className={`w-full py-4 font-black rounded-xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2 ${
+                      copied ? 'bg-green-500 text-white' : 'bg-on-surface text-white'
+                    }`}
+                  >
+                    {copied ? (
+                      <>
+                        <Check size={16} />
+                        Copiado!
+                      </>
+                    ) : (
+                      <>
+                        <QrCode size={16} />
+                        Copiar Chave PIX
+                      </>
+                    )}
+                  </button>
+                  <div className="flex items-center justify-center gap-2 text-[10px] text-on-surface/40 font-bold uppercase tracking-widest">
+                    <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                    Aguardando pagamento...
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -5469,7 +5640,12 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
   }, [plans, selectedPlan]);
 
   React.useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setCurrentUser(data.user));
+    supabase.auth.getUser().then(({ data, error }) => {
+      if (error && (error.message?.includes('Refresh Token Not Found') || error.message?.includes('Invalid Refresh Token'))) {
+        supabase.auth.signOut();
+      }
+      setCurrentUser(data?.user || null);
+    });
   }, []);
 
   const handleCopyPix = () => {
@@ -6258,7 +6434,10 @@ export default function App() {
         let subscribedCreatorIds = new Set<string>();
         let purchasedPostIds = new Set<string>();
         
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError && (sessionError.message?.includes('Refresh Token Not Found') || sessionError.message?.includes('Invalid Refresh Token'))) {
+          supabase.auth.signOut();
+        }
         if (session?.user) {
           // Fetch active subscriptions
           const { data: activeSubs } = await supabase
@@ -6470,7 +6649,7 @@ export default function App() {
           const { data: { session }, error: sessionError } = await supabase.auth.getSession();
           if (sessionError) {
             console.error('Public profile session check error:', sessionError);
-            if (sessionError.message.includes('Refresh Token Not Found')) {
+            if (sessionError.message?.includes('Refresh Token Not Found') || sessionError.message?.includes('Invalid Refresh Token')) {
               supabase.auth.signOut();
             }
           }
