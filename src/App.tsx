@@ -2674,6 +2674,7 @@ const ScreenProfile = ({
           <WelcomeAudioPlayer audioUrl={creator.welcome_audio} />
         )}
 
+        {/* Temporariamente removido
         {creator?.services_bio && (
           <div className="bg-gradient-to-br from-white to-primary/5 p-6 rounded-[2rem] shadow-sm max-w-md mx-auto border border-primary/10 mb-8 text-left relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110 duration-500"></div>
@@ -2698,6 +2699,7 @@ const ScreenProfile = ({
             </div>
           </div>
         )}
+        */}
 
         <AtendimentoPresencialSection atendimentos={creator?.atendimento_presencial || []} />
 
@@ -3062,6 +3064,7 @@ const ScreenPublicProfile = ({
           <WelcomeAudioPlayer audioUrl={creator.welcome_audio} />
         )}
 
+        {/* Temporariamente removido
         {creator?.services_bio && (
           <div className="bg-gradient-to-br from-white to-primary/5 p-6 rounded-[2rem] shadow-sm max-w-md mx-auto border border-primary/10 mb-8 text-left relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110 duration-500"></div>
@@ -3086,27 +3089,11 @@ const ScreenPublicProfile = ({
             </div>
           </div>
         )}
+        */}
 
         <AtendimentoPresencialSection atendimentos={creator?.atendimento_presencial || []} />
 
-        <div className="flex justify-center items-center gap-4 sm:gap-8 mb-8 py-4 px-4 bg-white rounded-2xl shadow-sm max-w-[280px] border border-primary/5 overflow-hidden">
-          <div className="text-center min-w-[50px]">
-            <span className="block text-lg font-bold">{myPosts.length}</span>
-            <span className="text-[9px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
-          </div>
-          <div className="w-px h-6 bg-primary/10 flex-shrink-0"></div>
-          <div className="text-center min-w-[50px]">
-            <span className="block text-lg font-bold">{followerCount}</span>
-            <span className="text-[9px] uppercase tracking-widest font-bold text-on-surface/40">Seguidores</span>
-          </div>
-          <div className="w-px h-6 bg-primary/10 flex-shrink-0"></div>
-          <div className="text-center min-w-[50px]">
-            <span className="block text-lg font-bold">{likesCount}</span>
-            <span className="text-[9px] uppercase tracking-widest font-bold text-on-surface/40">Curtidas</span>
-          </div>
-        </div>
-
-        <div className="max-w-md space-y-3 mb-12">
+        <div className="max-w-md mx-auto space-y-3 mb-8">
           <div className="flex flex-col gap-3">
             <div className="flex gap-3">
               <button 
@@ -3142,6 +3129,23 @@ const ScreenPublicProfile = ({
                 Acesso imediato a todo o conteúdo exclusivo
               </p>
             </div>
+          </div>
+        </div>
+
+        <div className="flex justify-center items-center gap-4 sm:gap-8 mb-12 py-4 px-4 bg-white rounded-2xl shadow-sm max-w-[280px] mx-auto border border-primary/5 overflow-hidden">
+          <div className="text-center min-w-[50px]">
+            <span className="block text-lg font-bold">{myPosts.length}</span>
+            <span className="text-[9px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
+          </div>
+          <div className="w-px h-6 bg-primary/10 flex-shrink-0"></div>
+          <div className="text-center min-w-[50px]">
+            <span className="block text-lg font-bold">{followerCount}</span>
+            <span className="text-[9px] uppercase tracking-widest font-bold text-on-surface/40">Seguidores</span>
+          </div>
+          <div className="w-px h-6 bg-primary/10 flex-shrink-0"></div>
+          <div className="text-center min-w-[50px]">
+            <span className="block text-lg font-bold">{likesCount}</span>
+            <span className="text-[9px] uppercase tracking-widest font-bold text-on-surface/40">Curtidas</span>
           </div>
         </div>
       </section>
