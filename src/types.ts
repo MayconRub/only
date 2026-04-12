@@ -24,6 +24,12 @@ export interface Creator {
   birth_date?: string;
   cidade?: string;
   verificada?: boolean;
+  atendimento_presencial?: {
+    id: string;
+    duration: number;
+    price: number;
+    isPopular: boolean;
+  }[];
 }
 
 export interface Comment {

@@ -58,6 +58,7 @@ import {
   Shield,
   PieChart,
   List,
+  Timer,
   AlertCircle,
   Wallet
 } from 'lucide-react';
@@ -308,10 +309,13 @@ const TopNav = ({
 );
 
 const ScreenCreatorPlans = ({ onBack, profile }: { onBack: () => void, profile: any }) => {
+  const [activeTab, setActiveTab] = useState<'assinaturas' | 'atendimento'>('assinaturas');
   const [plans, setPlans] = useState<any[]>([]);
+  const [atendimentos, setAtendimentos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingPlan, setEditingPlan] = useState<any | null>(null);
+  const [editingAtendimento, setEditingAtendimento] = useState<any | null>(null);
 
   React.useEffect(() => {
     if (profile) {
@@ -321,6 +325,7 @@ const ScreenCreatorPlans = ({ onBack, profile }: { onBack: () => void, profile: 
         { id: 'yearly', name: 'Anual', price: '249.90', description: 'Economize 30% - 365 dias', badge: 'Melhor Valor', duration: 365, category: 'Promoções' },
       ];
       setPlans(existingPlans);
+      setAtendimentos(profile.atendimento_presencial || []);
       setLoading(false);
     }
   }, [profile]);
@@ -382,147 +387,324 @@ const ScreenCreatorPlans = ({ onBack, profile }: { onBack: () => void, profile: 
     }
   };
 
+  const handleSaveAtendimento = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAtendimento) return;
+    
+    setSaving(true);
+    try {
+      let updatedAtendimentos;
+      if (editingAtendimento.isNew) {
+        const { isNew, ...atendimentoData } = editingAtendimento;
+        updatedAtendimentos = [...atendimentos, { ...atendimentoData, id: Date.now().toString() }];
+      } else {
+        updatedAtendimentos = atendimentos.map(a => a.id === editingAtendimento.id ? editingAtendimento : a);
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ atendimento_presencial: updatedAtendimentos })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+      
+      setAtendimentos(updatedAtendimentos);
+      setEditingAtendimento(null);
+    } catch (err) {
+      console.error('Error saving atendimento:', err);
+      alert('Erro ao salvar atendimento.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteAtendimento = async (id: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir este atendimento?')) return;
+    
+    setSaving(true);
+    try {
+      const updatedAtendimentos = atendimentos.filter(a => a.id !== id);
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({ atendimento_presencial: updatedAtendimentos })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+      
+      setAtendimentos(updatedAtendimentos);
+    } catch (err) {
+      console.error('Error deleting atendimento:', err);
+      alert('Erro ao excluir atendimento.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) return <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto text-center">Carregando...</div>;
 
   return (
     <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
       <section className="mb-8 pt-8 flex justify-between items-center">
         <div>
-          <h1 className="text-4xl font-extrabold tracking-tight mb-1">Planos</h1>
-          <p className="text-on-surface/60 text-sm font-medium">Gerencie seus planos de assinatura.</p>
+          <h1 className="text-4xl font-extrabold tracking-tight mb-1">Planos & Serviços</h1>
+          <p className="text-on-surface/60 text-sm font-medium">Gerencie suas assinaturas e atendimentos.</p>
         </div>
         <button 
-          onClick={() => setEditingPlan({ isNew: true, name: '', price: '', description: '', badge: '', duration: 30, category: 'Assinaturas' })}
+          onClick={() => {
+            if (activeTab === 'assinaturas') {
+              setEditingPlan({ isNew: true, name: '', price: '', description: '', badge: '', duration: 30, category: 'Assinaturas' });
+            } else {
+              setEditingAtendimento({ isNew: true, duration: 15, price: '', isPopular: false });
+            }
+          }}
           className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md"
         >
-          + Novo Plano
+          + Novo {activeTab === 'assinaturas' ? 'Plano' : 'Atendimento'}
         </button>
       </section>
 
-      {editingPlan ? (
-        <div className="bg-white p-6 rounded-3xl border border-primary/10 shadow-sm mb-8">
-          <h2 className="text-xl font-black mb-4">{editingPlan.isNew ? 'Novo Plano' : 'Editar Plano'}</h2>
-          <form onSubmit={handleSavePlan} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-on-surface/60 mb-1">Nome do Plano</label>
-              <input 
-                required
-                value={editingPlan.name}
-                onChange={e => setEditingPlan({...editingPlan, name: e.target.value})}
-                className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
-                placeholder="Ex: Mensal"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-on-surface/60 mb-1">Preço (R$)</label>
-              <input 
-                required
-                type="number"
-                step="0.01"
-                value={editingPlan.price}
-                onChange={e => setEditingPlan({...editingPlan, price: e.target.value})}
-                className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
-                placeholder="Ex: 29.90"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-on-surface/60 mb-1">Descrição</label>
-              <input 
-                required
-                value={editingPlan.description}
-                onChange={e => setEditingPlan({...editingPlan, description: e.target.value})}
-                className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
-                placeholder="Ex: Acesso total por 30 dias"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-on-surface/60 mb-1">Duração (Dias)</label>
-              <input 
-                required
-                type="number"
-                value={editingPlan.duration || ''}
-                onChange={e => setEditingPlan({...editingPlan, duration: parseInt(e.target.value)})}
-                className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
-                placeholder="Ex: 30"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-on-surface/60 mb-1">Badge (Opcional)</label>
-              <input 
-                value={editingPlan.badge || ''}
-                onChange={e => setEditingPlan({...editingPlan, badge: e.target.value})}
-                className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
-                placeholder="Ex: Popular"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-on-surface/60 mb-1">Categoria</label>
-              <select 
-                value={editingPlan.category || 'Assinaturas'}
-                onChange={e => setEditingPlan({...editingPlan, category: e.target.value})}
-                className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
-              >
-                <option value="Assinaturas">Assinaturas</option>
-                <option value="Promoções">Promoções</option>
-              </select>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button 
-                type="button"
-                onClick={() => setEditingPlan(null)}
-                className="flex-1 py-3 rounded-xl font-bold text-on-surface/60 bg-surface hover:bg-surface/80"
-              >
-                Cancelar
-              </button>
-              <button 
-                type="submit"
-                disabled={saving}
-                className="flex-1 py-3 rounded-xl font-bold text-white bg-primary hover:bg-primary/90 disabled:opacity-50"
-              >
-                {saving ? 'Salvando...' : 'Salvar'}
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {plans.map((plan) => (
-            <div key={plan.id} className="bg-white p-5 rounded-2xl border border-primary/5 shadow-sm flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="font-black text-on-surface text-lg uppercase tracking-tight">{plan.name}</h3>
-                  {plan.badge && (
-                    <span className="bg-primary/10 text-primary text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">
-                      {plan.badge}
-                    </span>
-                  )}
+      <div className="flex gap-4 mb-8 border-b border-primary/10 pb-2">
+        <button 
+          onClick={() => setActiveTab('assinaturas')}
+          className={`font-bold text-sm pb-2 border-b-2 transition-colors ${activeTab === 'assinaturas' ? 'border-primary text-primary' : 'border-transparent text-on-surface/40 hover:text-on-surface/80'}`}
+        >
+          Assinaturas
+        </button>
+        <button 
+          onClick={() => setActiveTab('atendimento')}
+          className={`font-bold text-sm pb-2 border-b-2 transition-colors ${activeTab === 'atendimento' ? 'border-primary text-primary' : 'border-transparent text-on-surface/40 hover:text-on-surface/80'}`}
+        >
+          Atendimento Presencial
+        </button>
+      </div>
+
+      {activeTab === 'assinaturas' && (
+        <>
+          {editingPlan ? (
+            <div className="bg-white p-6 rounded-3xl border border-primary/10 shadow-sm mb-8">
+              <h2 className="text-xl font-black mb-4">{editingPlan.isNew ? 'Novo Plano' : 'Editar Plano'}</h2>
+              <form onSubmit={handleSavePlan} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-on-surface/60 mb-1">Nome do Plano</label>
+                  <input 
+                    required
+                    value={editingPlan.name}
+                    onChange={e => setEditingPlan({...editingPlan, name: e.target.value})}
+                    className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
+                    placeholder="Ex: Mensal"
+                  />
                 </div>
-                <p className="text-xs font-bold text-on-surface/60">{plan.description}</p>
-                <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest mt-1">Duração: {plan.duration || 30} dias | Categoria: {plan.category || 'Assinaturas'}</p>
-                <p className="text-primary font-black mt-2">R$ {parseFloat(plan.price).toFixed(2).replace('.', ',')}</p>
-              </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => setEditingPlan(plan)}
-                  className="w-10 h-10 rounded-full bg-surface flex items-center justify-center text-on-surface/60 hover:text-primary transition-colors"
-                >
-                  <Edit2 size={16} />
-                </button>
-                <button 
-                  onClick={() => handleDeletePlan(plan.id)}
-                  className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-500 hover:bg-red-100 transition-colors"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
+                <div>
+                  <label className="block text-xs font-bold text-on-surface/60 mb-1">Preço (R$)</label>
+                  <input 
+                    required
+                    type="number"
+                    step="0.01"
+                    value={editingPlan.price}
+                    onChange={e => setEditingPlan({...editingPlan, price: e.target.value})}
+                    className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
+                    placeholder="Ex: 29.90"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-on-surface/60 mb-1">Descrição</label>
+                  <input 
+                    required
+                    value={editingPlan.description}
+                    onChange={e => setEditingPlan({...editingPlan, description: e.target.value})}
+                    className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
+                    placeholder="Ex: Acesso total por 30 dias"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-on-surface/60 mb-1">Duração (Dias)</label>
+                  <input 
+                    required
+                    type="number"
+                    value={editingPlan.duration || ''}
+                    onChange={e => setEditingPlan({...editingPlan, duration: parseInt(e.target.value)})}
+                    className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
+                    placeholder="Ex: 30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-on-surface/60 mb-1">Badge (Opcional)</label>
+                  <input 
+                    value={editingPlan.badge || ''}
+                    onChange={e => setEditingPlan({...editingPlan, badge: e.target.value})}
+                    className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
+                    placeholder="Ex: Popular"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-on-surface/60 mb-1">Categoria</label>
+                  <select 
+                    value={editingPlan.category || 'Assinaturas'}
+                    onChange={e => setEditingPlan({...editingPlan, category: e.target.value})}
+                    className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
+                  >
+                    <option value="Assinaturas">Assinaturas</option>
+                    <option value="Promoções">Promoções</option>
+                  </select>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button 
+                    type="button"
+                    onClick={() => setEditingPlan(null)}
+                    className="flex-1 py-3 rounded-xl font-bold text-on-surface/60 bg-surface hover:bg-surface/80"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={saving}
+                    className="flex-1 py-3 rounded-xl font-bold text-white bg-primary hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {saving ? 'Salvando...' : 'Salvar'}
+                  </button>
+                </div>
+              </form>
             </div>
-          ))}
-          {plans.length === 0 && (
-            <div className="text-center py-10 text-on-surface/40 font-bold">
-              Nenhum plano cadastrado.
+          ) : (
+            <div className="space-y-4">
+              {plans.map((plan) => (
+                <div key={plan.id} className="bg-white p-5 rounded-2xl border border-primary/5 shadow-sm flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-black text-on-surface text-lg uppercase tracking-tight">{plan.name}</h3>
+                      {plan.badge && (
+                        <span className="bg-primary/10 text-primary text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">
+                          {plan.badge}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs font-bold text-on-surface/60">{plan.description}</p>
+                    <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest mt-1">Duração: {plan.duration || 30} dias | Categoria: {plan.category || 'Assinaturas'}</p>
+                    <p className="text-primary font-black mt-2">R$ {parseFloat(plan.price).toFixed(2).replace('.', ',')}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setEditingPlan(plan)}
+                      className="w-10 h-10 rounded-full bg-surface flex items-center justify-center text-on-surface/60 hover:text-primary transition-colors"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button 
+                      onClick={() => handleDeletePlan(plan.id)}
+                      className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-500 hover:bg-red-100 transition-colors"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {plans.length === 0 && (
+                <div className="text-center py-10 text-on-surface/40 font-bold">
+                  Nenhum plano cadastrado.
+                </div>
+              )}
             </div>
           )}
-        </div>
+        </>
+      )}
+
+      {activeTab === 'atendimento' && (
+        <>
+          {editingAtendimento ? (
+            <div className="bg-white p-6 rounded-3xl border border-primary/10 shadow-sm mb-8">
+              <h2 className="text-xl font-black mb-4">{editingAtendimento.isNew ? 'Novo Atendimento' : 'Editar Atendimento'}</h2>
+              <form onSubmit={handleSaveAtendimento} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-on-surface/60 mb-1">Duração (Minutos)</label>
+                  <input 
+                    required
+                    type="number"
+                    value={editingAtendimento.duration}
+                    onChange={e => setEditingAtendimento({...editingAtendimento, duration: parseInt(e.target.value)})}
+                    className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
+                    placeholder="Ex: 15"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-on-surface/60 mb-1">Preço (R$)</label>
+                  <input 
+                    required
+                    type="number"
+                    step="0.01"
+                    value={editingAtendimento.price}
+                    onChange={e => setEditingAtendimento({...editingAtendimento, price: e.target.value})}
+                    className="w-full bg-surface border border-primary/10 rounded-xl px-4 py-3 font-bold"
+                    placeholder="Ex: 100.00"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox"
+                    id="isPopular"
+                    checked={editingAtendimento.isPopular}
+                    onChange={e => setEditingAtendimento({...editingAtendimento, isPopular: e.target.checked})}
+                    className="w-4 h-4 text-primary border-primary/20 rounded"
+                  />
+                  <label htmlFor="isPopular" className="text-sm font-bold text-on-surface/80">Marcar como Popular</label>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button 
+                    type="button"
+                    onClick={() => setEditingAtendimento(null)}
+                    className="flex-1 py-3 rounded-xl font-bold text-on-surface/60 bg-surface hover:bg-surface/80"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={saving}
+                    className="flex-1 py-3 rounded-xl font-bold text-white bg-primary hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {saving ? 'Salvando...' : 'Salvar'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {atendimentos.map((atendimento) => (
+                <div key={atendimento.id} className="bg-white p-5 rounded-2xl border border-primary/5 shadow-sm flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-black text-on-surface text-lg uppercase tracking-tight">{atendimento.duration} Min</h3>
+                      {atendimento.isPopular && (
+                        <span className="bg-primary text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">
+                          Popular
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-primary font-black mt-2">R$ {parseFloat(atendimento.price).toFixed(2).replace('.', ',')}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setEditingAtendimento(atendimento)}
+                      className="w-10 h-10 rounded-full bg-surface flex items-center justify-center text-on-surface/60 hover:text-primary transition-colors"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteAtendimento(atendimento.id)}
+                      className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-500 hover:bg-red-100 transition-colors"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {atendimentos.length === 0 && (
+                <div className="text-center py-10 text-on-surface/40 font-bold">
+                  Nenhum atendimento cadastrado.
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -2291,6 +2473,40 @@ const WelcomeAudioPlayer = ({ audioUrl }: { audioUrl: string }) => {
   );
 };
 
+const AtendimentoPresencialSection = ({ atendimentos }: { atendimentos: any[] }) => {
+  if (!atendimentos || atendimentos.length === 0) return null;
+  
+  return (
+    <div className="mb-8">
+      <div className="flex items-center gap-2 mb-4 px-2">
+        <h3 className="text-xl font-black tracking-tight text-on-surface">Atendimento Presencial</h3>
+        <MapPin size={20} className="text-[#b30047]" fill="currentColor" />
+      </div>
+      <div className="flex gap-3 overflow-x-auto pb-4 snap-x px-2">
+        {atendimentos.map((item, index) => (
+          <div key={index} className="min-w-[110px] bg-[#fff0f5] rounded-3xl p-3 flex flex-col relative snap-start border border-[#ffe6ee]">
+            {item.isPopular && (
+              <div className="absolute top-2 right-2 bg-[#b30047] text-white text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full">
+                Popular
+              </div>
+            )}
+            <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center mb-3 shadow-sm">
+              <Timer size={18} className="text-[#b30047]" fill="currentColor" />
+            </div>
+            <div className="flex items-baseline gap-1 mb-1">
+              <span className="text-xl font-black text-on-surface">{item.duration}</span>
+              <span className="text-[10px] font-bold text-on-surface/40">Min</span>
+            </div>
+            <div className="text-base font-black text-[#b30047]">
+              {parseFloat(item.price).toFixed(2).replace('.', ',')} R$
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const ScreenProfile = ({ 
   onEdit, 
   creator, 
@@ -2480,6 +2696,8 @@ const ScreenProfile = ({
             </div>
           </div>
         )}
+
+        <AtendimentoPresencialSection atendimentos={creator?.atendimento_presencial || []} />
 
         {isMaster && (
           <div className="flex justify-center items-center gap-4 sm:gap-8 mb-8 py-4 px-4 bg-white rounded-2xl shadow-sm max-w-[280px] border border-primary/5 overflow-hidden">
@@ -2866,6 +3084,8 @@ const ScreenPublicProfile = ({
             </div>
           </div>
         )}
+
+        <AtendimentoPresencialSection atendimentos={creator?.atendimento_presencial || []} />
 
         <div className="flex justify-center items-center gap-4 sm:gap-8 mb-8 py-4 px-4 bg-white rounded-2xl shadow-sm max-w-[280px] border border-primary/5 overflow-hidden">
           <div className="text-center min-w-[50px]">
@@ -4320,7 +4540,7 @@ const ScreenCreatePost = ({ onBack, onPostCreated }: { onBack: () => void, onPos
   );
 };
 
-const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, onNavigateToRegister: () => void }) => {
+const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: (user?: any) => void, onNavigateToRegister: () => void }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -4334,9 +4554,9 @@ const ScreenLogin = ({ onLogin, onNavigateToRegister }: { onLogin: () => void, o
     setError(null);
     setResetMessage(null);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      onLogin();
+      onLogin(data.user);
     } catch (err: any) {
       setError(err.message || 'Erro ao entrar');
     } finally {
@@ -4904,7 +5124,7 @@ const ScreenAdminDashboard = ({ onBack }: { onBack: () => void }) => {
   );
 };
 
-const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => void, onNavigateToLogin: () => void }) => {
+const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: (user?: any) => void, onNavigateToLogin: () => void }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -4952,7 +5172,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: () => v
         }
       }
 
-      onRegister();
+      onRegister(data.user);
     } catch (err: any) {
       setError(err.message || 'Erro ao cadastrar');
     } finally {
@@ -6322,8 +6542,8 @@ export default function App() {
       if (screen === 'register') {
         return (
           <ScreenRegister 
-            onRegister={() => {
-              if (publicCreator) {
+            onRegister={(user) => {
+              if (publicCreator && user?.id !== publicCreator.id) {
                 setScreen('payment');
               } else {
                 setScreen('feed');
@@ -6335,8 +6555,8 @@ export default function App() {
       }
       return (
         <ScreenLogin 
-          onLogin={() => {
-            if (publicCreator) {
+          onLogin={(user) => {
+            if (publicCreator && user?.id !== publicCreator.id) {
               setScreen('payment');
             } else {
               setScreen('feed');
