@@ -3197,7 +3197,7 @@ const ScreenPublicProfile = ({
 
         <AtendimentoPresencialSection atendimentos={creator?.atendimento_presencial || []} />
 
-        <div className="max-w-md mx-auto space-y-3 mb-0">
+        <div className="max-w-md mx-auto space-y-3 mb-4">
           <div className="flex flex-col gap-3">
             <div className="flex gap-3">
               <button 
