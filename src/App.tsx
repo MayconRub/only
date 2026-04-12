@@ -2482,22 +2482,22 @@ const AtendimentoPresencialSection = ({ atendimentos }: { atendimentos: any[] })
         <h3 className="text-xl font-black tracking-tight text-on-surface">Atendimento Presencial</h3>
         <MapPin size={20} className="text-[#b30047]" fill="currentColor" />
       </div>
-      <div className="flex gap-3 overflow-x-auto pb-4 snap-x px-2">
+      <div className="grid grid-cols-2 gap-3 px-2">
         {atendimentos.map((item, index) => (
-          <div key={index} className="min-w-[110px] bg-[#fff0f5] rounded-3xl p-3 flex flex-col relative snap-start border border-[#ffe6ee]">
+          <div key={index} className="bg-[#fff0f5] rounded-3xl p-4 flex flex-col items-center text-center relative border border-[#ffe6ee] w-full">
             {item.isPopular && (
-              <div className="absolute top-2 right-2 bg-[#b30047] text-white text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full">
+              <div className="absolute -top-2 bg-[#b30047] text-white text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-full shadow-sm">
                 Popular
               </div>
             )}
-            <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center mb-3 shadow-sm">
-              <Timer size={18} className="text-[#b30047]" fill="currentColor" />
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center mb-3 shadow-sm">
+              <Timer size={24} className="text-[#b30047]" fill="currentColor" />
             </div>
-            <div className="flex items-baseline gap-1 mb-1">
-              <span className="text-xl font-black text-on-surface">{item.duration}</span>
-              <span className="text-[10px] font-bold text-on-surface/40">Min</span>
+            <div className="flex items-baseline justify-center gap-1 mb-1">
+              <span className="text-2xl font-black text-on-surface">{item.duration}</span>
+              <span className="text-xs font-bold text-on-surface/40">Min</span>
             </div>
-            <div className="text-base font-black text-[#b30047]">
+            <div className="text-lg font-black text-[#b30047]">
               {parseFloat(item.price).toFixed(2).replace('.', ',')} R$
             </div>
           </div>
