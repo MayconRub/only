@@ -59,6 +59,8 @@ import {
   PieChart,
   List,
   Timer,
+  Clock4,
+  House,
   AlertCircle,
   Wallet
 } from 'lucide-react';
@@ -2480,7 +2482,7 @@ const AtendimentoPresencialSection = ({ atendimentos }: { atendimentos: any[] })
     <div className="mb-8">
       <div className="flex items-center gap-2 mb-4 px-2">
         <h3 className="text-xl font-black tracking-tight text-on-surface">Atendimento Presencial</h3>
-        <MapPin size={20} className="text-[#b30047]" fill="currentColor" />
+        <House size={20} className="text-[#b30047]" />
       </div>
       <div className="grid grid-cols-2 gap-3 px-2">
         {atendimentos.map((item, index) => (
@@ -2491,7 +2493,7 @@ const AtendimentoPresencialSection = ({ atendimentos }: { atendimentos: any[] })
               </div>
             )}
             <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center mb-3 shadow-sm">
-              <Timer size={24} className="text-[#b30047]" fill="currentColor" />
+              <Clock4 size={24} className="text-[#b30047]" />
             </div>
             <div className="flex items-baseline justify-center gap-1 mb-1">
               <span className="text-2xl font-black text-on-surface">{item.duration}</span>
