@@ -2994,7 +2994,11 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
 
       const data = await response.json();
       if (data.error) {
-        if (data.paymentId) setPaymentId(data.paymentId);
+        if (data.paymentId) {
+          setPaymentId(data.paymentId);
+          setStep('pix');
+          return;
+        }
         throw new Error(data.error);
       }
       
@@ -5729,7 +5733,11 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
       }
 
       if (data.error) {
-        if (data.paymentId) setPaymentId(data.paymentId);
+        if (data.paymentId) {
+          setPaymentId(data.paymentId);
+          // Don't alert, let the UI show the recovery state
+          return;
+        }
         throw new Error(data.error);
       }
       
@@ -5940,7 +5948,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
                   </p>
                 </div>
 
-                {!pixData ? (
+                {!pixData && !paymentId ? (
                   <div className="space-y-2">
                     <button 
                       onClick={generatePix}
@@ -6531,15 +6539,19 @@ export default function App() {
           subscribedCreatorIds = new Set(activeSubs?.map(s => s.creator_id) || []);
 
           // Fetch purchased posts
-          const { data: userPayments } = await supabase
+          const { data: userPayments, error: paymentsError } = await supabase
             .from('payments')
             .select('post_id')
             .eq('user_id', session.user.id)
             .eq('status', 'approved');
           
-          userPayments?.forEach(p => {
-            if (p.post_id) purchasedPostIds.add(p.post_id);
-          });
+          if (paymentsError) {
+            console.warn('Error fetching purchased posts (post_id might be missing):', paymentsError);
+          } else {
+            userPayments?.forEach(p => {
+              if (p.post_id) purchasedPostIds.add(p.post_id);
+            });
+          }
         }
 
         // Fetch posts for this creator
