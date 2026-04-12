@@ -19,6 +19,8 @@ import {
   PlusCircle, 
   Bell, 
   User, 
+  UserPlus,
+  Gift,
   ArrowLeft,
   ArrowRight,
   MoreHorizontal,
@@ -2863,6 +2865,102 @@ const ScreenProfile = ({
   );
 };
 
+const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () => void, creator: Creator }) => {
+  const [amount, setAmount] = React.useState<number | null>(null);
+  const [customAmount, setCustomAmount] = React.useState('');
+  const [step, setStep] = React.useState<'select' | 'pix'>('select');
+
+  if (!isOpen) return null;
+
+  const predefinedAmounts = [5, 10, 20, 50];
+
+  const handleContinue = () => {
+    if (amount || customAmount) {
+      setStep('pix');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <div className="p-6 text-center relative">
+          <button onClick={onClose} className="absolute top-4 right-4 text-on-surface/40 hover:text-on-surface">
+            <X size={20} />
+          </button>
+          
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full border-4 border-pink-100 overflow-hidden">
+            <img src={creator?.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          </div>
+          <h3 className="font-black text-lg mb-1">Enviar Mimo</h3>
+          <p className="text-xs text-on-surface/60 font-medium mb-6">Para {creator?.name}</p>
+
+          {step === 'select' ? (
+            <>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                {predefinedAmounts.map(val => (
+                  <button
+                    key={val}
+                    onClick={() => { setAmount(val); setCustomAmount(''); }}
+                    className={`py-3 rounded-xl font-bold text-sm transition-all border ${
+                      amount === val 
+                      ? 'bg-pink-500 text-white border-pink-500' 
+                      : 'bg-on-surface/5 text-on-surface/80 border-transparent hover:bg-on-surface/10'
+                    }`}
+                  >
+                    R$ {val},00
+                  </button>
+                ))}
+              </div>
+              
+              <div className="relative mb-6">
+                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                  <span className="text-on-surface/40 font-bold">R$</span>
+                </div>
+                <input
+                  type="number"
+                  placeholder="Outro valor"
+                  value={customAmount}
+                  onChange={(e) => { setCustomAmount(e.target.value); setAmount(null); }}
+                  className="w-full bg-on-surface/5 border border-transparent rounded-xl py-3 pl-12 pr-4 font-bold text-on-surface focus:outline-none focus:border-pink-500/30 focus:bg-white transition-all"
+                />
+              </div>
+
+              <button
+                onClick={handleContinue}
+                disabled={!amount && !customAmount}
+                className="w-full py-4 bg-pink-500 text-white font-black rounded-xl shadow-lg shadow-pink-500/20 active:scale-95 transition-all uppercase tracking-widest text-xs disabled:opacity-50 disabled:active:scale-100"
+              >
+                Continuar
+              </button>
+            </>
+          ) : (
+            <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+              <div className="bg-on-surface/5 p-4 rounded-xl flex items-center justify-center mb-4">
+                <QrCode size={120} className="text-on-surface/20" />
+              </div>
+              <p className="text-sm font-bold text-on-surface/80">
+                Valor: R$ {amount || customAmount}
+              </p>
+              <p className="text-xs text-on-surface/60 mb-4">
+                Escaneie o QR Code ou copie a chave PIX abaixo para enviar seu mimo.
+              </p>
+              <button
+                onClick={() => {
+                  alert('Chave PIX copiada!');
+                  onClose();
+                }}
+                className="w-full py-4 bg-on-surface text-white font-black rounded-xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs"
+              >
+                Copiar Chave PIX
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ScreenPublicProfile = ({ 
   creator, 
   posts, 
@@ -2893,6 +2991,7 @@ const ScreenPublicProfile = ({
   const [openComments, setOpenComments] = React.useState(false);
   const [activeStoryIndex, setActiveStoryIndex] = React.useState<number | null>(null);
   const [isFollowing, setIsFollowing] = React.useState(false);
+  const [showMimoModal, setShowMimoModal] = React.useState(false);
   const [followerCount, setFollowerCount] = React.useState(Number(creator.stats?.followers || 0));
   const [likesCount, setLikesCount] = React.useState(Number(creator.stats?.likes || 0));
 
@@ -2946,6 +3045,11 @@ const ScreenPublicProfile = ({
   
   return (
     <div className="pt-0 pb-24">
+      <MimoModal 
+        isOpen={showMimoModal} 
+        onClose={() => setShowMimoModal(false)} 
+        creator={creator} 
+      />
       {/* Full Screen Modal */}
       <FullScreenPostModal 
         post={selectedPost} 
@@ -3000,7 +3104,7 @@ const ScreenPublicProfile = ({
                 onClick={() => onMessage(creator)}
                 className="w-12 h-12 rounded-full border border-on-surface/10 bg-white/80 backdrop-blur-md flex items-center justify-center text-on-surface hover:bg-on-surface/5 transition-all active:scale-95 shadow-sm"
               >
-                <MessageCircle size={22} />
+                <Mail size={22} />
               </button>
             )}
             <button 
@@ -3011,7 +3115,7 @@ const ScreenPublicProfile = ({
                 : 'bg-white/80 backdrop-blur-md border-on-surface/10 text-on-surface hover:bg-on-surface/5'
               }`}
             >
-              <Star size={22} fill={isFollowing ? "currentColor" : "none"} />
+              <UserPlus size={22} />
             </button>
           </div>
         </div>
@@ -3093,31 +3197,19 @@ const ScreenPublicProfile = ({
 
         <AtendimentoPresencialSection atendimentos={creator?.atendimento_presencial || []} />
 
-        <div className="max-w-md mx-auto space-y-3 mb-8">
+        <div className="max-w-md mx-auto space-y-3 mb-0">
           <div className="flex flex-col gap-3">
             <div className="flex gap-3">
               <button 
-                onClick={handleFollow}
-                className={`flex-1 py-4 font-bold rounded-2xl transition-all uppercase tracking-widest text-[10px] border ${
-                  isFollowing 
-                  ? 'bg-on-surface/5 border-on-surface/10 text-on-surface/60' 
-                  : 'bg-white border-primary/20 text-primary'
-                }`}
+                onClick={() => setShowMimoModal(true)}
+                className="w-full py-4 bg-pink-500 text-white font-black rounded-2xl shadow-sm shadow-pink-500/20 active:scale-95 transition-all uppercase tracking-widest text-[10px] flex items-center justify-center gap-2"
               >
-                {isFollowing ? 'Seguindo' : 'Seguir'}
+                <Gift size={16} />
+                Enviar MIMO
               </button>
-              {onMessage && (
-                <button 
-                  onClick={() => onMessage(creator)}
-                  className="flex-1 py-4 bg-white border border-primary/20 text-primary font-black rounded-2xl shadow-sm active:scale-95 transition-all uppercase tracking-widest text-[10px] flex items-center justify-center gap-2"
-                >
-                  <MessageCircle size={16} />
-                  Mensagem
-                </button>
-              )}
             </div>
             
-            <div className="flex flex-col gap-2 mt-2">
+            <div className="flex flex-col gap-2 mt-2 mb-0">
               <button 
                 onClick={onSubscribe}
                 className="w-full py-4 premium-gradient text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-95 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
@@ -3132,7 +3224,7 @@ const ScreenPublicProfile = ({
           </div>
         </div>
 
-        <div className="flex justify-center items-center gap-4 sm:gap-8 mb-12 py-4 px-4 bg-white rounded-2xl shadow-sm max-w-[280px] mx-auto border border-primary/5 overflow-hidden">
+        <div className="flex justify-center items-center gap-4 sm:gap-8 mb-4 py-4 px-4 bg-white rounded-2xl shadow-sm max-w-[280px] mx-auto border border-primary/5 overflow-hidden">
           <div className="text-center min-w-[50px]">
             <span className="block text-lg font-bold">{myPosts.length}</span>
             <span className="text-[9px] uppercase tracking-widest font-bold text-on-surface/40">Posts</span>
