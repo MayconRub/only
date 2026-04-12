@@ -2945,7 +2945,7 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
 
   // Polling for payment status
   React.useEffect(() => {
-    if (!paymentId || success) return;
+    if (!paymentId || paymentId === 'undefined' || success) return;
 
     const interval = setInterval(async () => {
       const { data } = await supabase
@@ -2999,7 +2999,7 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
       }
       
       setPixData(data);
-      setPaymentId(data.paymentId);
+      if (data.paymentId) setPaymentId(data.paymentId);
       setStep('pix');
     } catch (error: any) {
       console.error("Erro ao gerar Pix para Mimo:", error);
@@ -5734,7 +5734,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
       }
       
       setPixData(data);
-      setPaymentId(data.paymentId);
+      if (data.paymentId) setPaymentId(data.paymentId);
     } catch (error: any) {
       console.error("Erro ao gerar Pix:", error);
       // If we have a paymentId, we can show the "waiting" UI even if generation failed
@@ -5750,7 +5750,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
 
   const checkPaymentStatus = async () => {
     const currentPaymentId = pixData?.paymentId || paymentId;
-    if (!currentPaymentId || checkingStatus) return;
+    if (!currentPaymentId || currentPaymentId === 'undefined' || checkingStatus) return;
     
     setCheckingStatus(true);
     try {
@@ -5765,7 +5765,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
         const { data } = await supabase
           .from('payments')
           .select('status')
-          .eq('id', pixData.paymentId)
+          .eq('id', currentPaymentId)
           .single();
 
         if (data && data.status === 'approved') {
@@ -5785,7 +5785,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
 
     const interval = setInterval(async () => {
       const currentId = pixData?.paymentId || paymentId;
-      if (!currentId) return;
+      if (!currentId || currentId === 'undefined') return;
 
       const { data } = await supabase
         .from('payments')

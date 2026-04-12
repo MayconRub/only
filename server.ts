@@ -26,6 +26,7 @@ function getSupabase() {
 
 // API Route: Create Pix Payment
 app.post("/api/payments/pix", async (req, res) => {
+  let paymentRecord: any;
   try {
     const body = req.body || {};
     const { amount, description, payerEmail, userId, creatorId, planId, duration, paymentId } = body;
@@ -48,8 +49,6 @@ app.post("/api/payments/pix", async (req, res) => {
     if (!userId || !creatorId || isNaN(amount) || amount <= 0) {
       return res.status(400).json({ error: "Dados de pagamento inválidos." });
     }
-
-    let paymentRecord;
     
     // SURGICAL IDEMPOTENCY: Check for existing pending payment first
     // We check for user, creator, amount and plan to avoid creating duplicates
@@ -131,12 +130,19 @@ app.post("/api/payments/pix", async (req, res) => {
           amountCents: amountCents,
           description: (description || "Pagamento").substring(0, 100),
           externalRef: paymentRecord.id,
+          idempotencyKey: paymentRecord.id, // CRITICAL: Use our ID as idempotency key
           metadata: { userId, creatorId, planId }
         });
         break;
       } catch (err: any) {
         attempts++;
-        const errorMessage = err.message || "Unknown error";
+        let errorMessage = err.message || "Unknown error";
+        
+        // If the error message is HTML, it's likely a Cloudflare/Gateway error
+        if (errorMessage.includes("<!DOCTYPE html>") || errorMessage.includes("<html>")) {
+          errorMessage = "Turbofy Gateway Error (502/504)";
+        }
+
         let statusCode = err.status || (err.response && err.response.status);
         
         // Manual detection for Cloudflare errors if status is missing
@@ -148,11 +154,13 @@ app.post("/api/payments/pix", async (req, res) => {
         console.error(`[PIX] Attempt ${attempts} failed (Status ${statusCode}):`, errorMessage.substring(0, 200));
         
         // If it's a conflict (409), it means it was created but we didn't get the ID
-        // Since we can't search by externalRef in the SDK, we are in a tough spot
-        // but we'll try to wait and retry createCharge - maybe it returns the existing one?
-        // (The user's screenshot suggests it doesn't, but we'll try)
+        // With idempotencyKey, a retry of createCharge should return the existing one.
+        // If it still fails with 409, we might have a problem, but usually 409 means "already exists".
+        if (statusCode === 409 || errorMessage.toLowerCase().includes("already exists") || errorMessage.toLowerCase().includes("conflict")) {
+          console.log("[PIX] Conflict/Idempotency hit, retrying createCharge might return the existing one.");
+        }
 
-        if (attempts >= maxAttempts) throw err;
+        if (attempts >= maxAttempts) throw new Error(errorMessage);
         // Exponential backoff
         await new Promise(resolve => setTimeout(resolve, 2000 * attempts));
       }
@@ -171,27 +179,27 @@ app.post("/api/payments/pix", async (req, res) => {
       qrCodeBase64: charge.pix.qrCode,
       qrCode: charge.pix.copyPaste,
     });
-  } catch (error: any) {
-    console.error("Error creating Pix payment:", error);
-    
-    let detailedError = error.message || "Erro interno no servidor";
-    
-    const isNetworkError = detailedError.includes("fetch failed") || 
-                          detailedError.includes("ECONNRESET") || 
-                          detailedError.includes("ETIMEDOUT") ||
-                          detailedError.includes("socket hang up");
+    } catch (error: any) {
+      console.error("[PIX] Final Error:", error.message);
+      
+      let detailedError = error.message || "Erro interno no servidor";
+      
+      const isNetworkError = detailedError.includes("fetch failed") || 
+                            detailedError.includes("ECONNRESET") || 
+                            detailedError.includes("ETIMEDOUT") ||
+                            detailedError.includes("socket hang up");
 
-    const isHtmlError = detailedError.includes("<!DOCTYPE html>") || detailedError.includes("<html>");
+      const isHtmlError = detailedError.includes("<!DOCTYPE html>") || detailedError.includes("<html>");
 
-    if (isNetworkError || isHtmlError) {
-      detailedError = "O serviço de pagamentos está demorando a responder. Como o PIX foi gerado no Turbofy, tente aguardar um momento ou clique em continuar novamente.";
+      if (isNetworkError || isHtmlError) {
+        detailedError = "O serviço de pagamentos está demorando a responder. Como o PIX foi gerado no Turbofy, tente aguardar um momento ou clique em continuar novamente.";
+      }
+      
+      res.status(500).json({ 
+        error: detailedError,
+        paymentId: paymentRecord?.id 
+      });
     }
-    
-    res.status(500).json({ 
-      error: detailedError,
-      paymentId: (error as any).paymentId 
-    });
-  }
 });
 
 // API Route: Turbofy Webhook
