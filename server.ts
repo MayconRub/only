@@ -32,7 +32,7 @@ app.get("/api/payments/test-turbofy", async (req, res) => {
     }
 
     const turbofyClient = createTurbofyClient({
-      baseUrl: "https://api.turbofy.com.br",
+      baseUrl: "https://api.turbofypay.com",
       credentials: {
         clientId: process.env.TURBOFY_CLIENT_ID.replace(/^["']|["']$/g, '').trim(),
         clientSecret: process.env.TURBOFY_CLIENT_SECRET.replace(/^["']|["']$/g, '').trim(),
@@ -76,9 +76,9 @@ app.post("/api/payments/pix", async (req, res) => {
         clientId: process.env.TURBOFY_CLIENT_ID.replace(/^["']|["']$/g, '').trim(),
         clientSecret: process.env.TURBOFY_CLIENT_SECRET.replace(/^["']|["']$/g, '').trim(),
       },
-      timeoutMs: 60000,
+      timeoutMs: 90000,
       // @ts-ignore
-      retries: 3
+      retries: 5
     });
 
     const supabase = getSupabase();
@@ -158,18 +158,26 @@ app.post("/api/payments/pix", async (req, res) => {
     const amountCents = Math.round(amount * 100);
     let charge;
     let attempts = 0;
-    const maxAttempts = 3; // Increase to 3 attempts
+    const maxAttempts = 5; // Increase to 5 attempts
     
     while (attempts < maxAttempts) {
       try {
         console.log(`[PIX] Creating charge for ${paymentRecord.id} (Attempt ${attempts + 1})`);
-        charge = await turbofyClient.pix.createCharge({
+        
+        // Use a Promise.race to implement a manual timeout if the SDK hangs
+        const chargePromise = turbofyClient.pix.createCharge({
           amountCents: amountCents,
           description: (description || "Pagamento").substring(0, 100),
           externalRef: paymentRecord.id,
           idempotencyKey: paymentRecord.id, // CRITICAL: Use our ID as idempotency key
           metadata: { userId, creatorId, planId }
         });
+
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("SDK Timeout after 80s")), 80000)
+        );
+
+        charge = await Promise.race([chargePromise, timeoutPromise]);
         break;
       } catch (err: any) {
         attempts++;
@@ -186,20 +194,21 @@ app.post("/api/payments/pix", async (req, res) => {
         if (!statusCode) {
           if (errorMessage.includes("502")) statusCode = 502;
           if (errorMessage.includes("504")) statusCode = 504;
+          if (errorMessage.includes("Timeout")) statusCode = 504;
         }
 
         console.error(`[PIX] Attempt ${attempts} failed (Status ${statusCode}):`, errorMessage.substring(0, 200));
         
-        // If it's a conflict (409), it means it was created but we didn't get the ID
-        // With idempotencyKey, a retry of createCharge should return the existing one.
-        // If it still fails with 409, we might have a problem, but usually 409 means "already exists".
-        if (statusCode === 409 || errorMessage.toLowerCase().includes("already exists") || errorMessage.toLowerCase().includes("conflict")) {
-          console.log("[PIX] Conflict/Idempotency hit, retrying createCharge might return the existing one.");
+        // If it's a 502/504, wait significantly longer
+        if (statusCode === 502 || statusCode === 504) {
+          console.log(`[PIX] Gateway error detected, waiting 10s before retry...`);
+          await new Promise(resolve => setTimeout(resolve, 10000));
+        } else {
+          // Exponential backoff for other errors
+          await new Promise(resolve => setTimeout(resolve, 3000 * attempts));
         }
 
         if (attempts >= maxAttempts) throw new Error(errorMessage);
-        // Exponential backoff
-        await new Promise(resolve => setTimeout(resolve, 2000 * attempts));
       }
     }
 
@@ -404,7 +413,7 @@ app.get("/api/payments/sync/:paymentId", async (req, res) => {
         },
       });
 
-      const charge = await turbofyClient.pix.getCharge(paymentRecord.mp_payment_id);
+      const charge = await turbofyClient.pix.getCharge({ id: paymentRecord.mp_payment_id });
       const status = charge.status as string;
       
       if (charge && (status === "PAID" || status === "approved" || status === "succeeded")) {

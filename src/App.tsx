@@ -3790,7 +3790,7 @@ const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
   );
 };
 
-const ChatView = ({ recipient, onBack, onMessagesRead }: { recipient: Creator, onBack?: () => void, onMessagesRead?: () => void }) => {
+const ChatView = ({ recipient, onBack, onMessagesRead, onViewProfile }: { recipient: Creator, onBack?: () => void, onMessagesRead?: () => void, onViewProfile?: (id: string) => void }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -4057,7 +4057,10 @@ const ChatView = ({ recipient, onBack, onMessagesRead }: { recipient: Creator, o
             <ArrowLeft size={24} />
           </button>
         )}
-        <div className="flex items-center gap-3">
+        <div 
+          className="flex items-center gap-3 cursor-pointer"
+          onClick={() => onViewProfile?.(recipient?.id)}
+        >
           <img src={recipient?.avatar} className="w-10 h-10 rounded-full object-cover border border-primary/10" referrerPolicy="no-referrer" />
           <div>
             <h3 className="font-black text-sm uppercase tracking-tight">{recipient?.name}</h3>
@@ -4200,7 +4203,7 @@ const ChatView = ({ recipient, onBack, onMessagesRead }: { recipient: Creator, o
   );
 };
 
-const ScreenMessages = ({ messages, isMaster, onMessagesRead }: { messages: Message[], isMaster: boolean, onMessagesRead?: () => void }) => {
+const ScreenMessages = ({ messages, isMaster, onMessagesRead, onViewProfile }: { messages: Message[], isMaster: boolean, onMessagesRead?: () => void, onViewProfile?: (id: string) => void }) => {
   const [selectedRecipient, setSelectedRecipient] = useState<Creator | null>(null);
   const [contacts, setContacts] = useState<Creator[]>([]);
   const [loading, setLoading] = useState(true);
@@ -4243,7 +4246,7 @@ const ScreenMessages = ({ messages, isMaster, onMessagesRead }: { messages: Mess
   }, [isMaster]);
 
   if (selectedRecipient) {
-    return <ChatView recipient={selectedRecipient} onBack={() => setSelectedRecipient(null)} onMessagesRead={onMessagesRead} />;
+    return <ChatView recipient={selectedRecipient} onBack={() => setSelectedRecipient(null)} onMessagesRead={onMessagesRead} onViewProfile={onViewProfile} />;
   }
 
   return (
@@ -4262,7 +4265,7 @@ const ScreenMessages = ({ messages, isMaster, onMessagesRead }: { messages: Mess
             {contacts.map(contact => (
               <button 
                 key={contact.id} 
-                onClick={() => setSelectedRecipient(contact)}
+                onClick={() => onViewProfile?.(contact.id)}
                 className="flex flex-col items-center gap-2 min-w-[70px]"
               >
                 <img src={contact?.avatar} className="w-14 h-14 rounded-full object-cover border-2 border-primary/10 p-0.5" referrerPolicy="no-referrer" />
@@ -5878,7 +5881,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
               <div className="space-y-2">
                 <h3 className="font-bold text-slate-900 text-xs uppercase tracking-widest">Assinaturas</h3>
                 <div className="space-y-2">
-                  {plans.filter((p: any) => (p.category || 'Assinaturas') === 'Assinaturas').map((plan: any) => (
+                  {plans.filter((p: any) => p.category !== 'Promoções').map((plan: any) => (
                     <button
                       key={plan.id}
                       onClick={() => {
@@ -5888,7 +5891,7 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
                       className="w-full bg-gradient-to-r from-rose-400 to-rose-500 hover:from-rose-500 hover:to-rose-600 text-white font-bold py-3.5 px-6 rounded-full flex items-center justify-between transition-all active:scale-[0.98] shadow-sm"
                     >
                       <span className="text-sm">{plan.name}</span>
-                      <span className="text-sm">R$ {parseFloat(String(plan.price)).toFixed(2).replace('.', ',')}</span>
+                      <span className="text-sm">R$ {parseFloat(String(plan.price).replace(',', '.')).toFixed(2).replace('.', ',')}</span>
                     </button>
                   ))}
                 </div>
@@ -6625,32 +6628,60 @@ export default function App() {
   };
 
   const handleLikePost = async (postId: string, isLiked: boolean) => {
-    try {
-      if (!user) return;
+    if (!user) return;
 
+    // Optimistic update
+    const updatePosts = (postsList: any[]) => postsList.map(p => {
+      if (p.id === postId) {
+        const newLikesCount = isLiked ? Math.max(0, (p.likesCount || 0) - 1) : (p.likesCount || 0) + 1;
+        return {
+          ...p,
+          isLikedByMe: !isLiked,
+          likesCount: newLikesCount,
+          likes: String(newLikesCount)
+        };
+      }
+      return p;
+    });
+
+    setPosts(prev => updatePosts(prev) as any);
+    if (publicPosts.length > 0) {
+      setPublicPosts(prev => updatePosts(prev) as any);
+    }
+
+    try {
       if (isLiked) {
         const { error } = await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', user.id);
         if (error) throw error;
-        console.log('Unlike successful for post:', postId);
       } else {
         const { error } = await supabase.from('post_likes').insert({ post_id: postId, user_id: user.id });
-        if (error) {
-          if (error.code === '23505') {
-            console.log('User already liked this post');
-          } else {
-            throw error;
-          }
-        }
-        console.log('Like successful for post:', postId);
+        if (error && error.code !== '23505') throw error;
       }
-      // Refresh data to update counts and notifications
-      fetchData();
+      // We don't call fetchData() here to keep it fast. 
+      // Real-time listener will eventually sync if needed, or next manual refresh.
     } catch (err: any) {
+      // Revert optimistic update on error
+      const revertPosts = (postsList: any[]) => postsList.map(p => {
+        if (p.id === postId) {
+          const newLikesCount = isLiked ? (p.likesCount || 0) + 1 : Math.max(0, (p.likesCount || 0) - 1);
+          return {
+            ...p,
+            isLikedByMe: isLiked,
+            likesCount: newLikesCount,
+            likes: String(newLikesCount)
+          };
+        }
+        return p;
+      });
+      
+      setPosts(prev => revertPosts(prev) as any);
+      if (publicPosts.length > 0) {
+        setPublicPosts(prev => revertPosts(prev) as any);
+      }
+
       console.error('Error liking post:', err);
       if (err.code === 'PGRST116' || err.message?.includes('relation "public.post_likes" does not exist')) {
-        alert('Erro: As tabelas de curtidas não foram criadas no banco de dados. Por favor, execute o script SQL no painel do Supabase.');
-      } else {
-        alert('Erro ao processar curtida: ' + (err.message || 'Erro desconhecido'));
+        alert('Erro: As tabelas de curtidas não foram criadas no banco de dados.');
       }
     }
   };
@@ -6920,11 +6951,7 @@ export default function App() {
         return (
           <ScreenRegister 
             onRegister={(user) => {
-              if (publicCreator && user?.id !== publicCreator.id) {
-                setScreen('payment');
-              } else {
-                setScreen('feed');
-              }
+              setScreen('feed');
             }} 
             onNavigateToLogin={() => setScreen('login')} 
           />
@@ -6933,11 +6960,7 @@ export default function App() {
       return (
         <ScreenLogin 
           onLogin={(user) => {
-            if (publicCreator && user?.id !== publicCreator.id) {
-              setScreen('payment');
-            } else {
-              setScreen('feed');
-            }
+            setScreen('feed');
           }} 
           onNavigateToRegister={() => setScreen('register')} 
         />
@@ -7048,9 +7071,9 @@ export default function App() {
         if (isMaster) {
           return <ScreenActivity notifications={notifications} onRefresh={fetchData} />;
         } else {
-          return <ScreenMessages messages={messages} isMaster={isMaster} onMessagesRead={() => setRefreshKey(prev => prev + 1)} />;
+          return <ScreenMessages messages={messages} isMaster={isMaster} onMessagesRead={() => setRefreshKey(prev => prev + 1)} onViewProfile={handleViewProfile} />;
         }
-      case 'messages': return <ScreenMessages messages={messages} isMaster={isMaster} onMessagesRead={() => setRefreshKey(prev => prev + 1)} />;
+      case 'messages': return <ScreenMessages messages={messages} isMaster={isMaster} onMessagesRead={() => setRefreshKey(prev => prev + 1)} onViewProfile={handleViewProfile} />;
       case 'wallet': return <ScreenWallet onBack={() => setScreen('feed')} isMaster={isMaster} />;
       case 'subscriptions': return <ScreenSubscriptions onBack={() => setScreen('feed')} />;
       case 'search': return <ScreenSearch onViewProfile={handleViewProfile} />;
@@ -7061,7 +7084,7 @@ export default function App() {
       case 'create-post': return <ScreenCreatePost onBack={() => setScreen('feed')} onPostCreated={() => { setRefreshKey(prev => prev + 1); setScreen('feed'); }} />;
       case 'admin-dashboard': return <ScreenAdminDashboard onBack={() => setScreen('profile')} />;
       case 'payment': return <ScreenPayment onBack={() => setScreen('feed')} creator={publicCreator || profile} />;
-      case 'chat': return selectedRecipient ? <ChatView recipient={selectedRecipient} onBack={() => setScreen('messages')} onMessagesRead={() => setRefreshKey(prev => prev + 1)} /> : null;
+      case 'chat': return selectedRecipient ? <ChatView recipient={selectedRecipient} onBack={() => setScreen('messages')} onMessagesRead={() => setRefreshKey(prev => prev + 1)} onViewProfile={handleViewProfile} /> : null;
       default: return (
         <ScreenFeed 
           posts={posts} 
