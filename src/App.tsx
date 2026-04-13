@@ -834,7 +834,7 @@ const ScreenSubscriptions = ({ onBack }: { onBack: () => void }) => {
 const ScreenSubscriberArea = ({ onNavigate, onLogout, profile }: { onNavigate: (s: Screen) => void, onLogout: () => void, profile: any }) => {
   const menuItems = [
     { icon: MessageCircle, title: 'Chat', description: 'Converse com criador agora', screen: 'messages' as Screen },
-    { icon: UserPlus, title: 'Assinaturas', description: 'Veja os criador que você assina', screen: 'subscriptions' as Screen },
+    { icon: Crown, title: 'Área VIP', description: 'Veja os criador que você assina', screen: 'subscriber-area' as Screen },
     { icon: Wallet, title: 'Carteira', description: 'Escolha como paga e veja seus gastos', screen: 'wallet' as Screen },
     { icon: Activity, title: 'Atividades', description: 'Acesse suas mídias favoritas salvas', screen: 'activity' as Screen },
     { icon: Settings, title: 'Definições', description: 'Personalize sua experiência', screen: 'edit-profile' as Screen },
@@ -1508,9 +1508,9 @@ const BottomNav = ({ active, onChange, isMaster, unreadCount }: { active: Screen
       </button>
     )}
 
-    <button onClick={() => onChange(isMaster ? 'wallet' : 'subscriptions')} className={`flex flex-col items-center gap-1 transition-all ${(active === 'wallet' || active === 'subscriptions') ? 'text-primary' : 'text-on-surface/40'}`}>
-      <CreditCard size={24} />
-      <span className="text-[10px] font-bold">{isMaster ? 'Carteira' : 'Assinaturas'}</span>
+    <button onClick={() => onChange(isMaster ? 'wallet' : 'subscriber-area')} className={`flex flex-col items-center gap-1 transition-all ${(active === 'wallet' || active === 'subscriber-area') ? 'text-primary' : 'text-on-surface/40'}`}>
+      <Crown size={24} />
+      <span className="text-[10px] font-bold">{isMaster ? 'Carteira' : 'Área VIP'}</span>
     </button>
     
     <button onClick={() => onChange('activity')} className={`flex flex-col items-center gap-1 transition-all relative ${active === 'activity' ? 'text-primary' : 'text-on-surface/40'}`}>
@@ -3249,7 +3249,8 @@ const ScreenPublicProfile = ({
   onMessage,
   isLoggedIn,
   onForwardPost,
-  onNavigate
+  onNavigate,
+  onFollow
 }: { 
   creator: Creator, 
   posts: Post[], 
@@ -3260,7 +3261,8 @@ const ScreenPublicProfile = ({
   onMessage?: (creator: Creator) => void,
   isLoggedIn: boolean,
   onForwardPost?: (post: Post) => void,
-  onNavigate?: (screen: Screen) => void
+  onNavigate?: (screen: Screen) => void,
+  onFollow?: () => void
 }) => {
   const [activeTab, setActiveTab] = React.useState<'all' | 'exclusive'>('all');
   const myPosts = posts.filter(p => p.creator.id === creator.id).filter(p => activeTab === 'all' ? true : p.isLocked);
@@ -3319,6 +3321,7 @@ const ScreenPublicProfile = ({
       setIsFollowing(true);
       setFollowerCount(prev => prev + 1);
     }
+    if (onFollow) onFollow();
   };
   
   return (
@@ -4403,7 +4406,6 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
   const [name, setName] = useState(creator.name);
   const [username, setUsername] = useState(creator.username);
   const [bio, setBio] = useState(creator.bio);
-  const [servicesBio, setServicesBio] = useState(creator.services_bio || '');
   const [welcomeAudio, setWelcomeAudio] = useState(creator.welcome_audio || '');
   const [avatar, setAvatar] = useState(creator.avatar);
   const [coverImage, setCoverImage] = useState(creator.cover_image || '');
@@ -4519,7 +4521,6 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
         name,
         username,
         bio,
-        services_bio: servicesBio,
         welcome_audio: welcomeAudio,
         avatar,
         cover_image: coverImage,
@@ -6237,6 +6238,18 @@ export default function App() {
         console.log('Master profile not found');
       }
 
+      // Fetch followed creators
+      let followedCreatorIds: string[] = [];
+      try {
+        const { data: follows } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', user.id);
+        followedCreatorIds = follows?.map(f => f.following_id) || [];
+      } catch (err) {
+        console.warn('Error fetching follows:', err);
+      }
+
       // Fetch posts with likes and comments
       let postsData: any[] = [];
       let postsError: any = null;
@@ -6251,10 +6264,12 @@ export default function App() {
             post_comments (*, profiles:user_id (*))
           `);
         
-        // Only filter if masterId exists
-        if (masterId) {
-          query = query.eq('creator_id', masterId);
-        }
+        // Filter posts: user's own, master's, or followed creators
+        const relevantIds = [user.id];
+        if (masterId) relevantIds.push(masterId);
+        if (followedCreatorIds.length > 0) relevantIds.push(...followedCreatorIds);
+        
+        query = query.in('creator_id', relevantIds);
 
         const { data, error } = await query;
         
@@ -6284,10 +6299,12 @@ export default function App() {
       // 1. If user is a global admin, show ALL posts.
       // 2. If no masterId is found, show all posts.
       // 3. Always show user's OWN posts.
-      // 4. Otherwise, show only master's posts.
+      // 4. Show followed creators' posts.
+      // 5. Otherwise, show only master's posts.
       const filteredPostsData = postsData.filter((p: any) => {
         if (isGlobalAdmin) return true;
         if (p.creator_id === user.id) return true;
+        if (followedCreatorIds.includes(p.creator_id)) return true;
         if (!masterId) return true;
         return p.creator_id === masterId;
       });
@@ -6318,6 +6335,7 @@ export default function App() {
       const filteredStoriesData = storiesData.filter((s: any) => {
         if (isGlobalAdmin) return true;
         if (s.creator_id === user.id) return true;
+        if (followedCreatorIds.includes(s.creator_id)) return true;
         if (!masterId) return true;
         return s.creator_id === masterId;
       });
@@ -7140,6 +7158,7 @@ export default function App() {
               setForwardingPost(post);
             }}
             onNavigate={setScreen}
+            onFollow={() => fetchData()}
           />
         ) : (
           <ScreenFeed 
