@@ -24,6 +24,36 @@ function getSupabase() {
   return createClient(url, key);
 }
 
+// API Route: Test Turbofy Connection
+app.get("/api/payments/test-turbofy", async (req, res) => {
+  try {
+    if (!process.env.TURBOFY_CLIENT_ID || !process.env.TURBOFY_CLIENT_SECRET) {
+      return res.status(500).json({ error: "Credentials missing" });
+    }
+
+    const turbofyClient = createTurbofyClient({
+      baseUrl: "https://api.turbofy.com.br",
+      credentials: {
+        clientId: process.env.TURBOFY_CLIENT_ID.replace(/^["']|["']$/g, '').trim(),
+        clientSecret: process.env.TURBOFY_CLIENT_SECRET.replace(/^["']|["']$/g, '').trim(),
+      }
+    });
+
+    // Try a simple call
+    // @ts-ignore
+    const config = turbofyClient.config;
+    
+    res.json({ 
+      status: "Configured", 
+      baseUrl: config.baseUrl,
+      clientIdLength: process.env.TURBOFY_CLIENT_ID.length,
+      clientSecretLength: process.env.TURBOFY_CLIENT_SECRET.length
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // API Route: Create Pix Payment
 app.post("/api/payments/pix", async (req, res) => {
   let paymentRecord: any;
@@ -35,8 +65,13 @@ app.post("/api/payments/pix", async (req, res) => {
       return res.status(500).json({ error: "Turbofy credentials not configured." });
     }
 
+    console.log("[PIX] Using credentials:", {
+      idLength: process.env.TURBOFY_CLIENT_ID.length,
+      secretLength: process.env.TURBOFY_CLIENT_SECRET.length
+    });
+
     const turbofyClient = createTurbofyClient({
-      baseUrl: "https://api.turbofy.com.br",
+      baseUrl: "https://api.turbofypay.com",
       credentials: {
         clientId: process.env.TURBOFY_CLIENT_ID.replace(/^["']|["']$/g, '').trim(),
         clientSecret: process.env.TURBOFY_CLIENT_SECRET.replace(/^["']|["']$/g, '').trim(),
@@ -199,9 +234,10 @@ app.post("/api/payments/pix", async (req, res) => {
                             detailedError.includes("socket hang up");
 
       const isHtmlError = detailedError.includes("<!DOCTYPE html>") || detailedError.includes("<html>");
+      const is502 = detailedError.includes("502") || detailedError.includes("Bad gateway");
 
-      if (isNetworkError || isHtmlError) {
-        detailedError = "O serviço de pagamentos está demorando a responder. Como o PIX foi gerado no Turbofy, tente aguardar um momento ou clique em continuar novamente.";
+      if (isNetworkError || isHtmlError || is502) {
+        detailedError = "O serviço de pagamentos (Turbofy) está instável no momento (Erro 502). Como o PIX foi gerado no painel deles, tente aguardar um momento ou clique em 'Recuperar QR Code' novamente.";
       }
       
       res.status(500).json({ 

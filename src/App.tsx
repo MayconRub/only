@@ -6140,7 +6140,7 @@ export default function App() {
         masterId = masterProfile?.id;
         console.log('Master ID found:', masterId);
       } catch (e) {
-        console.log('Master profile not found, showing all posts');
+        console.log('Master profile not found');
       }
 
       // Fetch posts with likes and comments
@@ -6148,7 +6148,7 @@ export default function App() {
       let postsError: any = null;
 
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('secure_posts')
           .select(`
             *,
@@ -6156,6 +6156,13 @@ export default function App() {
             post_likes (*),
             post_comments (*, profiles:user_id (*))
           `);
+        
+        // Only filter if masterId exists
+        if (masterId) {
+          query = query.eq('creator_id', masterId);
+        }
+
+        const { data, error } = await query;
         
         if (error) throw error;
         postsData = data || [];
