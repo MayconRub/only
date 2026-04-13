@@ -812,6 +812,40 @@ const ScreenSubscriptions = ({ onBack }: { onBack: () => void }) => {
   );
 };
 
+const ScreenSubscriberArea = ({ onBack }: { onBack: () => void }) => {
+  const menuItems = [
+    { icon: MessageCircle, title: 'Chat', description: 'Converse com creators agora' },
+    { icon: UserPlus, title: 'Assinaturas', description: 'Veja os creators que você assina' },
+    { icon: Wallet, title: 'Carteira', description: 'Escolha como paga e veja seus gastos' },
+    { icon: Activity, title: 'Atividades', description: 'Acesse suas mídias favoritas salvas' },
+    { icon: Settings, title: 'Definições', description: 'Personalize sua experiência' },
+    { icon: AlertCircle, title: 'Ajuda', description: 'Precisa de suporte ou tem dúvidas?' },
+  ];
+
+  return (
+    <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
+      <section className="mb-8 pt-8">
+        <h1 className="text-4xl font-extrabold tracking-tight mb-1">Área do Assinante</h1>
+      </section>
+
+      <div className="grid grid-cols-2 gap-4">
+        {menuItems.map((item, index) => (
+          <button key={index} className="bg-white p-5 rounded-3xl border border-primary/5 shadow-sm text-left hover:border-primary/20 transition-all">
+            <item.icon className="text-primary mb-3" size={24} />
+            <h3 className="font-black text-on-surface text-base mb-1">{item.title}</h3>
+            <p className="text-xs text-on-surface/60 font-medium">{item.description}</p>
+          </button>
+        ))}
+      </div>
+
+      <button className="mt-8 w-full bg-white p-5 rounded-3xl border border-red-100 shadow-sm text-left text-red-500 font-bold flex items-center gap-3">
+        <ArrowLeft size={20} />
+        Sair da plataforma
+      </button>
+    </div>
+  );
+};
+
 const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: boolean }) => {
   const [balance, setBalance] = useState('R$ 0,00');
   const [availableBalance, setAvailableBalance] = useState(0);
@@ -2598,7 +2632,8 @@ const ScreenProfile = ({
   onCommentPost?: (id: string, content: string) => void,
   onMessage?: (creator: Creator) => void,
   onForwardPost?: (post: Post) => void,
-  onNavigateToAdmin?: () => void
+  onNavigateToAdmin?: () => void,
+  onNavigateToSubscriberArea?: () => void
 }) => {
   const [activeTab, setActiveTab] = React.useState<'all' | 'exclusive'>('all');
   const myPosts = (posts || []).filter(p => {
@@ -2650,7 +2685,7 @@ const ScreenProfile = ({
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-background"></div>
       </div>
 
-      <section className="max-w-4xl mx-auto px-6 text-left -mt-20 relative z-10">
+      <section className={`max-w-4xl mx-auto px-6 text-left relative z-10 ${myStories.length > 0 ? '-mt-20' : 'mt-6'}`}>
         <div className="flex justify-between items-end mb-6">
           <div className="relative">
             <div 
@@ -3269,7 +3304,20 @@ const ScreenPublicProfile = ({
           setSelectedPost(null);
           setOpenComments(false);
         }} 
-        onLike={onLikePost}
+        onLike={(id, isLiked) => {
+          if (onLikePost) onLikePost(id, isLiked);
+          // Update local state for the modal
+          if (selectedPost && selectedPost.id === id) {
+            const newLikesCount = isLiked ? Math.max(0, (selectedPost.likesCount || 0) - 1) : (selectedPost.likesCount || 0) + 1;
+            setSelectedPost({
+              ...selectedPost,
+              isLikedByMe: !isLiked,
+              likesCount: newLikesCount
+            });
+            // Update total likes count
+            setLikesCount(prev => isLiked ? Math.max(0, prev - 1) : prev + 1);
+          }
+        }}
         onComment={onCommentPost}
         onForward={onForwardPost}
         initialShowComments={openComments}
@@ -3367,7 +3415,7 @@ const ScreenPublicProfile = ({
           )}
         </div>
 
-        <p className="text-sm text-on-surface/80 font-medium mb-2 max-w-xl leading-relaxed">{creator?.bio}</p>
+        <p className="text-sm text-black font-medium mb-2 max-w-xl leading-relaxed">{creator?.bio}</p>
 
         {creator?.cidade && (
           <div className="flex items-center gap-1.5 text-on-surface/40 mb-6">
@@ -3455,18 +3503,12 @@ const ScreenPublicProfile = ({
       </section>
 
       <div className="sticky top-16 bg-white/80 backdrop-blur-md z-40 border-b border-primary/5 mb-6">
-        <div className="max-w-4xl mx-auto px-6 flex justify-around">
+        <div className="max-w-4xl mx-auto px-6 flex justify-center">
           <button 
             onClick={() => setActiveTab('all')}
             className={`py-4 border-b-2 font-bold text-xs uppercase tracking-widest ${activeTab === 'all' ? 'border-primary text-primary' : 'border-transparent text-on-surface/40'}`}
           >
-            POST
-          </button>
-          <button 
-            onClick={() => setActiveTab('exclusive')}
-            className={`py-4 border-b-2 font-bold text-xs uppercase tracking-widest ${activeTab === 'exclusive' ? 'border-primary text-primary' : 'border-transparent text-on-surface/40'}`}
-          >
-            Exclusivos
+            MIDIAS
           </button>
         </div>
       </div>
@@ -3512,7 +3554,7 @@ const ScreenPublicProfile = ({
               )}
               <div className="absolute top-3 right-3 z-10">
                 <div className="bg-black/40 backdrop-blur-md px-2 py-1 rounded-full text-white flex items-center gap-1 shadow-lg">
-                  <Heart size={12} fill="white" />
+                  <Heart size={12} fill={post.isLikedByMe ? "#ec4899" : "white"} className={post.isLikedByMe ? "text-pink-500" : ""} />
                   <span className="text-[10px] font-black">{post.likesCount || 0}</span>
                 </div>
               </div>
@@ -6564,8 +6606,16 @@ export default function App() {
           }
         }
 
-        // Fetch posts for this creator
-        const { data: postsData } = await supabase.from('secure_posts').select('*, creator:profiles(*)').eq('creator_id', creatorId);
+        // Fetch posts for this creator with likes and comments
+        const { data: postsData } = await supabase
+          .from('secure_posts')
+          .select(`
+            *,
+            creator:profiles(*),
+            post_likes (*),
+            post_comments (*)
+          `)
+          .eq('creator_id', creatorId);
         
         const isGlobalAdmin = profile?.role === 'admin' || profile?.role === 'master';
 
@@ -6580,6 +6630,9 @@ export default function App() {
             ...p,
             isLocked: p.is_locked,
             isVideo: p.is_video,
+            likesCount: p.post_likes?.length || 0,
+            commentsCount: p.post_comments?.length || 0,
+            isLikedByMe: session?.user ? p.post_likes?.some((l: any) => l.user_id === session.user.id) : false,
             hasAccess: checkAccess(p, session?.user?.id, profile, subscribedCreatorIds)
           })) as any);
         }
@@ -6970,16 +7023,7 @@ export default function App() {
     if (!profile || fetchError) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center">
-          <div className="text-primary font-black text-xl tracking-widest mb-4">ERRO DE PERFIL OU DADOS</div>
-          <p className="text-xs text-on-surface/40 font-bold uppercase tracking-widest mb-8 leading-relaxed max-w-xs">
-            {fetchError ? `Erro: ${fetchError}` : 'Não foi possível carregar seu perfil. Tente novamente ou entre em contato com o suporte.'}
-          </p>
-          <button 
-            onClick={handleReset}
-            className="w-full max-w-xs py-4 bg-primary/5 text-primary font-black rounded-2xl border border-primary/10 active:scale-95 transition-all text-[10px] uppercase tracking-widest"
-          >
-            Voltar para o Login
-          </button>
+          <div className="text-primary font-black animate-pulse text-xl tracking-widest mb-4 uppercase">CARREGANDO</div>
         </div>
       );
     }
@@ -7078,6 +7122,7 @@ export default function App() {
       case 'subscriptions': return <ScreenSubscriptions onBack={() => setScreen('feed')} />;
       case 'search': return <ScreenSearch onViewProfile={handleViewProfile} />;
       case 'creator-plans': return <ScreenCreatorPlans onBack={() => setScreen('feed')} profile={profile} />;
+      case 'subscriber-area': return <ScreenSubscriberArea onBack={() => setScreen('profile')} />;
       case 'edit-profile': 
         if (!profile) return null;
         return <ScreenEditProfile onBack={() => setScreen('profile')} creator={profile} onProfileUpdated={() => { refreshProfile(); setRefreshKey(prev => prev + 1); }} />;
