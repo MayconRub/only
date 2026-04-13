@@ -5511,6 +5511,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: (user?:
         const { error: profileError } = await supabase.from('profiles').insert({
           id: data.user.id,
           name: name,
+          email: email,
           username: email.split('@')[0] + Math.floor(Math.random() * 1000),
           avatar: `https://picsum.photos/seed/${data.user.id}/400`,
           bio: 'Novo usuário no pedaço!',
