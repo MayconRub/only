@@ -36,12 +36,14 @@ app.post("/api/payments/pix", async (req, res) => {
     }
 
     const turbofyClient = createTurbofyClient({
-      baseUrl: "https://api.turbofypay.com",
+      baseUrl: "https://api.turbofy.com.br",
       credentials: {
         clientId: process.env.TURBOFY_CLIENT_ID.replace(/^["']|["']$/g, '').trim(),
         clientSecret: process.env.TURBOFY_CLIENT_SECRET.replace(/^["']|["']$/g, '').trim(),
       },
-      timeoutMs: 60000, // Increase timeout to 60s
+      timeoutMs: 60000,
+      // @ts-ignore
+      retries: 3
     });
 
     const supabase = getSupabase();
@@ -102,37 +104,16 @@ app.post("/api/payments/pix", async (req, res) => {
     }
 
     // If we already have a platform ID, try to recover it immediately
-    if (paymentRecord.mp_payment_id || paymentRecord.pix_copy_paste) {
+    if (paymentRecord.mp_payment_id) {
       try {
-        // If we have the copy-paste key in DB, we can return it immediately
-        if (paymentRecord.pix_copy_paste) {
+        // @ts-ignore
+        const charge = await turbofyClient.pix.getCharge({ id: paymentRecord.mp_payment_id });
+        if (charge && charge.pix) {
           return res.json({
             paymentId: paymentRecord.id,
-            qrCodeBase64: paymentRecord.pix_qr_code,
-            qrCode: paymentRecord.pix_copy_paste,
+            qrCodeBase64: charge.pix.qrCode,
+            qrCode: charge.pix.copyPaste,
           });
-        }
-
-        // Otherwise try to fetch from Turbofy
-        if (paymentRecord.mp_payment_id) {
-          // @ts-ignore
-          const charge = await turbofyClient.pix.getCharge({ id: paymentRecord.mp_payment_id });
-          if (charge && charge.pix) {
-            // Update DB with the data we just got
-            await supabase
-              .from("payments")
-              .update({ 
-                pix_copy_paste: charge.pix.copyPaste,
-                pix_qr_code: charge.pix.qrCode
-              })
-              .eq("id", paymentRecord.id);
-
-            return res.json({
-              paymentId: paymentRecord.id,
-              qrCodeBase64: charge.pix.qrCode,
-              qrCode: charge.pix.copyPaste,
-            });
-          }
         }
       } catch (e) {
         console.log("[PIX] Platform ID exists but fetch failed, proceeding to createCharge.");
@@ -189,13 +170,11 @@ app.post("/api/payments/pix", async (req, res) => {
 
     if (!charge) throw new Error("Serviço de pagamentos indisponível.");
 
-    // Update record with platform ID and PIX data
+    // Update record with platform ID
     await supabase
       .from("payments")
       .update({ 
-        mp_payment_id: charge.id,
-        pix_copy_paste: charge.pix.copyPaste,
-        pix_qr_code: charge.pix.qrCode
+        mp_payment_id: charge.id
       })
       .eq("id", paymentRecord.id);
 
@@ -205,7 +184,12 @@ app.post("/api/payments/pix", async (req, res) => {
       qrCode: charge.pix.copyPaste,
     });
     } catch (error: any) {
-      console.error("[PIX] Final Error:", error.message);
+      console.error("[PIX] Final Error Details:", {
+        message: error.message,
+        status: error.status,
+        response: error.response?.data,
+        stack: error.stack
+      });
       
       let detailedError = error.message || "Erro interno no servidor";
       
@@ -222,9 +206,7 @@ app.post("/api/payments/pix", async (req, res) => {
       
       res.status(500).json({ 
         error: detailedError,
-        paymentId: paymentRecord?.id,
-        qrCode: paymentRecord?.pix_copy_paste,
-        qrCodeBase64: paymentRecord?.pix_qr_code
+        paymentId: paymentRecord?.id
       });
     }
 });
