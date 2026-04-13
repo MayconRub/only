@@ -256,7 +256,10 @@ const TopNav = ({
   isMaster = false,
   onMessageClick,
   onSettingsClick,
-  unreadCount = 0
+  onProfileClick,
+  onNotificationsClick,
+  unreadCount = 0,
+  unreadNotifications = 0
 }: { 
   title?: string, 
   showBack?: boolean, 
@@ -265,9 +268,12 @@ const TopNav = ({
   isMaster?: boolean,
   onMessageClick?: () => void,
   onSettingsClick?: () => void,
-  unreadCount?: number
+  onProfileClick?: () => void,
+  onNotificationsClick?: () => void,
+  unreadCount?: number,
+  unreadNotifications?: number
 }) => (
-  <header className="fixed top-0 w-full flex justify-between items-center px-6 py-0 glass-header z-50">
+  <header className="fixed top-0 w-full flex justify-between items-center px-6 py-2 glass-header z-50">
     <div className="flex items-center gap-4">
       {showBack && (
         <button onClick={onBack} className="text-on-surface hover:opacity-80 transition-opacity">
@@ -279,25 +285,35 @@ const TopNav = ({
           <img 
             src={APP_LOGO_URL} 
             alt="Logo" 
-            className="h-12 w-auto object-contain" 
+            className="h-10 w-auto object-contain" 
             referrerPolicy="no-referrer"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
             }}
           />
-          <span className="text-2xl font-black text-primary tracking-tighter leading-none">NUDLYE</span>
+          <span className="text-xl font-black text-primary tracking-tighter leading-none">NUDLYE</span>
         </div>
       </div>
     </div>
-    <div className="flex items-center gap-4">
+    <div className="flex items-center gap-3">
+      {!isMaster && onNotificationsClick && (
+        <button onClick={onNotificationsClick} className="text-on-surface/60 hover:text-primary transition-colors relative">
+          <Bell size={24} strokeWidth={1.5} />
+          {unreadNotifications > 0 && (
+            <span className="absolute -top-1 -right-1 bg-primary text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center border-2 border-white">
+              {unreadNotifications > 99 ? '99+' : unreadNotifications}
+            </span>
+          )}
+        </button>
+      )}
       {isMaster && onSettingsClick && (
         <button onClick={onSettingsClick} className="text-on-surface/60 hover:text-primary transition-colors relative">
-          <Settings size={24} />
+          <Settings size={24} strokeWidth={1.5} />
         </button>
       )}
       {isMaster && onMessageClick && (
         <button onClick={onMessageClick} className="text-on-surface/60 hover:text-primary transition-colors relative">
-          <MessageCircle size={24} />
+          <MessageCircle size={24} strokeWidth={1.5} />
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 bg-primary text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center border-2 border-white">
               {unreadCount > 99 ? '99+' : unreadCount}
@@ -305,9 +321,12 @@ const TopNav = ({
           )}
         </button>
       )}
-      <div className="w-8 h-8 rounded-full overflow-hidden border border-primary/20">
+      <button 
+        onClick={onProfileClick}
+        className="w-9 h-9 rounded-full overflow-hidden border border-primary/10 active:scale-95 transition-transform"
+      >
         <img src={avatar || ELENA.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-      </div>
+      </button>
     </div>
   </header>
 );
@@ -812,35 +831,47 @@ const ScreenSubscriptions = ({ onBack }: { onBack: () => void }) => {
   );
 };
 
-const ScreenSubscriberArea = ({ onBack }: { onBack: () => void }) => {
+const ScreenSubscriberArea = ({ onNavigate, onLogout, profile }: { onNavigate: (s: Screen) => void, onLogout: () => void, profile: any }) => {
   const menuItems = [
-    { icon: MessageCircle, title: 'Chat', description: 'Converse com creators agora' },
-    { icon: UserPlus, title: 'Assinaturas', description: 'Veja os creators que você assina' },
-    { icon: Wallet, title: 'Carteira', description: 'Escolha como paga e veja seus gastos' },
-    { icon: Activity, title: 'Atividades', description: 'Acesse suas mídias favoritas salvas' },
-    { icon: Settings, title: 'Definições', description: 'Personalize sua experiência' },
-    { icon: AlertCircle, title: 'Ajuda', description: 'Precisa de suporte ou tem dúvidas?' },
+    { icon: MessageCircle, title: 'Chat', description: 'Converse com creators agora', screen: 'messages' as Screen },
+    { icon: UserPlus, title: 'Assinaturas', description: 'Veja os creators que você assina', screen: 'subscriptions' as Screen },
+    { icon: Wallet, title: 'Carteira', description: 'Escolha como paga e veja seus gastos', screen: 'wallet' as Screen },
+    { icon: Activity, title: 'Atividades', description: 'Acesse suas mídias favoritas salvas', screen: 'activity' as Screen },
+    { icon: Settings, title: 'Definições', description: 'Personalize sua experiência', screen: 'edit-profile' as Screen },
+    { icon: AlertCircle, title: 'Ajuda', description: 'Precisa de suporte ou tem dúvidas?', screen: 'help' as any },
   ];
 
   return (
-    <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
-      <section className="mb-8 pt-8">
-        <h1 className="text-4xl font-extrabold tracking-tight mb-1">Área do Assinante</h1>
+    <div className="pt-24 pb-24 px-6 max-w-2xl mx-auto min-h-screen bg-[#FDFCF9]">
+      <section className="mb-8">
+        <h1 className="text-2xl font-bold text-on-surface mb-6">Área do Assinante</h1>
       </section>
 
       <div className="grid grid-cols-2 gap-4">
         {menuItems.map((item, index) => (
-          <button key={index} className="bg-white p-5 rounded-3xl border border-primary/5 shadow-sm text-left hover:border-primary/20 transition-all">
-            <item.icon className="text-primary mb-3" size={24} />
-            <h3 className="font-black text-on-surface text-base mb-1">{item.title}</h3>
-            <p className="text-xs text-on-surface/60 font-medium">{item.description}</p>
+          <button 
+            key={index} 
+            onClick={() => item.screen && onNavigate(item.screen)}
+            className="bg-white p-6 rounded-[2rem] border border-primary/5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] text-left hover:shadow-md transition-all active:scale-[0.98] flex flex-col h-full"
+          >
+            <div className="mb-4">
+              <item.icon className="text-on-surface" size={24} strokeWidth={1.5} />
+            </div>
+            <h3 className="font-bold text-on-surface text-base mb-1">{item.title}</h3>
+            <p className="text-[11px] text-on-surface/50 font-medium leading-tight">{item.description}</p>
           </button>
         ))}
       </div>
 
-      <button className="mt-8 w-full bg-white p-5 rounded-3xl border border-red-100 shadow-sm text-left text-red-500 font-bold flex items-center gap-3">
-        <ArrowLeft size={20} />
-        Sair da plataforma
+      <button 
+        onClick={onLogout}
+        className="mt-8 w-full bg-white p-6 rounded-[2rem] border border-primary/5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] text-left text-red-500 font-bold flex flex-col hover:shadow-md transition-all active:scale-[0.98]"
+      >
+        <div className="flex items-center gap-2 mb-1">
+          <ArrowLeft size={20} strokeWidth={2} />
+          <span className="text-base">Sair</span>
+        </div>
+        <p className="text-[11px] text-on-surface/50 font-medium pl-7">Sair da plataforma</p>
       </button>
     </div>
   );
@@ -2135,7 +2166,7 @@ const ScreenSearch = ({ onViewProfile }: { onViewProfile: (creator: any) => void
           {results.map((user) => (
             <button 
               key={user.id}
-              onClick={() => onViewProfile(user)}
+              onClick={() => onViewProfile(user.id)}
               className="w-full flex items-center gap-4 p-4 bg-surface rounded-2xl border border-primary/5 active:scale-[0.98] transition-all"
             >
               <img 
@@ -2947,7 +2978,7 @@ const ScreenProfile = ({
             </div>
             <h3 className="text-lg font-black mb-2">Conta de Assinante</h3>
             <p className="text-xs text-on-surface/50 font-bold uppercase tracking-widest leading-relaxed">
-              Você está logado como assinante.<br/>Aproveite o conteúdo exclusivo do Master!
+              Mergulhe agora nos conteúdos mais quentes e exclusivos que preparamos para você
             </p>
           </div>
         )}
@@ -7046,31 +7077,33 @@ export default function App() {
           onViewProfile={handleViewProfile}
         />
       );
-      case 'profile': return (
-        <ScreenProfile 
-          onEdit={() => setScreen('edit-profile')} 
-          creator={profile} 
-          onLogout={() => signOut()} 
-          posts={posts}
-          onDeletePost={handleDeletePost}
-          onUpdatePost={handleUpdatePost}
-          onSubscribe={() => handleSubscribe(profile)}
-          stories={stories}
-          onDeleteStory={handleDeleteStory}
-          isMaster={isMaster}
-          onLikePost={handleLikePost}
-          onCommentPost={handleCommentPost}
-          onMessage={(c) => {
-            setSelectedRecipient(c);
-            setScreen('chat');
-          }}
-          onForwardPost={(post) => {
-            console.log('Forwarding post from profile:', post);
-            setForwardingPost(post);
-          }}
-          onNavigateToAdmin={() => setScreen('admin-dashboard')}
-        />
-      );
+      case 'profile': 
+        return (
+          <ScreenProfile 
+            onEdit={() => setScreen('edit-profile')} 
+            creator={profile} 
+            onLogout={() => signOut()} 
+            posts={posts}
+            onDeletePost={handleDeletePost}
+            onUpdatePost={handleUpdatePost}
+            onSubscribe={() => handleSubscribe(profile)}
+            stories={stories}
+            onDeleteStory={handleDeleteStory}
+            isMaster={isMaster}
+            onLikePost={handleLikePost}
+            onCommentPost={handleCommentPost}
+            onMessage={(c) => {
+              setSelectedRecipient(c);
+              setScreen('chat');
+            }}
+            onForwardPost={(post) => {
+              console.log('Forwarding post from profile:', post);
+              setForwardingPost(post);
+            }}
+            onNavigateToAdmin={() => setScreen('admin-dashboard')}
+            onNavigateToSubscriberArea={() => setScreen('subscriber-area')}
+          />
+        );
       case 'public-profile': 
         return publicCreator ? (
           <ScreenPublicProfile 
@@ -7123,7 +7156,7 @@ export default function App() {
       case 'subscriptions': return <ScreenSubscriptions onBack={() => setScreen('feed')} />;
       case 'search': return <ScreenSearch onViewProfile={handleViewProfile} />;
       case 'creator-plans': return <ScreenCreatorPlans onBack={() => setScreen('feed')} profile={profile} />;
-      case 'subscriber-area': return <ScreenSubscriberArea onBack={() => setScreen('profile')} />;
+      case 'subscriber-area': return <ScreenSubscriberArea onNavigate={setScreen} onLogout={signOut} profile={profile} />;
       case 'edit-profile': 
         if (!profile) return null;
         return <ScreenEditProfile onBack={() => setScreen('profile')} creator={profile} onProfileUpdated={() => { refreshProfile(); setRefreshKey(prev => prev + 1); }} />;
@@ -7193,7 +7226,10 @@ export default function App() {
           isMaster={isMaster}
           onMessageClick={() => setScreen('messages')}
           onSettingsClick={() => setScreen('creator-plans')}
+          onProfileClick={() => setScreen('subscriber-area')}
+          onNotificationsClick={() => setScreen('activity')}
           unreadCount={unreadMessagesCount}
+          unreadNotifications={unreadNotificationsCount}
         />
       )}
       
