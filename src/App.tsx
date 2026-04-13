@@ -2994,6 +2994,9 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
 
       const data = await response.json();
       if (data.error) {
+        if (data.qrCode) {
+          setPixData({ qrCode: data.qrCode, qrCodeBase64: data.qrCodeBase64, paymentId: data.paymentId });
+        }
         if (data.paymentId) {
           setPaymentId(data.paymentId);
           setStep('pix');
@@ -3103,7 +3106,7 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
                 </>
               ) : (
                 <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
-                  <div className="bg-white p-4 rounded-2xl border-2 border-primary/5 flex items-center justify-center mb-4 shadow-inner">
+                  <div className="bg-white p-4 rounded-2xl border-2 border-primary/5 flex flex-col items-center justify-center mb-4 shadow-inner">
                     {pixData?.qrCodeBase64 ? (
                       <img src={`data:image/png;base64,${pixData.qrCodeBase64}`} className="w-48 h-48" alt="QR Code PIX" />
                     ) : (
@@ -3112,6 +3115,15 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
                         <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">
                           Gerando QR Code...
                         </p>
+                      </div>
+                    )}
+                    
+                    {pixData?.qrCode && !pixData?.qrCodeBase64 && (
+                      <div className="mt-4 w-full">
+                        <p className="text-[10px] font-bold text-on-surface/40 uppercase mb-2">Chave PIX Copia e Cola:</p>
+                        <div className="bg-on-surface/5 p-2 rounded-lg break-all text-[10px] font-mono select-all">
+                          {pixData.qrCode}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -5733,6 +5745,9 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
       }
 
       if (data.error) {
+        if (data.qrCode) {
+          setPixData({ qrCode: data.qrCode, qrCodeBase64: data.qrCodeBase64, paymentId: data.paymentId });
+        }
         if (data.paymentId) {
           setPaymentId(data.paymentId);
           // Don't alert, let the UI show the recovery state
@@ -5974,12 +5989,12 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
                 ) : (
                   <div className="space-y-4 flex flex-col items-center">
                     {/* QR Code */}
-                    <div className="w-48 h-48 bg-white rounded-2xl p-3 shadow-lg border border-on-surface/5 relative flex items-center justify-center">
+                    <div className="w-48 h-64 bg-white rounded-2xl p-3 shadow-lg border border-on-surface/5 relative flex flex-col items-center justify-center gap-4">
                       {pixData?.qrCodeBase64 ? (
                         <img 
                           src={`data:image/jpeg;base64,${pixData.qrCodeBase64}`} 
                           alt="Pix QR Code" 
-                          className="w-full h-full object-contain"
+                          className="w-full h-40 object-contain"
                         />
                       ) : (
                         <div className="flex flex-col items-center gap-3 text-center p-4">
@@ -5987,6 +6002,15 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
                           <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest leading-tight">
                             Processando no Turbofy...
                           </p>
+                        </div>
+                      )}
+
+                      {pixData?.qrCode && !pixData?.qrCodeBase64 && (
+                        <div className="w-full px-2">
+                           <p className="text-[8px] font-bold text-on-surface/40 uppercase mb-1">Copia e Cola:</p>
+                           <div className="bg-on-surface/5 p-1.5 rounded-lg break-all text-[8px] font-mono select-all max-h-16 overflow-y-auto">
+                             {pixData.qrCode}
+                           </div>
                         </div>
                       )}
                     </div>

@@ -102,16 +102,37 @@ app.post("/api/payments/pix", async (req, res) => {
     }
 
     // If we already have a platform ID, try to recover it immediately
-    if (paymentRecord.mp_payment_id) {
+    if (paymentRecord.mp_payment_id || paymentRecord.pix_copy_paste) {
       try {
-        // @ts-ignore
-        const charge = await turbofyClient.pix.getCharge({ id: paymentRecord.mp_payment_id });
-        if (charge && charge.pix) {
+        // If we have the copy-paste key in DB, we can return it immediately
+        if (paymentRecord.pix_copy_paste) {
           return res.json({
             paymentId: paymentRecord.id,
-            qrCodeBase64: charge.pix.qrCode,
-            qrCode: charge.pix.copyPaste,
+            qrCodeBase64: paymentRecord.pix_qr_code,
+            qrCode: paymentRecord.pix_copy_paste,
           });
+        }
+
+        // Otherwise try to fetch from Turbofy
+        if (paymentRecord.mp_payment_id) {
+          // @ts-ignore
+          const charge = await turbofyClient.pix.getCharge({ id: paymentRecord.mp_payment_id });
+          if (charge && charge.pix) {
+            // Update DB with the data we just got
+            await supabase
+              .from("payments")
+              .update({ 
+                pix_copy_paste: charge.pix.copyPaste,
+                pix_qr_code: charge.pix.qrCode
+              })
+              .eq("id", paymentRecord.id);
+
+            return res.json({
+              paymentId: paymentRecord.id,
+              qrCodeBase64: charge.pix.qrCode,
+              qrCode: charge.pix.copyPaste,
+            });
+          }
         }
       } catch (e) {
         console.log("[PIX] Platform ID exists but fetch failed, proceeding to createCharge.");
@@ -168,10 +189,14 @@ app.post("/api/payments/pix", async (req, res) => {
 
     if (!charge) throw new Error("Serviço de pagamentos indisponível.");
 
-    // Update record with platform ID
+    // Update record with platform ID and PIX data
     await supabase
       .from("payments")
-      .update({ mp_payment_id: charge.id })
+      .update({ 
+        mp_payment_id: charge.id,
+        pix_copy_paste: charge.pix.copyPaste,
+        pix_qr_code: charge.pix.qrCode
+      })
       .eq("id", paymentRecord.id);
 
     res.json({
@@ -197,7 +222,9 @@ app.post("/api/payments/pix", async (req, res) => {
       
       res.status(500).json({ 
         error: detailedError,
-        paymentId: paymentRecord?.id 
+        paymentId: paymentRecord?.id,
+        qrCode: paymentRecord?.pix_copy_paste,
+        qrCodeBase64: paymentRecord?.pix_qr_code
       });
     }
 });
