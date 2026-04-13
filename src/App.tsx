@@ -833,8 +833,8 @@ const ScreenSubscriptions = ({ onBack }: { onBack: () => void }) => {
 
 const ScreenSubscriberArea = ({ onNavigate, onLogout, profile }: { onNavigate: (s: Screen) => void, onLogout: () => void, profile: any }) => {
   const menuItems = [
-    { icon: MessageCircle, title: 'Chat', description: 'Converse com creators agora', screen: 'messages' as Screen },
-    { icon: UserPlus, title: 'Assinaturas', description: 'Veja os creators que você assina', screen: 'subscriptions' as Screen },
+    { icon: MessageCircle, title: 'Chat', description: 'Converse com criador agora', screen: 'messages' as Screen },
+    { icon: UserPlus, title: 'Assinaturas', description: 'Veja os criador que você assina', screen: 'subscriptions' as Screen },
     { icon: Wallet, title: 'Carteira', description: 'Escolha como paga e veja seus gastos', screen: 'wallet' as Screen },
     { icon: Activity, title: 'Atividades', description: 'Acesse suas mídias favoritas salvas', screen: 'activity' as Screen },
     { icon: Settings, title: 'Definições', description: 'Personalize sua experiência', screen: 'edit-profile' as Screen },
@@ -4657,20 +4657,23 @@ const ScreenEditProfile = ({ onBack, creator, onProfileUpdated }: { onBack: () =
             />
           </div>
           <div className="space-y-1.5">
+            <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Nome de Usuário (@)</label>
+            <div className="relative flex items-center">
+              <span className="absolute left-4 text-on-surface/40 font-bold">@</span>
+              <input 
+                className="w-full bg-white border border-primary/10 rounded-xl pl-9 pr-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
+                value={username}
+                onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g, ''))}
+                required
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
             <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Bio Editorial</label>
             <textarea 
               className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm text-sm leading-relaxed min-h-[100px] resize-none font-medium text-on-surface/80" 
               value={bio}
               onChange={(e) => setBio(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[10px] uppercase tracking-widest font-black text-primary/70 px-1">Preços e Serviços</label>
-            <textarea 
-              className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 shadow-sm text-xs leading-relaxed min-h-[80px] resize-none font-medium text-on-surface/60" 
-              placeholder="Use **texto** para negrito. Ex: **Video Chamada** R$ 50,00"
-              value={servicesBio}
-              onChange={(e) => setServicesBio(e.target.value)}
             />
           </div>
           <div className="space-y-1.5">
@@ -5515,6 +5518,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: (user?:
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -5530,7 +5534,8 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: (user?:
         options: {
           data: {
             full_name: name,
-            phone: phone
+            phone: phone,
+            username: username
           }
         }
       });
@@ -5543,7 +5548,7 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: (user?:
           id: data.user.id,
           name: name,
           email: email,
-          username: email.split('@')[0] + Math.floor(Math.random() * 1000),
+          username: username || (email.split('@')[0] + Math.floor(Math.random() * 1000)),
           avatar: `https://picsum.photos/seed/${data.user.id}/400`,
           bio: 'Novo usuário no pedaço!',
           stats: { posts: '0', followers: '0', likes: '0' },
@@ -5600,11 +5605,23 @@ const ScreenRegister = ({ onRegister, onNavigateToLogin }: { onRegister: (user?:
             <div className="space-y-1.5">
               <input 
                 className="w-full bg-white border border-primary/5 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
-                placeholder="Nome de Usuário" 
+                placeholder="Nome Completo" 
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
               />
+            </div>
+            <div className="space-y-1.5">
+              <div className="relative flex items-center">
+                <span className="absolute left-5 text-on-surface/40 font-bold">@</span>
+                <input 
+                  className="w-full bg-white border border-primary/5 rounded-2xl pl-10 pr-5 py-4 focus:ring-2 focus:ring-primary/20 shadow-sm font-bold text-on-surface" 
+                  placeholder="nome_de_usuario" 
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g, ''))}
+                  required
+                />
+              </div>
             </div>
             <div className="space-y-1.5">
               <input 
