@@ -834,7 +834,7 @@ const ScreenSubscriptions = ({ onBack }: { onBack: () => void }) => {
 const ScreenSubscriberArea = ({ onNavigate, onLogout, profile }: { onNavigate: (s: Screen) => void, onLogout: () => void, profile: any }) => {
   const menuItems = [
     { icon: MessageCircle, title: 'Chat', description: 'Converse com criador agora', screen: 'messages' as Screen },
-    { icon: Crown, title: 'Área VIP', description: 'Veja os criador que você assina', screen: 'subscriber-area' as Screen },
+    { icon: Crown, title: 'Área VIP', description: 'Veja os criador que você assina', screen: 'subscriptions' as Screen },
     { icon: Wallet, title: 'Carteira', description: 'Escolha como paga e veja seus gastos', screen: 'wallet' as Screen },
     { icon: Activity, title: 'Atividades', description: 'Acesse suas mídias favoritas salvas', screen: 'activity' as Screen },
     { icon: Settings, title: 'Definições', description: 'Personalize sua experiência', screen: 'edit-profile' as Screen },
@@ -1768,10 +1768,11 @@ const FullScreenPostModal = ({
   );
 };
 
-const CropModal = ({ image, onCropComplete, onClose, aspect = 1 }: { image: string, onCropComplete: (croppedImage: Blob) => void, onClose: () => void, aspect?: number }) => {
+const CropModal = ({ image, onCropComplete, onSkip, onClose, aspect = 1 }: { image: string, onCropComplete: (croppedImage: Blob) => void, onSkip?: () => void, onClose: () => void, aspect?: number }) => {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+  const [currentAspect, setCurrentAspect] = useState(aspect);
 
   const onCropChange = (crop: any) => setCrop(crop);
   const onZoomChange = (zoom: number) => setZoom(zoom);
@@ -1830,10 +1831,22 @@ const CropModal = ({ image, onCropComplete, onClose, aspect = 1 }: { image: stri
     }
   };
 
+  const aspects = [
+    { label: 'Quadrado', value: 1 },
+    { label: 'Retrato', value: 4 / 5 },
+    { label: 'Paisagem', value: 16 / 9 },
+    { label: 'Livre', value: undefined }
+  ];
+
   return (
     <div className="fixed inset-0 z-[200] bg-black flex flex-col">
       <div className="flex justify-between items-center p-4 bg-white z-10">
-        <button onClick={onClose} className="text-on-surface/60 font-bold uppercase tracking-widest text-xs">Cancelar</button>
+        <div className="flex gap-4">
+          <button onClick={onClose} className="text-on-surface/60 font-bold uppercase tracking-widest text-xs">Cancelar</button>
+          {onSkip && (
+            <button onClick={onSkip} className="text-on-surface/40 hover:text-primary font-bold uppercase tracking-widest text-xs transition-colors">Original</button>
+          )}
+        </div>
         <h3 className="font-bold uppercase tracking-widest text-xs">Ajustar Imagem</h3>
         <button onClick={handleDone} className="text-primary font-bold uppercase tracking-widest text-xs">Concluir</button>
       </div>
@@ -1842,23 +1855,41 @@ const CropModal = ({ image, onCropComplete, onClose, aspect = 1 }: { image: stri
           image={image}
           crop={crop}
           zoom={zoom}
-          aspect={aspect}
+          aspect={currentAspect}
           onCropChange={onCropChange}
           onCropComplete={onCropCompleteInternal}
           onZoomChange={onZoomChange}
         />
       </div>
-      <div className="p-6 bg-white">
-        <input
-          type="range"
-          value={zoom}
-          min={1}
-          max={3}
-          step={0.1}
-          aria-labelledby="Zoom"
-          onChange={(e) => setZoom(Number(e.target.value))}
-          className="w-full h-2 bg-primary/10 rounded-lg appearance-none cursor-pointer accent-primary"
-        />
+      <div className="p-6 bg-white space-y-6">
+        <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+          {aspects.map((asp) => (
+            <button
+              key={asp.label}
+              onClick={() => setCurrentAspect(asp.value)}
+              className={`flex-shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                currentAspect === asp.value
+                  ? 'bg-primary text-white shadow-lg'
+                  : 'bg-on-surface/5 text-on-surface/40 hover:bg-on-surface/10'
+              }`}
+            >
+              {asp.label}
+            </button>
+          ))}
+        </div>
+        <div className="space-y-2">
+          <p className="text-[10px] font-black uppercase tracking-widest text-on-surface/30">Zoom</p>
+          <input
+            type="range"
+            value={zoom}
+            min={1}
+            max={3}
+            step={0.1}
+            aria-labelledby="Zoom"
+            onChange={(e) => setZoom(Number(e.target.value))}
+            className="w-full h-2 bg-primary/10 rounded-lg appearance-none cursor-pointer accent-primary"
+          />
+        </div>
       </div>
     </div>
   );
@@ -2213,7 +2244,8 @@ const ScreenFeed = ({
   onLikePost,
   onCommentPost,
   onViewProfile,
-  onForwardPost
+  onForwardPost,
+  onRefresh
 }: { 
   posts: Post[], 
   stories: any[], 
@@ -2227,7 +2259,8 @@ const ScreenFeed = ({
   onLikePost?: (id: string, isLiked: boolean) => void,
   onCommentPost?: (id: string, content: string) => void,
   onViewProfile?: (creatorId: string) => void,
-  onForwardPost?: (post: Post) => void
+  onForwardPost?: (post: Post) => void,
+  onRefresh?: () => void
 }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [selectedPost, setSelectedPost] = React.useState<Post | null>(null);
@@ -2235,10 +2268,55 @@ const ScreenFeed = ({
   const [editingPost, setEditingPost] = React.useState<Post | null>(null);
   const [activeStoryIndex, setActiveStoryIndex] = React.useState<number | null>(null);
   const [showPostMenu, setShowPostMenu] = React.useState<string | null>(null);
+  const [cropImage, setCropImage] = React.useState<{ url: string, aspect: number } | null>(null);
+  const [originalFile, setOriginalFile] = React.useState<File | null>(null);
+
+  const handleStoryFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type.startsWith('image/')) {
+      setOriginalFile(file);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropImage({ url: reader.result as string, aspect: 9 / 16 });
+      };
+      reader.readAsDataURL(file);
+    } else {
+      onStoryUpload(file);
+    }
+  };
+
+  const handleStorySkipCrop = () => {
+    if (originalFile) {
+      onStoryUpload(originalFile);
+    }
+    setCropImage(null);
+    setOriginalFile(null);
+  };
+
+  const handleStoryCropComplete = (croppedBlob: Blob) => {
+    const file = new File([croppedBlob], `story_${Date.now()}.jpg`, { type: 'image/jpeg' });
+    onStoryUpload(file);
+    setCropImage(null);
+    setOriginalFile(null);
+  };
 
   return (
     <div className="pt-20 pb-24 max-w-2xl mx-auto">
       {/* Modals */}
+      {cropImage && (
+        <CropModal 
+          image={cropImage.url} 
+          aspect={cropImage.aspect}
+          onCropComplete={handleStoryCropComplete} 
+          onSkip={handleStorySkipCrop}
+          onClose={() => {
+            setCropImage(null);
+            setOriginalFile(null);
+          }} 
+        />
+      )}
       <FullScreenPostModal 
         post={selectedPost} 
         onClose={() => {
@@ -2271,9 +2349,7 @@ const ScreenFeed = ({
             ref={fileInputRef} 
             className="hidden" 
             accept="image/*,video/*"
-            onChange={(e) => {
-              if (e.target.files?.[0]) onStoryUpload(e.target.files[0]);
-            }}
+            onChange={handleStoryFileSelection}
           />
           {isMaster && (
             <div 
@@ -2457,9 +2533,17 @@ const ScreenFeed = ({
         <Camera className="text-primary/20" size={40} />
       </div>
       <h3 className="text-lg font-black mb-2">Nenhuma postagem</h3>
-      <p className="text-xs text-on-surface/40 font-bold uppercase tracking-widest leading-relaxed">
+      <p className="text-xs text-on-surface/40 font-bold uppercase tracking-widest leading-relaxed mb-8">
         Ainda não há conteúdo disponível no feed.
       </p>
+      {onRefresh && (
+        <button 
+          onClick={onRefresh}
+          className="px-8 py-3 bg-primary text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all text-[10px] uppercase tracking-widest"
+        >
+          Atualizar Feed
+        </button>
+      )}
     </div>
   )}
 </div>
@@ -4783,11 +4867,10 @@ const ScreenCreatePost = ({ onBack, onPostCreated }: { onBack: () => void, onPos
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cropImage, setCropImage] = useState<{ url: string, aspect: number } | null>(null);
+  const [originalFile, setOriginalFile] = useState<File | null>(null);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const uploadFile = async (file: File) => {
     setUploading(true);
     setError(null);
     try {
@@ -4812,6 +4895,37 @@ const ScreenCreatePost = ({ onBack, onPostCreated }: { onBack: () => void, onPos
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type.startsWith('image/')) {
+      setOriginalFile(file);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropImage({ url: reader.result as string, aspect: 1 });
+      };
+      reader.readAsDataURL(file);
+    } else {
+      await uploadFile(file);
+    }
+  };
+
+  const handleSkipCrop = async () => {
+    if (originalFile) {
+      await uploadFile(originalFile);
+    }
+    setCropImage(null);
+    setOriginalFile(null);
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob) => {
+    const file = new File([croppedBlob], `post_${Date.now()}.jpg`, { type: 'image/jpeg' });
+    await uploadFile(file);
+    setCropImage(null);
+    setOriginalFile(null);
   };
 
   const handleCreatePost = async (e: React.FormEvent) => {
@@ -4846,6 +4960,18 @@ const ScreenCreatePost = ({ onBack, onPostCreated }: { onBack: () => void, onPos
 
   return (
     <div className="pt-20 pb-24 px-6 max-w-2xl mx-auto">
+      {cropImage && (
+        <CropModal 
+          image={cropImage.url} 
+          aspect={cropImage.aspect}
+          onCropComplete={handleCropComplete} 
+          onSkip={handleSkipCrop}
+          onClose={() => {
+            setCropImage(null);
+            setOriginalFile(null);
+          }} 
+        />
+      )}
       <section className="mb-8 pt-8">
         <h1 className="text-4xl font-extrabold tracking-tight mb-1">Nova Postagem</h1>
         <p className="text-on-surface/60 text-sm font-medium">Compartilhe sua arte com o mundo.</p>
@@ -6241,20 +6367,36 @@ export default function App() {
       // Fetch followed creators
       let followedCreatorIds: string[] = [];
       try {
-        const { data: follows } = await supabase
+        const { data: follows, error: followsError } = await supabase
           .from('follows')
           .select('following_id')
-          .eq('follower_id', user.id);
+          .eq('follower_id', profile.id);
+        
+        if (followsError) throw followsError;
         followedCreatorIds = follows?.map(f => f.following_id) || [];
+        console.log('Followed creators found:', followedCreatorIds);
       } catch (err) {
         console.warn('Error fetching follows:', err);
       }
 
       // Fetch posts with likes and comments
       let postsData: any[] = [];
-      let postsError: any = null;
-
+      
       try {
+        // Construct relevant IDs for initial filtering
+        const relevantIds = [profile.id];
+        if (masterId) relevantIds.push(masterId);
+        if (followedCreatorIds.length > 0) {
+          followedCreatorIds.forEach(id => {
+            if (id && !relevantIds.includes(id)) relevantIds.push(id);
+          });
+        }
+        
+        console.log('Current User ID:', profile.id);
+        console.log('Master ID:', masterId);
+        console.log('Followed IDs:', followedCreatorIds);
+        console.log('Fetching posts for relevant IDs:', relevantIds);
+
         let query = supabase
           .from('secure_posts')
           .select(`
@@ -6264,50 +6406,66 @@ export default function App() {
             post_comments (*, profiles:user_id (*))
           `);
         
-        // Filter posts: user's own, master's, or followed creators
-        const relevantIds = [user.id];
-        if (masterId) relevantIds.push(masterId);
-        if (followedCreatorIds.length > 0) relevantIds.push(...followedCreatorIds);
-        
+        // Filter at DB level for performance, but fallback to all if needed
         query = query.in('creator_id', relevantIds);
 
         const { data, error } = await query;
         
         if (error) throw error;
         postsData = data || [];
+        console.log(`Fetched ${postsData.length} posts from DB`);
       } catch (err: any) {
-        console.warn('Full posts query failed, trying simpler query:', err.message);
+        console.warn('Filtered posts query failed, trying all posts:', err.message);
         const { data, error } = await supabase
           .from('secure_posts')
-          .select('*');
+          .select(`
+            *,
+            profiles:creator_id (*),
+            post_likes (*),
+            post_comments (*, profiles:user_id (*))
+          `);
         
         if (error) {
-          console.error('Simple posts query also failed:', error);
+          console.error('All posts query also failed:', error);
           throw error;
         }
         postsData = data || [];
+        console.log(`Fetched ${postsData.length} posts from fallback query`);
       }
       
-      // Sort posts in JS to avoid created_at column issues
+      // Sort posts in JS
       postsData.sort((a, b) => {
         const dateA = new Date(a.created_at || a.time || 0).getTime();
         const dateB = new Date(b.created_at || b.time || 0).getTime();
         return dateB - dateA;
       });
 
-      // Filter posts:
-      // 1. If user is a global admin, show ALL posts.
-      // 2. If no masterId is found, show all posts.
-      // 3. Always show user's OWN posts.
-      // 4. Show followed creators' posts.
-      // 5. Otherwise, show only master's posts.
+      // Final filter in JS to ensure user only sees what they should
       const filteredPostsData = postsData.filter((p: any) => {
+        // 1. Admins see everything
         if (isGlobalAdmin) return true;
-        if (p.creator_id === user.id) return true;
+        // 2. Users see their own posts
+        if (p.creator_id === profile.id) return true;
+        // 3. Users see posts from creators they follow
         if (followedCreatorIds.includes(p.creator_id)) return true;
+        // 4. If no masterId is defined, show everything (discovery mode)
         if (!masterId) return true;
-        return p.creator_id === masterId;
+        // 5. Always show master's posts
+        if (p.creator_id === masterId) return true;
+        
+        return false;
       });
+
+      console.log(`After filtering, ${filteredPostsData.length} posts remain`);
+      if (filteredPostsData.length === 0 && postsData.length > 0) {
+        console.log('Sample of fetched posts (not filtered):', postsData.slice(0, 5).map(p => ({ id: p.id, creator: p.creator_id })));
+        console.log('Filtering criteria:', {
+          currentUserId: profile.id,
+          masterId,
+          followedIds: followedCreatorIds,
+          isGlobalAdmin
+        });
+      }
 
       // Fetch stories
       let storiesData: any[] = [];
@@ -6334,7 +6492,7 @@ export default function App() {
 
       const filteredStoriesData = storiesData.filter((s: any) => {
         if (isGlobalAdmin) return true;
-        if (s.creator_id === user.id) return true;
+        if (s.creator_id === profile.id) return true;
         if (followedCreatorIds.includes(s.creator_id)) return true;
         if (!masterId) return true;
         return s.creator_id === masterId;
@@ -6497,7 +6655,7 @@ export default function App() {
       console.warn('User is logged in but profile is missing');
       setDataLoading(false);
     }
-  }, [isLoggedIn, profile, fetchData, authLoading]);
+  }, [isLoggedIn, profile, fetchData, authLoading, screen === 'feed']);
 
   // Real-time updates for notifications
   React.useEffect(() => {
@@ -7099,7 +7257,7 @@ export default function App() {
       case 'feed': return (
         <ScreenFeed 
           posts={posts} 
-          stories={stories.filter(s => s.creator_id === profile.id)} 
+          stories={stories} 
           onStoryUpload={handleStoryUpload} 
           creator={profile} 
           onDeletePost={handleDeletePost}
@@ -7110,6 +7268,7 @@ export default function App() {
           onLikePost={handleLikePost}
           onCommentPost={handleCommentPost}
           onViewProfile={handleViewProfile}
+          onRefresh={fetchData}
         />
       );
       case 'profile': 
@@ -7163,7 +7322,7 @@ export default function App() {
         ) : (
           <ScreenFeed 
             posts={posts} 
-            stories={stories.filter(s => s.creator_id === profile.id)} 
+            stories={stories} 
             onStoryUpload={handleStoryUpload} 
             creator={profile} 
             onDeletePost={handleDeletePost}
@@ -7174,6 +7333,7 @@ export default function App() {
             onLikePost={handleLikePost}
             onCommentPost={handleCommentPost}
             onViewProfile={handleViewProfile}
+            onRefresh={fetchData}
             onForwardPost={(post) => {
               console.log('Forwarding post from feed (else):', post);
               setForwardingPost(post);
@@ -7203,7 +7363,7 @@ export default function App() {
       default: return (
         <ScreenFeed 
           posts={posts} 
-          stories={stories.filter(s => s.creator_id === profile.id)} 
+          stories={stories} 
           onStoryUpload={handleStoryUpload} 
           creator={profile} 
           onDeletePost={handleDeletePost}
@@ -7214,6 +7374,7 @@ export default function App() {
           onLikePost={handleLikePost}
           onCommentPost={handleCommentPost}
           onViewProfile={handleViewProfile}
+          onRefresh={fetchData}
           onForwardPost={(post) => {
             console.log('Forwarding post from feed (default):', post);
             setForwardingPost(post);

@@ -22,6 +22,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const signOut = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('AuthContext: Error during signOut:', err);
+    } finally {
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      // Clear local storage manually as a safety measure
+      localStorage.removeItem('supabase.auth.token');
+    }
+  };
+
   const fetchProfile = async (userId: string) => {
     try {
       const { data, error: profileError } = await supabase
@@ -34,10 +48,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (profileError.code === 'PGRST116') {
           // Profile doesn't exist, create it
           const { data: userData, error: userError } = await supabase.auth.getUser();
-          if (userError && (userError.message?.includes('Refresh Token Not Found') || userError.message?.includes('Invalid Refresh Token'))) {
-            supabase.auth.signOut();
-            return null;
+          
+          if (userError) {
+            console.error('AuthContext: Error getting user during profile creation:', userError);
+            if (userError.message?.includes('Refresh Token Not Found') || userError.message?.includes('Invalid Refresh Token')) {
+              console.warn('AuthContext: Invalid refresh token detected during profile creation, signing out...');
+              await signOut();
+              return null;
+            }
           }
+
           if (!userData.user) return null;
 
           const newProfile = {
@@ -95,14 +115,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { ...data, social_links: socialLinks } as Creator;
     } catch (err: any) {
       console.error('Error fetching/creating profile:', err);
+      if (err.message?.includes('Refresh Token Not Found') || err.message?.includes('Invalid Refresh Token')) {
+        await signOut();
+      }
       return null;
     }
   };
 
   const refreshProfile = async () => {
     if (user) {
-      const p = await fetchProfile(user.id);
-      setProfile(p);
+      try {
+        const p = await fetchProfile(user.id);
+        setProfile(p);
+      } catch (err: any) {
+        console.error('AuthContext: Error refreshing profile:', err);
+        if (err.message?.includes('Refresh Token Not Found') || err.message?.includes('Invalid Refresh Token')) {
+          await signOut();
+        }
+      }
     }
   };
 
@@ -114,19 +144,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!isMounted) return;
       
       console.log('Auth state change handled:', session?.user?.email || 'No user');
-      setSession(session);
-      setUser(session?.user ?? null);
       
-      if (session?.user) {
-        const p = await fetchProfile(session.user.id);
-        if (isMounted) setProfile(p);
-      } else {
-        if (isMounted) setProfile(null);
-      }
-      
-      if (isMounted) {
-        setLoading(false);
-        if (timeoutId) clearTimeout(timeoutId);
+      try {
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          const p = await fetchProfile(session.user.id);
+          if (isMounted) setProfile(p);
+        } else {
+          if (isMounted) setProfile(null);
+        }
+      } catch (err: any) {
+        console.error('AuthContext: Error in handleAuthStateChange:', err);
+        if (err.message?.includes('Refresh Token Not Found') || err.message?.includes('Invalid Refresh Token')) {
+          await signOut();
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+          if (timeoutId) clearTimeout(timeoutId);
+        }
       }
     };
 
@@ -149,13 +187,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) {
         console.error('Initial session fetch error:', error);
         if (error.message?.includes('Refresh Token Not Found') || error.message?.includes('Invalid Refresh Token')) {
-          supabase.auth.signOut();
+          signOut();
+          return;
         }
       }
       handleAuthStateChange(session);
     }).catch(err => {
       console.error('Initial session fetch exception:', err);
-      if (isMounted) {
+      if (err.message?.includes('Refresh Token Not Found') || err.message?.includes('Invalid Refresh Token')) {
+        signOut();
+      } else if (isMounted) {
         setLoading(false);
         setError('Erro ao conectar ao servidor de autenticação.');
       }
@@ -174,13 +215,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (timeoutId) clearTimeout(timeoutId);
     };
   }, []);
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setSession(null);
-    setUser(null);
-    setProfile(null);
-  };
 
   return (
     <AuthContext.Provider value={{ session, user, profile, loading, error, signOut, refreshProfile }}>
