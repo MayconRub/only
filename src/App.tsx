@@ -192,7 +192,7 @@ const SecureMedia = ({
 
   if (loading) {
     return (
-      <div className={`${className} bg-on-surface/5 flex items-center justify-center`}>
+      <div className={`${className} bg-black flex items-center justify-center`}>
         <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
       </div>
     );
@@ -200,9 +200,9 @@ const SecureMedia = ({
 
   if (error || !url) {
     return (
-      <div className={`${className} bg-on-surface/5 flex flex-col items-center justify-center p-4 text-center`}>
-        <Lock size={24} className="text-on-surface/20 mb-2" />
-        <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">Conteúdo Protegido</p>
+      <div className={`${className} bg-black/90 flex flex-col items-center justify-center p-4 text-center text-white`}>
+        <Lock size={24} className="text-white/40 mb-2" />
+        <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">Conteúdo Protegido</p>
       </div>
     );
   }
@@ -210,13 +210,14 @@ const SecureMedia = ({
   if (isVideo) {
     return (
       <video 
-        src={`${url}${url.includes('?') ? '&' : '?'}t=0.001`} 
+        src={`${url}#t=0.001`} 
         className={className} 
         controls={controls}
         autoPlay={autoPlay}
         muted={muted}
         playsInline={playsInline}
         preload="metadata"
+        crossOrigin="anonymous"
       />
     );
   }
@@ -2451,7 +2452,7 @@ const ScreenFeed = ({
             </div>
           
           <div 
-            className="aspect-square relative overflow-hidden bg-on-surface/5 cursor-pointer"
+            className="aspect-square relative overflow-hidden bg-black cursor-pointer"
             onClick={() => {
               if (post.hasAccess) {
                 setSelectedPost(post);
@@ -3000,7 +3001,7 @@ const ScreenProfile = ({
               {myPosts.map((post) => (
                 <div 
                   key={post.id} 
-                  className="relative aspect-square overflow-hidden rounded-2xl bg-on-surface/5 shadow-sm group cursor-pointer"
+                  className="relative aspect-square overflow-hidden rounded-2xl bg-black shadow-sm group cursor-pointer"
                   onClick={() => {
                     if (post.hasAccess) {
                       setSelectedPost(post);
@@ -3636,7 +3637,7 @@ const ScreenPublicProfile = ({
           {myPosts.map((post) => (
             <div 
               key={post.id} 
-              className="relative aspect-square overflow-hidden rounded-2xl bg-on-surface/5 shadow-sm group cursor-pointer"
+              className="relative aspect-square overflow-hidden rounded-2xl bg-black shadow-sm group cursor-pointer"
               onClick={() => {
                 if (!post.hasAccess) onSubscribe();
                 else {
