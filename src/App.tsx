@@ -2818,7 +2818,7 @@ const ScreenProfile = ({
           <div className="flex gap-3 mb-4">
             <button 
               onClick={() => {
-                const url = `${window.location.origin}/?u=${creator.username}`;
+                const url = `${window.location.origin}/${creator.username}`;
                 navigator.clipboard.writeText(url);
                 alert('Link do perfil copiado!');
               }}
@@ -2948,7 +2948,7 @@ const ScreenProfile = ({
               </button>
               <button 
                 onClick={() => {
-                  const url = `${window.location.origin}/?u=${creator.username}`;
+                  const url = `${window.location.origin}/${creator.username}`;
                   navigator.clipboard.writeText(url);
                   alert('Link do perfil copiado!');
                 }}
@@ -6339,6 +6339,140 @@ export default function App() {
     return access;
   };
 
+  const handleViewProfile = async (creatorId: string) => {
+    try {
+      if (profile && creatorId === profile.id) {
+        setScreen('profile');
+        return;
+      }
+      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', creatorId).single();
+      if (profileData) {
+        // Fetch social connections
+        const { data: socialData } = await supabase
+          .from('social_connections')
+          .select('platform, url')
+          .eq('profile_id', creatorId);
+
+        const socialLinks = socialData?.reduce((acc: any, curr: any) => {
+          acc[curr.platform] = curr.url;
+          return acc;
+        }, {});
+
+        setPublicCreator({ ...profileData, social_links: socialLinks } as any);
+        
+        // Fetch access data for the current user
+        let subscribedCreatorIds = new Set<string>();
+        let purchasedPostIds = new Set<string>();
+        
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError && (sessionError.message?.includes('Refresh Token Not Found') || sessionError.message?.includes('Invalid Refresh Token'))) {
+          supabase.auth.signOut();
+        }
+        if (session?.user) {
+          // Fetch active subscriptions
+          const { data: activeSubs } = await supabase
+            .from('subscriptions')
+            .select('creator_id')
+            .eq('user_id', session.user.id)
+            .eq('status', 'active')
+            .gt('end_date', new Date().toISOString());
+          
+          subscribedCreatorIds = new Set(activeSubs?.map(s => s.creator_id) || []);
+
+          // Fetch purchased posts
+          const { data: userPayments, error: paymentsError } = await supabase
+            .from('payments')
+            .select('post_id')
+            .eq('user_id', session.user.id)
+            .eq('status', 'approved');
+          
+          if (paymentsError) {
+            console.warn('Error fetching purchased posts (post_id might be missing):', paymentsError);
+          } else {
+            userPayments?.forEach(p => {
+              if (p.post_id) purchasedPostIds.add(p.post_id);
+            });
+          }
+        }
+
+        // Fetch posts for this creator with likes and comments
+        const { data: postsData } = await supabase
+          .from('secure_posts')
+          .select(`
+            *,
+            creator:profiles(*),
+            post_likes (*),
+            post_comments (*)
+          `)
+          .eq('creator_id', creatorId);
+        
+        const isGlobalAdmin = profile?.role === 'admin' || profile?.role === 'master';
+
+        if (postsData) {
+          const sortedPosts = [...postsData].sort((a, b) => {
+            const dateA = new Date(a.created_at || a.time || 0).getTime();
+            const dateB = new Date(b.created_at || b.time || 0).getTime();
+            return dateB - dateA;
+          });
+          
+          setPublicPosts(sortedPosts.map(p => ({
+            ...p,
+            isLocked: p.is_locked,
+            isVideo: p.is_video,
+            likesCount: p.post_likes?.length || 0,
+            commentsCount: p.post_comments?.length || 0,
+            isLikedByMe: session?.user ? p.post_likes?.some((l: any) => l.user_id === session.user.id) : false,
+            hasAccess: checkAccess(p, session?.user?.id, profile, subscribedCreatorIds)
+          })) as any);
+        }
+        
+        // Update URL to pretty format without query param
+        window.history.pushState(null, '', `/${profileData.username}`);
+        setScreen('public-profile');
+      }
+    } catch (err) {
+      console.error('Error viewing profile:', err);
+    }
+  };
+
+  React.useEffect(() => {
+    localStorage.setItem('novinha_screen', screen);
+    
+    // Clean URL if we navigate away from public profile
+    if (screen !== 'public-profile') {
+      const path = window.location.pathname.slice(1).split('/')[0];
+      const reservedPaths = ['feed', 'profile', 'activity', 'messages', 'login', 'register', 'edit-profile', 'create-post', 'public-profile', 'payment', 'wallet', 'subscriptions', 'chat', 'search', 'admin-dashboard', 'subscriber-area'];
+      if (path && !reservedPaths.includes(path)) {
+        window.history.pushState(null, '', '/');
+      }
+    }
+  }, [screen]);
+
+  // Support for browser back button
+  React.useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const uParam = params.get('u');
+      const path = window.location.pathname.slice(1).split('/')[0];
+      const reservedPaths = ['feed', 'profile', 'activity', 'messages', 'login', 'register', 'edit-profile', 'create-post', 'public-profile', 'payment', 'wallet', 'subscriptions', 'chat', 'search', 'admin-dashboard', 'subscriber-area'];
+      
+      const username = uParam || (path && !reservedPaths.includes(path) ? path : null);
+      if (username) {
+        // Trigger a fetch if we find a username in the path
+        const fetchTarget = async () => {
+          const { data } = await supabase.from('profiles').select('*').eq('username', username).single();
+          if (data) handleViewProfile(data.id);
+        };
+        fetchTarget();
+      } else if (window.location.pathname === '/' || reservedPaths.includes(path)) {
+        setScreen(path as Screen || 'feed');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const fetchData = React.useCallback(async () => {
     if (!user || !profile) {
       setDataLoading(false);
@@ -6776,99 +6910,6 @@ export default function App() {
     }
   };
 
-  const handleViewProfile = async (creatorId: string) => {
-    try {
-      if (profile && creatorId === profile.id) {
-        setScreen('profile');
-        return;
-      }
-      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', creatorId).single();
-      if (profileData) {
-        // Fetch social connections
-        const { data: socialData } = await supabase
-          .from('social_connections')
-          .select('platform, url')
-          .eq('profile_id', creatorId);
-
-        const socialLinks = socialData?.reduce((acc: any, curr: any) => {
-          acc[curr.platform] = curr.url;
-          return acc;
-        }, {});
-
-        setPublicCreator({ ...profileData, social_links: socialLinks } as any);
-        
-        // Fetch access data for the current user
-        let subscribedCreatorIds = new Set<string>();
-        let purchasedPostIds = new Set<string>();
-        
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError && (sessionError.message?.includes('Refresh Token Not Found') || sessionError.message?.includes('Invalid Refresh Token'))) {
-          supabase.auth.signOut();
-        }
-        if (session?.user) {
-          // Fetch active subscriptions
-          const { data: activeSubs } = await supabase
-            .from('subscriptions')
-            .select('creator_id')
-            .eq('user_id', session.user.id)
-            .eq('status', 'active')
-            .gt('end_date', new Date().toISOString());
-          
-          subscribedCreatorIds = new Set(activeSubs?.map(s => s.creator_id) || []);
-
-          // Fetch purchased posts
-          const { data: userPayments, error: paymentsError } = await supabase
-            .from('payments')
-            .select('post_id')
-            .eq('user_id', session.user.id)
-            .eq('status', 'approved');
-          
-          if (paymentsError) {
-            console.warn('Error fetching purchased posts (post_id might be missing):', paymentsError);
-          } else {
-            userPayments?.forEach(p => {
-              if (p.post_id) purchasedPostIds.add(p.post_id);
-            });
-          }
-        }
-
-        // Fetch posts for this creator with likes and comments
-        const { data: postsData } = await supabase
-          .from('secure_posts')
-          .select(`
-            *,
-            creator:profiles(*),
-            post_likes (*),
-            post_comments (*)
-          `)
-          .eq('creator_id', creatorId);
-        
-        const isGlobalAdmin = profile?.role === 'admin' || profile?.role === 'master';
-
-        if (postsData) {
-          const sortedPosts = [...postsData].sort((a, b) => {
-            const dateA = new Date(a.created_at || a.time || 0).getTime();
-            const dateB = new Date(b.created_at || b.time || 0).getTime();
-            return dateB - dateA;
-          });
-          
-          setPublicPosts(sortedPosts.map(p => ({
-            ...p,
-            isLocked: p.is_locked,
-            isVideo: p.is_video,
-            likesCount: p.post_likes?.length || 0,
-            commentsCount: p.post_comments?.length || 0,
-            isLikedByMe: session?.user ? p.post_likes?.some((l: any) => l.user_id === session.user.id) : false,
-            hasAccess: checkAccess(p, session?.user?.id, profile, subscribedCreatorIds)
-          })) as any);
-        }
-        setScreen('public-profile');
-      }
-    } catch (err) {
-      console.error('Error viewing profile:', err);
-    }
-  };
-
   const handleSubscribe = (targetCreator: Creator) => {
     setPublicCreator(targetCreator);
     if (isLoggedIn) {
@@ -7037,7 +7078,11 @@ export default function App() {
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const username = params.get('u');
+    const uParam = params.get('u');
+    const path = window.location.pathname.slice(1).split('/')[0];
+    const reservedPaths = ['feed', 'profile', 'activity', 'messages', 'login', 'register', 'edit-profile', 'create-post', 'public-profile', 'payment', 'wallet', 'subscriptions', 'chat', 'search', 'admin-dashboard', 'subscriber-area'];
+    
+    const username = uParam || (path && !reservedPaths.includes(path) ? path : null);
     
     if (username) {
       const fetchPublicProfile = async () => {
@@ -7412,6 +7457,7 @@ export default function App() {
           showBack={['edit-profile', 'create-post', 'public-profile', 'payment'].includes(screen)} 
           onBack={() => {
             if (screen === 'public-profile') {
+              window.history.pushState(null, '', '/');
               if (isLoggedIn) setScreen('feed');
               else setScreen('login');
             } else if (screen === 'payment') {
