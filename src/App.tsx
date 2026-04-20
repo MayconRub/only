@@ -3120,10 +3120,6 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
   const handleContinue = async () => {
     const finalAmount = amount || parseFloat(customAmount);
     if (!finalAmount || finalAmount <= 0) return;
-    if (!user) {
-      alert('Você precisa estar logado para enviar um mimo.');
-      return;
-    }
 
     setLoading(true);
     try {
@@ -3133,12 +3129,12 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
         body: JSON.stringify({
           amount: finalAmount,
           description: `Mimo para ${creator.name}`,
-          payerEmail: user.email,
-          userId: user.id,
+          payerEmail: user?.email || 'favo@mimo.com',
+          userId: user?.id || null, 
           creatorId: creator.id,
           planId: 'mimo',
           duration: 0,
-          paymentId: paymentId // Reuse existing ID
+          paymentId: paymentId 
         })
       });
 
@@ -3226,7 +3222,7 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
                     ))}
                   </div>
                   
-                  <div className="relative mb-6">
+                  <div className="relative mb-4">
                     <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
                       <span className="text-on-surface/40 font-bold">R$</span>
                     </div>
@@ -3235,14 +3231,14 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
                       placeholder="Outro valor"
                       value={customAmount}
                       onChange={(e) => { setCustomAmount(e.target.value); setAmount(null); }}
-                      className="w-full bg-on-surface/5 border border-transparent rounded-xl py-3 pl-12 pr-4 font-bold text-on-surface focus:outline-none focus:border-pink-500/30 focus:bg-white transition-all"
+                      className="w-full bg-on-surface/5 border border-transparent rounded-xl py-3 pl-12 pr-4 font-bold text-on-surface focus:outline-none focus:border-pink-500/30 focus:bg-white transition-all text-sm"
                     />
                   </div>
 
                   <button
                     onClick={handleContinue}
                     disabled={(!amount && !customAmount) || loading}
-                    className="w-full py-4 bg-pink-500 text-white font-black rounded-xl shadow-lg shadow-pink-500/20 active:scale-95 transition-all uppercase tracking-widest text-xs disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
+                    className="w-full py-4 bg-pink-500 text-white font-black rounded-xl shadow-lg shadow-pink-500/20 active:scale-95 transition-all uppercase tracking-widest text-xs disabled:opacity-30 disabled:active:scale-100 flex items-center justify-center gap-2"
                   >
                     {loading ? (
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

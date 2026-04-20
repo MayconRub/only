@@ -83,7 +83,18 @@ app.post("/api/payments/pix", async (req, res) => {
 
     const supabase = getSupabase();
 
-    if (!userId || !creatorId || isNaN(amount) || amount <= 0) {
+    // Check if it's an anonymous MIMO
+    let effectivelyUserId = userId;
+    let effectivelyEmail = payerEmail;
+    
+    if (!effectivelyUserId && planId === 'mimo') {
+      // For anonymous MIMOs, we use the creator's own ID for the database record
+      // to avoid FK violations, but we'll mark it in metadata
+      effectivelyUserId = creatorId;
+      effectivelyEmail = payerEmail || "anon@mimo.com";
+    }
+
+    if (!effectivelyUserId || !creatorId || isNaN(amount) || amount <= 0) {
       return res.status(400).json({ error: "Dados de pagamento inválidos." });
     }
     
@@ -104,7 +115,7 @@ app.post("/api/payments/pix", async (req, res) => {
       const { data: recentPending } = await supabase
         .from("payments")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", effectivelyUserId)
         .eq("creator_id", creatorId)
         .eq("amount", amount)
         .eq("plan_id", planId)
@@ -124,7 +135,7 @@ app.post("/api/payments/pix", async (req, res) => {
       const { data: newRecord, error: dbError } = await supabase
         .from("payments")
         .insert({
-          user_id: userId,
+          user_id: effectivelyUserId,
           creator_id: creatorId,
           amount: amount,
           plan_id: planId,
@@ -134,7 +145,10 @@ app.post("/api/payments/pix", async (req, res) => {
         .select()
         .single();
 
-      if (dbError || !newRecord) throw new Error("Falha ao registrar pagamento no banco de dados.");
+      if (dbError || !newRecord) {
+        console.error("[PIX] Error creating payment record:", dbError);
+        throw new Error("Falha ao registrar pagamento no banco de dados.");
+      }
       paymentRecord = newRecord;
     }
 
@@ -170,7 +184,13 @@ app.post("/api/payments/pix", async (req, res) => {
           description: (description || "Pagamento").substring(0, 100),
           externalRef: paymentRecord.id,
           idempotencyKey: paymentRecord.id, // CRITICAL: Use our ID as idempotency key
-          metadata: { userId, creatorId, planId }
+          metadata: { 
+            userId: effectivelyUserId, 
+            creatorId, 
+            planId,
+            isAnonymous: !userId,
+            payerEmail: effectivelyEmail
+          }
         });
 
         const timeoutPromise = new Promise((_, reject) => 
@@ -352,11 +372,16 @@ app.post("/api/webhooks/turbofy", async (req, res) => {
               }
 
               // Create a notification for the creator
+              const isAnonymous = paymentRecord.user_id === paymentRecord.creator_id;
               await supabase.from("notifications").insert({
                 user_id: paymentRecord.creator_id,
                 type: "mimo",
-                content: `Você recebeu um mimo de R$ ${paymentRecord.amount}!`,
-                metadata: { amount: paymentRecord.amount, sender_id: paymentRecord.user_id }
+                content: `Você recebeu um mimo de R$ ${paymentRecord.amount}${isAnonymous ? ' de um fã anônimo' : ''}!`,
+                metadata: { 
+                  amount: paymentRecord.amount, 
+                  sender_id: paymentRecord.user_id,
+                  is_anonymous: isAnonymous
+                }
               });
             }
           } else {
