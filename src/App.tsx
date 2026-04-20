@@ -6284,6 +6284,12 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
 export default function App() {
   const { user, profile, loading: authLoading, error: authError, signOut, refreshProfile } = useAuth();
   const [screen, setScreen] = React.useState<Screen>(() => {
+    // Check for public profile URL parameter first
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('u')) return 'public-profile';
+    }
+    
     const saved = localStorage.getItem('novinha_screen');
     if (saved && ['feed', 'profile', 'activity', 'messages', 'edit-profile', 'create-post', 'wallet', 'payment'].includes(saved)) {
       return saved as Screen;
@@ -6297,6 +6303,13 @@ export default function App() {
   const [unreadNotificationsCount, setUnreadNotificationsCount] = React.useState(0);
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [publicCreator, setPublicCreator] = React.useState<Creator | null>(null);
+  const [publicProfileLoading, setPublicProfileLoading] = React.useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return !!params.get('u');
+    }
+    return false;
+  });
   const [publicPosts, setPublicPosts] = React.useState<Post[]>([]);
   const [dataLoading, setDataLoading] = React.useState(true);
   const [showResetButton, setShowResetButton] = React.useState(false);
@@ -7040,80 +7053,87 @@ export default function App() {
     
     if (username) {
       const fetchPublicProfile = async () => {
-        const { data: targetProfile } = await supabase.from('profiles').select('*').eq('username', username).single();
-        if (targetProfile) {
-          // Fetch social connections
-          const { data: socialData } = await supabase
-            .from('social_connections')
-            .select('platform, url')
-            .eq('profile_id', targetProfile.id);
+        setPublicProfileLoading(true);
+        try {
+          const { data: targetProfile } = await supabase.from('profiles').select('*').eq('username', username).single();
+          if (targetProfile) {
+            // Fetch social connections
+            const { data: socialData } = await supabase
+              .from('social_connections')
+              .select('platform, url')
+              .eq('profile_id', targetProfile.id);
 
-          const socialLinks = socialData?.reduce((acc: any, curr: any) => {
-            acc[curr.platform] = curr.url;
-            return acc;
-          }, {});
+            const socialLinks = socialData?.reduce((acc: any, curr: any) => {
+              acc[curr.platform] = curr.url;
+              return acc;
+            }, {});
 
-          setPublicCreator({ ...targetProfile, social_links: socialLinks } as any);
-          let subscribedCreatorIds = new Set<string>();
-          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-          if (sessionError) {
-            console.error('Public profile session check error:', sessionError);
-            if (sessionError.message?.includes('Refresh Token Not Found') || sessionError.message?.includes('Invalid Refresh Token')) {
-              supabase.auth.signOut();
+            setPublicCreator({ ...targetProfile, social_links: socialLinks } as any);
+            let subscribedCreatorIds = new Set<string>();
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError) {
+              console.error('Public profile session check error:', sessionError);
+              if (sessionError.message?.includes('Refresh Token Not Found') || sessionError.message?.includes('Invalid Refresh Token')) {
+                supabase.auth.signOut();
+              }
             }
-          }
-          if (session?.user) {
-             // Fetch active subscriptions
-             const { data: activeSubs } = await supabase
-               .from('subscriptions')
-               .select('creator_id')
-               .eq('user_id', session.user.id)
-               .eq('status', 'active')
-               .gt('end_date', new Date().toISOString());
-             
-             subscribedCreatorIds = new Set(activeSubs?.map(s => s.creator_id) || []);
-          }
+            if (session?.user) {
+               // Fetch active subscriptions
+               const { data: activeSubs } = await supabase
+                 .from('subscriptions')
+                 .select('creator_id')
+                 .eq('user_id', session.user.id)
+                 .eq('status', 'active')
+                 .gt('end_date', new Date().toISOString());
+               
+               subscribedCreatorIds = new Set(activeSubs?.map(s => s.creator_id) || []);
+            }
 
-          const { data: posts, error: postsError } = await supabase.from('secure_posts').select('*, creator:profiles(*), post_likes(user_id), post_comments(id)').eq('creator_id', targetProfile.id);
-          
-          const isGlobalAdmin = profile?.role === 'admin' || profile?.role === 'master';
+            const { data: posts, error: postsError } = await supabase.from('secure_posts').select('*, creator:profiles(*), post_likes(user_id), post_comments(id)').eq('creator_id', targetProfile.id);
+            
+            const isGlobalAdmin = profile?.role === 'admin' || profile?.role === 'master';
 
-          if (postsError) {
-            console.error('Error fetching public posts with likes/comments:', postsError);
-            const { data: fallbackPosts } = await supabase.from('secure_posts').select('*, creator:profiles(*)').eq('creator_id', targetProfile.id);
-            if (fallbackPosts) {
-              const sortedFallback = [...fallbackPosts].sort((a, b) => {
+            if (postsError) {
+              console.error('Error fetching public posts with likes/comments:', postsError);
+              const { data: fallbackPosts } = await supabase.from('secure_posts').select('*, creator:profiles(*)').eq('creator_id', targetProfile.id);
+              if (fallbackPosts) {
+                const sortedFallback = [...fallbackPosts].sort((a, b) => {
+                  const dateA = new Date(a.created_at || a.time || 0).getTime();
+                  const dateB = new Date(b.created_at || b.time || 0).getTime();
+                  return dateB - dateA;
+                });
+                setPublicPosts(sortedFallback.map((p: any) => ({
+                  ...p,
+                  isLocked: p.is_locked,
+                  hasAccess: checkAccess(p, session?.user?.id, profile, subscribedCreatorIds),
+                  isVideo: p.is_video,
+                  likesCount: 0,
+                  commentsCount: 0,
+                  isLikedByMe: false
+                })) as any);
+              }
+            } else if (posts) {
+              const sortedPosts = [...posts].sort((a, b) => {
                 const dateA = new Date(a.created_at || a.time || 0).getTime();
                 const dateB = new Date(b.created_at || b.time || 0).getTime();
                 return dateB - dateA;
               });
-              setPublicPosts(sortedFallback.map((p: any) => ({
+              setPublicPosts(sortedPosts.map((p: any) => ({
                 ...p,
                 isLocked: p.is_locked,
                 hasAccess: checkAccess(p, session?.user?.id, profile, subscribedCreatorIds),
                 isVideo: p.is_video,
-                likesCount: 0,
-                commentsCount: 0,
-                isLikedByMe: false
+                likesCount: p.post_likes?.length || 0,
+                commentsCount: p.post_comments?.length || 0,
+                isLikedByMe: p.post_likes?.some((l: any) => l.user_id === session?.user?.id)
               })) as any);
             }
-          } else if (posts) {
-            const sortedPosts = [...posts].sort((a, b) => {
-              const dateA = new Date(a.created_at || a.time || 0).getTime();
-              const dateB = new Date(b.created_at || b.time || 0).getTime();
-              return dateB - dateA;
-            });
-            setPublicPosts(sortedPosts.map((p: any) => ({
-              ...p,
-              isLocked: p.is_locked,
-              hasAccess: checkAccess(p, session?.user?.id, profile, subscribedCreatorIds),
-              isVideo: p.is_video,
-              likesCount: p.post_likes?.length || 0,
-              commentsCount: p.post_comments?.length || 0,
-              isLikedByMe: p.post_likes?.some((l: any) => l.user_id === session?.user?.id)
-            })) as any);
+            setScreen('public-profile');
           }
-          setScreen('public-profile');
+        } catch (err) {
+          console.error('Error in fetchPublicProfile:', err);
+        } finally {
+          setPublicProfileLoading(false);
         }
       };
       fetchPublicProfile();
@@ -7205,6 +7225,14 @@ export default function App() {
   }
 
   const renderScreen = () => {
+    if (publicProfileLoading) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center">
+          <div className="text-primary font-black animate-pulse text-xl tracking-widest mb-8 uppercase">Carregando Perfil...</div>
+        </div>
+      );
+    }
+
     if (!isLoggedIn) {
       if (screen === 'public-profile' && publicCreator) {
         return (
