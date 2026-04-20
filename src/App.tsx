@@ -6285,6 +6285,9 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
 export default function App() {
   const { user, profile, loading: authLoading, error: authError, signOut, refreshProfile } = useAuth();
   const [screen, setScreen] = React.useState<Screen>(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('u')) return 'public-profile';
+    
     const saved = localStorage.getItem('novinha_screen');
     if (saved && ['feed', 'profile', 'activity', 'messages', 'edit-profile', 'create-post', 'wallet', 'payment'].includes(saved)) {
       return saved as Screen;
@@ -7115,6 +7118,8 @@ export default function App() {
             })) as any);
           }
           setScreen('public-profile');
+        } else {
+          setScreen('feed');
         }
       };
       fetchPublicProfile();
@@ -7207,24 +7212,32 @@ export default function App() {
 
   const renderScreen = () => {
     if (!isLoggedIn) {
-      if (screen === 'public-profile' && publicCreator) {
-        return (
-          <ScreenPublicProfile 
-            creator={publicCreator} 
-            posts={publicPosts} 
-            stories={stories}
-            onSubscribe={() => {
-              if (isLoggedIn) {
-                alert('Você já está logado! Processando assinatura...');
-              } else {
-                setScreen('register');
-              }
-            }} 
-            onMessage={() => setScreen('register')}
-            isLoggedIn={isLoggedIn}
-            onNavigate={setScreen}
-          />
-        );
+      if (screen === 'public-profile') {
+        if (publicCreator) {
+          return (
+            <ScreenPublicProfile 
+              creator={publicCreator} 
+              posts={publicPosts} 
+              stories={stories}
+              onSubscribe={() => {
+                if (isLoggedIn) {
+                  alert('Você já está logado! Processando assinatura...');
+                } else {
+                  setScreen('register');
+                }
+              }} 
+              onMessage={() => setScreen('register')}
+              isLoggedIn={isLoggedIn}
+              onNavigate={setScreen}
+            />
+          );
+        } else {
+          return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center">
+              <div className="text-primary font-black animate-pulse text-xl tracking-widest mb-4 uppercase">CARREGANDO PERFIL</div>
+            </div>
+          );
+        }
       }
       if (screen === 'register') {
         return (
@@ -7300,47 +7313,35 @@ export default function App() {
           />
         );
       case 'public-profile': 
-        return publicCreator ? (
-          <ScreenPublicProfile 
-            creator={publicCreator} 
-            posts={publicPosts} 
-            stories={stories}
-            onSubscribe={() => handleSubscribe(publicCreator)} 
-            onLikePost={handleLikePost}
-            onCommentPost={handleCommentPost}
-            onMessage={(c) => {
-              setSelectedRecipient(c);
-              setScreen('chat');
-            }}
-            isLoggedIn={isLoggedIn}
-            onForwardPost={(post) => {
-              console.log('Forwarding post from public profile:', post);
-              setForwardingPost(post);
-            }}
-            onNavigate={setScreen}
-            onFollow={() => fetchData()}
-          />
-        ) : (
-          <ScreenFeed 
-            posts={posts} 
-            stories={stories} 
-            onStoryUpload={handleStoryUpload} 
-            creator={profile} 
-            onDeletePost={handleDeletePost}
-            onUpdatePost={handleUpdatePost}
-            onDeleteStory={handleDeleteStory}
-            onSubscribe={handleSubscribe}
-            isMaster={isMaster}
-            onLikePost={handleLikePost}
-            onCommentPost={handleCommentPost}
-            onViewProfile={handleViewProfile}
-            onRefresh={fetchData}
-            onForwardPost={(post) => {
-              console.log('Forwarding post from feed (else):', post);
-              setForwardingPost(post);
-            }}
-          />
-        );
+        if (publicCreator) {
+          return (
+            <ScreenPublicProfile 
+              creator={publicCreator} 
+              posts={publicPosts} 
+              stories={stories}
+              onSubscribe={() => handleSubscribe(publicCreator)} 
+              onLikePost={handleLikePost}
+              onCommentPost={handleCommentPost}
+              onMessage={(c) => {
+                setSelectedRecipient(c);
+                setScreen('chat');
+              }}
+              isLoggedIn={isLoggedIn}
+              onForwardPost={(post) => {
+                console.log('Forwarding post from public profile:', post);
+                setForwardingPost(post);
+              }}
+              onNavigate={setScreen}
+              onFollow={() => fetchData()}
+            />
+          );
+        } else {
+          return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center">
+              <div className="text-primary font-black animate-pulse text-xl tracking-widest mb-4 uppercase">CARREGANDO PERFIL</div>
+            </div>
+          );
+        }
       case 'activity': 
         console.log('Rendering Activity screen with', notifications.length, 'notifications');
         if (isMaster) {
