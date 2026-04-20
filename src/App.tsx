@@ -192,7 +192,7 @@ const SecureMedia = ({
 
   if (loading) {
     return (
-      <div className={`${className} bg-black flex items-center justify-center`}>
+      <div className={`${className} bg-on-surface/5 flex items-center justify-center`}>
         <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
       </div>
     );
@@ -200,9 +200,9 @@ const SecureMedia = ({
 
   if (error || !url) {
     return (
-      <div className={`${className} bg-black/90 flex flex-col items-center justify-center p-4 text-center text-white`}>
-        <Lock size={24} className="text-white/40 mb-2" />
-        <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">Conteúdo Protegido</p>
+      <div className={`${className} bg-on-surface/5 flex flex-col items-center justify-center p-4 text-center`}>
+        <Lock size={24} className="text-on-surface/20 mb-2" />
+        <p className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">Conteúdo Protegido</p>
       </div>
     );
   }
@@ -210,14 +210,13 @@ const SecureMedia = ({
   if (isVideo) {
     return (
       <video 
-        src={`${url}#t=0.001`} 
+        src={`${url}${url.includes('?') ? '&' : '?'}t=0.001`} 
         className={className} 
         controls={controls}
         autoPlay={autoPlay}
         muted={muted}
         playsInline={playsInline}
         preload="metadata"
-        crossOrigin="anonymous"
       />
     );
   }
@@ -324,13 +323,9 @@ const TopNav = ({
       )}
       <button 
         onClick={onProfileClick}
-        className="w-9 h-9 rounded-full overflow-hidden border border-primary/10 active:scale-95 transition-transform bg-on-surface/5 flex items-center justify-center"
+        className="w-9 h-9 rounded-full overflow-hidden border border-primary/10 active:scale-95 transition-transform"
       >
-        {avatar ? (
-          <img src={avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-        ) : (
-          <User size={18} className="text-on-surface/40" />
-        )}
+        <img src={avatar || ELENA.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
       </button>
     </div>
   </header>
@@ -1369,15 +1364,10 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
                   {mimos.map((mimo, index) => (
                     <div key={mimo.id} className={`p-4 flex items-center justify-between ${index !== mimos.length - 1 ? 'border-b border-primary/5' : ''}`}>
                       <div className="flex items-center gap-3">
-                        <img 
-                          src={mimo.profiles?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${mimo.id}`} 
-                          alt={mimo.profiles?.name || 'Visitante'} 
-                          className="w-10 h-10 rounded-full object-cover bg-primary/5" 
-                          referrerPolicy="no-referrer" 
-                        />
+                        <img src={mimo.profiles?.avatar} alt={mimo.profiles?.name} className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
                         <div>
-                          <p className="font-bold text-sm text-on-surface">{mimo.profiles?.name || 'Visitante'}</p>
-                          <p className="text-[10px] text-on-surface/60 font-medium">@{mimo.profiles?.username || 'visitante'} • {new Date(mimo.created_at).toLocaleDateString('pt-BR')}</p>
+                          <p className="font-bold text-sm text-on-surface">{mimo.profiles?.name || 'Usuário'}</p>
+                          <p className="text-[10px] text-on-surface/60 font-medium">@{mimo.profiles?.username || 'usuario'} • {new Date(mimo.created_at).toLocaleDateString('pt-BR')}</p>
                         </div>
                       </div>
                       <div className="text-right">
@@ -2335,7 +2325,7 @@ const ScreenFeed = ({
         }} 
         onDelete={onDeletePost}
         onEdit={setEditingPost}
-        currentUserId={creator?.id}
+        currentUserId={creator.id}
         onLike={onLikePost}
         onComment={onCommentPost}
         onForward={onForwardPost}
@@ -2368,7 +2358,7 @@ const ScreenFeed = ({
             >
               <div className="relative p-[3px] rounded-full story-ring">
                 <div className="p-0.5 bg-white rounded-full">
-                  <img src={creator?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=guest'} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
+                  <img src={creator?.avatar} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
                 </div>
                 <div className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 border-2 border-white">
                   <PlusCircle size={14} />
@@ -2398,7 +2388,7 @@ const ScreenFeed = ({
     <div className="space-y-4 py-4">
       {posts.length > 0 ? (
         posts.map(post => {
-          const isOwner = post.creator?.id === creator?.id && creator?.id !== undefined;
+          const isOwner = post.creator.id === creator.id;
           
           return (
             <article key={post.id} className="bg-white shadow-sm">
@@ -2461,7 +2451,7 @@ const ScreenFeed = ({
             </div>
           
           <div 
-            className="aspect-square relative overflow-hidden bg-black cursor-pointer"
+            className="aspect-square relative overflow-hidden bg-on-surface/5 cursor-pointer"
             onClick={() => {
               if (post.hasAccess) {
                 setSelectedPost(post);
@@ -3010,7 +3000,7 @@ const ScreenProfile = ({
               {myPosts.map((post) => (
                 <div 
                   key={post.id} 
-                  className="relative aspect-square overflow-hidden rounded-2xl bg-black shadow-sm group cursor-pointer"
+                  className="relative aspect-square overflow-hidden rounded-2xl bg-on-surface/5 shadow-sm group cursor-pointer"
                   onClick={() => {
                     if (post.hasAccess) {
                       setSelectedPost(post);
@@ -3130,6 +3120,10 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
   const handleContinue = async () => {
     const finalAmount = amount || parseFloat(customAmount);
     if (!finalAmount || finalAmount <= 0) return;
+    if (!user) {
+      alert('Você precisa estar logado para enviar um mimo.');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -3139,8 +3133,8 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
         body: JSON.stringify({
           amount: finalAmount,
           description: `Mimo para ${creator.name}`,
-          payerEmail: user?.email || 'visitante@novinha.job',
-          userId: user?.id || null,
+          payerEmail: user.email,
+          userId: user.id,
           creatorId: creator.id,
           planId: 'mimo',
           duration: 0,
@@ -3642,7 +3636,7 @@ const ScreenPublicProfile = ({
           {myPosts.map((post) => (
             <div 
               key={post.id} 
-              className="relative aspect-square overflow-hidden rounded-2xl bg-black shadow-sm group cursor-pointer"
+              className="relative aspect-square overflow-hidden rounded-2xl bg-on-surface/5 shadow-sm group cursor-pointer"
               onClick={() => {
                 if (!post.hasAccess) onSubscribe();
                 else {
@@ -6290,9 +6284,6 @@ const ScreenPayment = ({ onBack, creator }: { onBack: () => void, creator: Creat
 export default function App() {
   const { user, profile, loading: authLoading, error: authError, signOut, refreshProfile } = useAuth();
   const [screen, setScreen] = React.useState<Screen>(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('u')) return 'public-profile';
-    
     const saved = localStorage.getItem('novinha_screen');
     if (saved && ['feed', 'profile', 'activity', 'messages', 'edit-profile', 'create-post', 'wallet', 'payment'].includes(saved)) {
       return saved as Screen;
@@ -6348,10 +6339,15 @@ export default function App() {
   };
 
   const fetchData = React.useCallback(async () => {
+    if (!user || !profile) {
+      setDataLoading(false);
+      return;
+    }
+    
     setDataLoading(true);
     setFetchError(null);
     try {
-      console.log('Fetching data. User logged in:', !!user);
+      console.log('Fetching data for user:', user.id);
       
       // Get master profile ID for filtering
       let masterId = null;
@@ -6363,30 +6359,44 @@ export default function App() {
           .limit(1)
           .maybeSingle();
         masterId = masterProfile?.id;
+        console.log('Master ID found:', masterId);
       } catch (e) {
         console.log('Master profile not found');
       }
 
       // Fetch followed creators
       let followedCreatorIds: string[] = [];
-      if (profile) {
-        try {
-          const { data: follows, error: followsError } = await supabase
-            .from('follows')
-            .select('following_id')
-            .eq('follower_id', profile.id);
-          
-          if (followsError) throw followsError;
-          followedCreatorIds = follows?.map(f => f.following_id) || [];
-        } catch (err) {
-          console.warn('Error fetching follows:', err);
-        }
+      try {
+        const { data: follows, error: followsError } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', profile.id);
+        
+        if (followsError) throw followsError;
+        followedCreatorIds = follows?.map(f => f.following_id) || [];
+        console.log('Followed creators found:', followedCreatorIds);
+      } catch (err) {
+        console.warn('Error fetching follows:', err);
       }
 
       // Fetch posts with likes and comments
       let postsData: any[] = [];
       
       try {
+        // Construct relevant IDs for initial filtering
+        const relevantIds = [profile.id];
+        if (masterId) relevantIds.push(masterId);
+        if (followedCreatorIds.length > 0) {
+          followedCreatorIds.forEach(id => {
+            if (id && !relevantIds.includes(id)) relevantIds.push(id);
+          });
+        }
+        
+        console.log('Current User ID:', profile.id);
+        console.log('Master ID:', masterId);
+        console.log('Followed IDs:', followedCreatorIds);
+        console.log('Fetching posts for relevant IDs:', relevantIds);
+
         let query = supabase
           .from('secure_posts')
           .select(`
@@ -6396,23 +6406,14 @@ export default function App() {
             post_comments (*, profiles:user_id (*))
           `);
         
-        // Non-logged users see all (public discovery)
-        // Logged users see relevant ones unless admin
-        if (profile && !isGlobalAdmin) {
-          const relevantIds = [profile.id];
-          if (masterId) relevantIds.push(masterId);
-          if (followedCreatorIds.length > 0) {
-            followedCreatorIds.forEach(id => {
-              if (id && !relevantIds.includes(id)) relevantIds.push(id);
-            });
-          }
-          query = query.in('creator_id', relevantIds);
-        }
+        // Filter at DB level for performance, but fallback to all if needed
+        query = query.in('creator_id', relevantIds);
 
         const { data, error } = await query;
         
         if (error) throw error;
         postsData = data || [];
+        console.log(`Fetched ${postsData.length} posts from DB`);
       } catch (err: any) {
         console.warn('Filtered posts query failed, trying all posts:', err.message);
         const { data, error } = await supabase
@@ -6424,8 +6425,12 @@ export default function App() {
             post_comments (*, profiles:user_id (*))
           `);
         
-        if (error) throw error;
+        if (error) {
+          console.error('All posts query also failed:', error);
+          throw error;
+        }
         postsData = data || [];
+        console.log(`Fetched ${postsData.length} posts from fallback query`);
       }
       
       // Sort posts in JS
@@ -6435,17 +6440,21 @@ export default function App() {
         return dateB - dateA;
       });
 
-      // Filter
-      let filteredPostsData = postsData;
-      if (profile && !isGlobalAdmin) {
-        filteredPostsData = postsData.filter((p: any) => {
-          if (p.creator_id === profile.id) return true;
-          if (followedCreatorIds.includes(p.creator_id)) return true;
-          if (!masterId) return true;
-          if (p.creator_id === masterId) return true;
-          return false;
-        });
-      }
+      // Final filter in JS to ensure user only sees what they should
+      const filteredPostsData = postsData.filter((p: any) => {
+        // 1. Admins see everything
+        if (isGlobalAdmin) return true;
+        // 2. Users see their own posts
+        if (p.creator_id === profile.id) return true;
+        // 3. Users see posts from creators they follow
+        if (followedCreatorIds.includes(p.creator_id)) return true;
+        // 4. If no masterId is defined, show everything (discovery mode)
+        if (!masterId) return true;
+        // 5. Always show master's posts
+        if (p.creator_id === masterId) return true;
+        
+        return false;
+      });
 
       console.log(`After filtering, ${filteredPostsData.length} posts remain`);
       if (filteredPostsData.length === 0 && postsData.length > 0) {
@@ -7105,8 +7114,6 @@ export default function App() {
             })) as any);
           }
           setScreen('public-profile');
-        } else {
-          setScreen('feed');
         }
       };
       fetchPublicProfile();
@@ -7199,34 +7206,25 @@ export default function App() {
 
   const renderScreen = () => {
     if (!isLoggedIn) {
-      if (screen === 'public-profile') {
-        if (publicCreator) {
-          return (
-            <ScreenPublicProfile 
-              creator={publicCreator} 
-              posts={publicPosts} 
-              stories={stories}
-              onSubscribe={() => {
-                if (isLoggedIn) {
-                  alert('Você já está logado! Processando assinatura...');
-                } else {
-                  setScreen('register');
-                }
-              }} 
-              onMessage={() => setScreen('register')}
-              isLoggedIn={isLoggedIn}
-              onNavigate={setScreen}
-            />
-          );
-        } else {
-          return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center">
-              <div className="text-primary font-black animate-pulse text-xl tracking-widest mb-4 uppercase">CARREGANDO PERFIL</div>
-            </div>
-          );
-        }
+      if (screen === 'public-profile' && publicCreator) {
+        return (
+          <ScreenPublicProfile 
+            creator={publicCreator} 
+            posts={publicPosts} 
+            stories={stories}
+            onSubscribe={() => {
+              if (isLoggedIn) {
+                alert('Você já está logado! Processando assinatura...');
+              } else {
+                setScreen('register');
+              }
+            }} 
+            onMessage={() => setScreen('register')}
+            isLoggedIn={isLoggedIn}
+            onNavigate={setScreen}
+          />
+        );
       }
-      
       if (screen === 'register') {
         return (
           <ScreenRegister 
@@ -7301,35 +7299,47 @@ export default function App() {
           />
         );
       case 'public-profile': 
-        if (publicCreator) {
-          return (
-            <ScreenPublicProfile 
-              creator={publicCreator} 
-              posts={publicPosts} 
-              stories={stories}
-              onSubscribe={() => handleSubscribe(publicCreator)} 
-              onLikePost={handleLikePost}
-              onCommentPost={handleCommentPost}
-              onMessage={(c) => {
-                setSelectedRecipient(c);
-                setScreen('chat');
-              }}
-              isLoggedIn={isLoggedIn}
-              onForwardPost={(post) => {
-                console.log('Forwarding post from public profile:', post);
-                setForwardingPost(post);
-              }}
-              onNavigate={setScreen}
-              onFollow={() => fetchData()}
-            />
-          );
-        } else {
-          return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center">
-              <div className="text-primary font-black animate-pulse text-xl tracking-widest mb-4 uppercase">CARREGANDO PERFIL</div>
-            </div>
-          );
-        }
+        return publicCreator ? (
+          <ScreenPublicProfile 
+            creator={publicCreator} 
+            posts={publicPosts} 
+            stories={stories}
+            onSubscribe={() => handleSubscribe(publicCreator)} 
+            onLikePost={handleLikePost}
+            onCommentPost={handleCommentPost}
+            onMessage={(c) => {
+              setSelectedRecipient(c);
+              setScreen('chat');
+            }}
+            isLoggedIn={isLoggedIn}
+            onForwardPost={(post) => {
+              console.log('Forwarding post from public profile:', post);
+              setForwardingPost(post);
+            }}
+            onNavigate={setScreen}
+            onFollow={() => fetchData()}
+          />
+        ) : (
+          <ScreenFeed 
+            posts={posts} 
+            stories={stories} 
+            onStoryUpload={handleStoryUpload} 
+            creator={profile} 
+            onDeletePost={handleDeletePost}
+            onUpdatePost={handleUpdatePost}
+            onDeleteStory={handleDeleteStory}
+            onSubscribe={handleSubscribe}
+            isMaster={isMaster}
+            onLikePost={handleLikePost}
+            onCommentPost={handleCommentPost}
+            onViewProfile={handleViewProfile}
+            onRefresh={fetchData}
+            onForwardPost={(post) => {
+              console.log('Forwarding post from feed (else):', post);
+              setForwardingPost(post);
+            }}
+          />
+        );
       case 'activity': 
         console.log('Rendering Activity screen with', notifications.length, 'notifications');
         if (isMaster) {
@@ -7388,7 +7398,7 @@ export default function App() {
     return 'Novinha do JOB MOC';
   };
 
-  const showNav = isLoggedIn && !['edit-profile', 'create-post', 'public-profile', 'payment', 'login', 'register'].includes(screen);
+  const showNav = isLoggedIn && !['edit-profile', 'create-post', 'public-profile', 'payment'].includes(screen);
   const showTopNav = (isLoggedIn || screen === 'public-profile' || screen === 'payment') && !['login', 'register'].includes(screen);
 
   const unreadMessagesCount = messages.reduce((acc, m) => acc + (m.unreadCount || 0), 0);
