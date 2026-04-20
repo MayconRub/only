@@ -7055,7 +7055,7 @@ export default function App() {
       const fetchPublicProfile = async () => {
         setPublicProfileLoading(true);
         try {
-          const { data: targetProfile } = await supabase.from('profiles').select('*').eq('username', username).single();
+          const { data: targetProfile } = await supabase.from('profiles').select('*').ilike('username', username).single();
           if (targetProfile) {
             // Fetch social connections
             const { data: socialData } = await supabase
@@ -7234,23 +7234,38 @@ export default function App() {
     }
 
     if (!isLoggedIn) {
-      if (screen === 'public-profile' && publicCreator) {
+      if (screen === 'public-profile') {
+        if (publicCreator) {
+          return (
+            <ScreenPublicProfile 
+              creator={publicCreator} 
+              posts={publicPosts} 
+              stories={stories}
+              onSubscribe={() => setScreen('register')} 
+              onMessage={() => setScreen('register')}
+              isLoggedIn={isLoggedIn}
+              onNavigate={setScreen}
+              onLikePost={handleLikePost}
+              onCommentPost={handleCommentPost}
+            />
+          );
+        }
         return (
-          <ScreenPublicProfile 
-            creator={publicCreator} 
-            posts={publicPosts} 
-            stories={stories}
-            onSubscribe={() => {
-              if (isLoggedIn) {
-                alert('Você já está logado! Processando assinatura...');
-              } else {
-                setScreen('register');
-              }
-            }} 
-            onMessage={() => setScreen('register')}
-            isLoggedIn={isLoggedIn}
-            onNavigate={setScreen}
-          />
+          <div className="min-h-screen flex flex-col items-center justify-center bg-background p-8 text-center">
+            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center text-primary mb-6">
+              <User size={40} />
+            </div>
+            <h1 className="text-2xl font-black mb-2 uppercase tracking-tight">Criador não encontrado</h1>
+            <p className="text-on-surface/60 font-medium mb-8 max-w-[280px]">
+              O perfil que você está procurando não foi encontrado ou o link está incorreto.
+            </p>
+            <button 
+              onClick={() => setScreen('login')}
+              className="w-full max-w-[200px] py-4 bg-primary text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all text-xs uppercase tracking-widest"
+            >
+              Ir para o Início
+            </button>
+          </div>
         );
       }
       if (screen === 'register') {
