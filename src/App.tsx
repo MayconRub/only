@@ -324,9 +324,13 @@ const TopNav = ({
       )}
       <button 
         onClick={onProfileClick}
-        className="w-9 h-9 rounded-full overflow-hidden border border-primary/10 active:scale-95 transition-transform"
+        className="w-9 h-9 rounded-full overflow-hidden border border-primary/10 active:scale-95 transition-transform bg-on-surface/5 flex items-center justify-center"
       >
-        <img src={avatar || ELENA.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+        {avatar ? (
+          <img src={avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+        ) : (
+          <User size={18} className="text-on-surface/40" />
+        )}
       </button>
     </div>
   </header>
@@ -2331,7 +2335,7 @@ const ScreenFeed = ({
         }} 
         onDelete={onDeletePost}
         onEdit={setEditingPost}
-        currentUserId={creator.id}
+        currentUserId={creator?.id}
         onLike={onLikePost}
         onComment={onCommentPost}
         onForward={onForwardPost}
@@ -2364,7 +2368,7 @@ const ScreenFeed = ({
             >
               <div className="relative p-[3px] rounded-full story-ring">
                 <div className="p-0.5 bg-white rounded-full">
-                  <img src={creator?.avatar} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
+                  <img src={creator?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=guest'} className="w-16 h-16 rounded-full object-cover" referrerPolicy="no-referrer" />
                 </div>
                 <div className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 border-2 border-white">
                   <PlusCircle size={14} />
@@ -2394,7 +2398,7 @@ const ScreenFeed = ({
     <div className="space-y-4 py-4">
       {posts.length > 0 ? (
         posts.map(post => {
-          const isOwner = post.creator.id === creator.id;
+          const isOwner = post.creator?.id === creator?.id && creator?.id !== undefined;
           
           return (
             <article key={post.id} className="bg-white shadow-sm">
@@ -6344,15 +6348,10 @@ export default function App() {
   };
 
   const fetchData = React.useCallback(async () => {
-    if (!user || !profile) {
-      setDataLoading(false);
-      return;
-    }
-    
     setDataLoading(true);
     setFetchError(null);
     try {
-      console.log('Fetching data for user:', user.id);
+      console.log('Fetching data. User logged in:', !!user);
       
       // Get master profile ID for filtering
       let masterId = null;
@@ -6364,44 +6363,30 @@ export default function App() {
           .limit(1)
           .maybeSingle();
         masterId = masterProfile?.id;
-        console.log('Master ID found:', masterId);
       } catch (e) {
         console.log('Master profile not found');
       }
 
       // Fetch followed creators
       let followedCreatorIds: string[] = [];
-      try {
-        const { data: follows, error: followsError } = await supabase
-          .from('follows')
-          .select('following_id')
-          .eq('follower_id', profile.id);
-        
-        if (followsError) throw followsError;
-        followedCreatorIds = follows?.map(f => f.following_id) || [];
-        console.log('Followed creators found:', followedCreatorIds);
-      } catch (err) {
-        console.warn('Error fetching follows:', err);
+      if (profile) {
+        try {
+          const { data: follows, error: followsError } = await supabase
+            .from('follows')
+            .select('following_id')
+            .eq('follower_id', profile.id);
+          
+          if (followsError) throw followsError;
+          followedCreatorIds = follows?.map(f => f.following_id) || [];
+        } catch (err) {
+          console.warn('Error fetching follows:', err);
+        }
       }
 
       // Fetch posts with likes and comments
       let postsData: any[] = [];
       
       try {
-        // Construct relevant IDs for initial filtering
-        const relevantIds = [profile.id];
-        if (masterId) relevantIds.push(masterId);
-        if (followedCreatorIds.length > 0) {
-          followedCreatorIds.forEach(id => {
-            if (id && !relevantIds.includes(id)) relevantIds.push(id);
-          });
-        }
-        
-        console.log('Current User ID:', profile.id);
-        console.log('Master ID:', masterId);
-        console.log('Followed IDs:', followedCreatorIds);
-        console.log('Fetching posts for relevant IDs:', relevantIds);
-
         let query = supabase
           .from('secure_posts')
           .select(`
@@ -6411,14 +6396,23 @@ export default function App() {
             post_comments (*, profiles:user_id (*))
           `);
         
-        // Filter at DB level for performance, but fallback to all if needed
-        query = query.in('creator_id', relevantIds);
+        // Non-logged users see all (public discovery)
+        // Logged users see relevant ones unless admin
+        if (profile && !isGlobalAdmin) {
+          const relevantIds = [profile.id];
+          if (masterId) relevantIds.push(masterId);
+          if (followedCreatorIds.length > 0) {
+            followedCreatorIds.forEach(id => {
+              if (id && !relevantIds.includes(id)) relevantIds.push(id);
+            });
+          }
+          query = query.in('creator_id', relevantIds);
+        }
 
         const { data, error } = await query;
         
         if (error) throw error;
         postsData = data || [];
-        console.log(`Fetched ${postsData.length} posts from DB`);
       } catch (err: any) {
         console.warn('Filtered posts query failed, trying all posts:', err.message);
         const { data, error } = await supabase
@@ -6430,12 +6424,8 @@ export default function App() {
             post_comments (*, profiles:user_id (*))
           `);
         
-        if (error) {
-          console.error('All posts query also failed:', error);
-          throw error;
-        }
+        if (error) throw error;
         postsData = data || [];
-        console.log(`Fetched ${postsData.length} posts from fallback query`);
       }
       
       // Sort posts in JS
@@ -6445,21 +6435,17 @@ export default function App() {
         return dateB - dateA;
       });
 
-      // Final filter in JS to ensure user only sees what they should
-      const filteredPostsData = postsData.filter((p: any) => {
-        // 1. Admins see everything
-        if (isGlobalAdmin) return true;
-        // 2. Users see their own posts
-        if (p.creator_id === profile.id) return true;
-        // 3. Users see posts from creators they follow
-        if (followedCreatorIds.includes(p.creator_id)) return true;
-        // 4. If no masterId is defined, show everything (discovery mode)
-        if (!masterId) return true;
-        // 5. Always show master's posts
-        if (p.creator_id === masterId) return true;
-        
-        return false;
-      });
+      // Filter
+      let filteredPostsData = postsData;
+      if (profile && !isGlobalAdmin) {
+        filteredPostsData = postsData.filter((p: any) => {
+          if (p.creator_id === profile.id) return true;
+          if (followedCreatorIds.includes(p.creator_id)) return true;
+          if (!masterId) return true;
+          if (p.creator_id === masterId) return true;
+          return false;
+        });
+      }
 
       console.log(`After filtering, ${filteredPostsData.length} posts remain`);
       if (filteredPostsData.length === 0 && postsData.length > 0) {
@@ -7240,6 +7226,7 @@ export default function App() {
           );
         }
       }
+      
       if (screen === 'register') {
         return (
           <ScreenRegister 
@@ -7401,7 +7388,7 @@ export default function App() {
     return 'Novinha do JOB MOC';
   };
 
-  const showNav = isLoggedIn && !['edit-profile', 'create-post', 'public-profile', 'payment'].includes(screen);
+  const showNav = isLoggedIn && !['edit-profile', 'create-post', 'public-profile', 'payment', 'login', 'register'].includes(screen);
   const showTopNav = (isLoggedIn || screen === 'public-profile' || screen === 'payment') && !['login', 'register'].includes(screen);
 
   const unreadMessagesCount = messages.reduce((acc, m) => acc + (m.unreadCount || 0), 0);
