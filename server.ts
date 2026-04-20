@@ -83,8 +83,13 @@ app.post("/api/payments/pix", async (req, res) => {
 
     const supabase = getSupabase();
 
-    if (!userId || !creatorId || isNaN(amount) || amount <= 0) {
+    if (!creatorId || isNaN(amount) || amount <= 0) {
       return res.status(400).json({ error: "Dados de pagamento inválidos." });
+    }
+    
+    // For "mimo", userId is optional (guests can send mimos)
+    if (planId !== 'mimo' && !userId) {
+      return res.status(400).json({ error: "ID do usuário é obrigatório para assinaturas." });
     }
     
     // SURGICAL IDEMPOTENCY: Check for existing pending payment first
@@ -100,7 +105,7 @@ app.post("/api/payments/pix", async (req, res) => {
       paymentRecord = existing;
     }
 
-    if (!paymentRecord) {
+    if (!paymentRecord && userId) {
       const { data: recentPending } = await supabase
         .from("payments")
         .select("*")

@@ -1365,10 +1365,15 @@ const ScreenWallet = ({ onBack, isMaster }: { onBack: () => void, isMaster: bool
                   {mimos.map((mimo, index) => (
                     <div key={mimo.id} className={`p-4 flex items-center justify-between ${index !== mimos.length - 1 ? 'border-b border-primary/5' : ''}`}>
                       <div className="flex items-center gap-3">
-                        <img src={mimo.profiles?.avatar} alt={mimo.profiles?.name} className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
+                        <img 
+                          src={mimo.profiles?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${mimo.id}`} 
+                          alt={mimo.profiles?.name || 'Visitante'} 
+                          className="w-10 h-10 rounded-full object-cover bg-primary/5" 
+                          referrerPolicy="no-referrer" 
+                        />
                         <div>
-                          <p className="font-bold text-sm text-on-surface">{mimo.profiles?.name || 'Usuário'}</p>
-                          <p className="text-[10px] text-on-surface/60 font-medium">@{mimo.profiles?.username || 'usuario'} • {new Date(mimo.created_at).toLocaleDateString('pt-BR')}</p>
+                          <p className="font-bold text-sm text-on-surface">{mimo.profiles?.name || 'Visitante'}</p>
+                          <p className="text-[10px] text-on-surface/60 font-medium">@{mimo.profiles?.username || 'visitante'} • {new Date(mimo.created_at).toLocaleDateString('pt-BR')}</p>
                         </div>
                       </div>
                       <div className="text-right">
@@ -3121,10 +3126,6 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
   const handleContinue = async () => {
     const finalAmount = amount || parseFloat(customAmount);
     if (!finalAmount || finalAmount <= 0) return;
-    if (!user) {
-      alert('Você precisa estar logado para enviar um mimo.');
-      return;
-    }
 
     setLoading(true);
     try {
@@ -3134,8 +3135,8 @@ const MimoModal = ({ isOpen, onClose, creator }: { isOpen: boolean, onClose: () 
         body: JSON.stringify({
           amount: finalAmount,
           description: `Mimo para ${creator.name}`,
-          payerEmail: user.email,
-          userId: user.id,
+          payerEmail: user?.email || 'visitante@novinha.job',
+          userId: user?.id || null,
           creatorId: creator.id,
           planId: 'mimo',
           duration: 0,
